@@ -1,0 +1,11 @@
+{
+  "profit_summary": {
+    "total_net_profit": 19089,
+    "total_margin": 35000.0,
+    "total_return_rate": "119.7%",
+    "yearly_return_rate": "31.15%",
+    "yearly_return_profit": 8336
+  },
+  "trade_records": [],
+  "symbol_profit_tracker": {}
+}

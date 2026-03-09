@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BStrategy运行面板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#10b981',
+                        accent: '#f59e0b',
+                        danger: '#ef4444',
+                        dark: '#1e293b',
+                        light: '#f8fafc'
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto { content-visibility: auto; }
+            .card-hover { @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1; }
+            .btn-primary { @apply bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors; }
+        }
+        body {
+            font-size: 0.8rem;
+        }
+        h1 {
+            font-size: 1.5rem;
+        }
+        h2 {
+            font-size: 1.3rem;
+        }
+        h3 {
+            font-size: 1.1rem;
+        }
+        .text-2xl {
+            font-size: 1.25rem;
+        }
+        .text-xl {
+            font-size: 1.125rem;
+        }
+        .text-lg {
+            font-size: 1rem;
+        }
+        .text-md {
+            font-size: 0.9rem;
+        }
+        .text-sm {
+            font-size: 0.75rem;
+        }
+        .text-xs {
+            font-size: 0.675rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <header class="bg-white shadow-md sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-3 flex flex-col md:flex-row items-start md:items-center">
+            <div class="flex items-center mb-3 md:mb-0">
+                <div class="flex items-center mr-6">
+                    <span class="text-sm font-semibold text-gray-700 mr-2">市场周期:</span>
+                    <span class="px-3 py-1 rounded-full text-sm font-semibold flex items-center" id="market-cycle">
+                        <i class="fa fa-arrow-down mr-1"></i> 熊
+                    </span>
+                </div>
+                <div class="flex items-center">
+                    <span class="text-sm font-semibold text-gray-700 mr-2">BTC价格:</span>
+                    <span class="text-sm font-bold text-dark" id="btc-price">$68,000.00</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-8">
+        <!-- 策略盈亏摘要 -->
+        <section class="mb-12">
+            <div class="bg-white rounded-xl shadow-md p-6">
+                <h3 class="text-xl font-semibold text-dark mb-4">策略盈亏摘要</h3>
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-500 mb-1">当前总资金</div>
+                        <div class="text-lg font-bold text-dark" id="total-margin">0.00 USDT</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-500 mb-1">累计净收益</div>
+                        <div class="text-lg font-bold text-green-600" id="total-net-profit">0.00 USDT</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-500 mb-1">总收益率</div>
+                        <div class="text-lg font-bold text-green-600" id="total-return-rate">0.00%</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-500 mb-1">本年收益率</div>
+                        <div class="text-lg font-bold text-green-600" id="yearly-return-rate">0.00%</div>
+                    </div>
+                     <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-500 mb-1">本年净收益</div>
+                        <div class="text-lg font-bold text-green-600" id="yearly-return-profit">0.00 USDT</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4H多空策略模块 -->
+        <section class="mb-12 bg-gray-100 rounded-xl p-6">
+            <div class="mb-6">
+                <div class="flex items-center mb-3">
+                    <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                        <i class="fa fa-signal text-primary text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-dark">4H多空策略</h3>
+                </div>
+                <p class="text-gray-600 mb-3">TradingView策略,做多/做空</p>
+                <div class="flex items-center mb-4">
+                    <span class="text-xs font-medium text-gray-500 mr-2">状态:</span>
+                    <span class="px-2 py-1 rounded-full text-xs font-semibold" id="tradingview-status">做空</span>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-md p-6">
+                <h4 class="text-lg font-semibold text-dark mb-4">4H多空策略交易记录</h4>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    交易对
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    方向
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    数量
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    价格
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    信号
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    时间
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="tradingview-tbody">
+                            <tr>
+                                <td colspan="6" class="px-3 py-4 text-center text-gray-500">
+                                    <i class="fa fa-info-circle text-lg mb-1"></i>
+                                    <p>暂无交易记录</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 套利策略模块 -->
+        <section class="mb-12 bg-gray-100 rounded-xl p-6">
+            <div class="mb-6">
+                <div class="flex items-center mb-3">
+                    <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                        <i class="fa fa-exchange text-secondary text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-dark">套利策略</h3>
+                </div>
+                <p class="text-gray-600 mb-3">利用资金费率差异进行套利交易，获取稳定收益。</p>
+                <div class="flex items-center mb-4">
+                    <span class="text-xs font-medium text-gray-500 mr-2">状态:</span>
+                    <span class="px-2 py-1 rounded-full text-xs font-semibold" id="arbitrage-status">运行</span>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-md p-6 mb-6">
+                <h4 class="text-lg font-semibold text-dark mb-4">套利策略盈亏摘要</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-500 mb-1">初始总资金</div>
+                        <div class="text-lg font-bold text-dark" id="arbitrage-initial-funds">1000.00 USDT</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-500 mb-1">累计净收益</div>
+                        <div class="text-lg font-bold text-green-600" id="arbitrage-total-net-profit">0.00 USDT</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-500 mb-1">累计总收益率</div>
+                        <div class="text-lg font-bold text-green-600" id="arbitrage-total-return-rate">0.00%</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-md p-6">
+                <h4 class="text-lg font-semibold text-dark mb-4">套利策略交易记录</h4>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    交易对
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    方向
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    数量
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    开仓价格
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    平仓价格
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    净收益
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="arbitrage-tbody">
+                            <tr>
+                                <td colspan="6" class="px-3 py-4 text-center text-gray-500">
+                                    <i class="fa fa-info-circle text-lg mb-1"></i>
+                                    <p>暂无交易记录</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 摸顶抄底策略模块 -->
+        <section class="mb-12 bg-gray-100 rounded-xl p-6">
+            <div class="mb-6">
+                <div class="flex items-center mb-3">
+                    <div class="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center mr-3">
+                        <i class="fa fa-line-chart text-accent text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-dark">摸顶抄底策略</h3>
+                </div>
+                <p class="text-gray-600 mb-3">周期性操作，根据牛熊转换交易。</p>
+                <div class="flex items-center mb-4">
+                    <span class="text-xs font-medium text-gray-500 mr-2">状态:</span>
+                    <span class="px-2 py-1 rounded-full text-xs font-semibold" id="top-bottom-status">摸顶做空</span>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-md p-6">
+                <h4 class="text-lg font-semibold text-dark mb-3">当前持仓状态</h4>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-500 mb-1">当前仓位状态</div>
+                        <div class="text-md font-bold text-dark" id="top-bottom-status-display">做空</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-500 mb-1">当前仓位数量</div>
+                        <div class="text-md font-bold text-dark" id="top-bottom-quantity"> BTC</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-500 mb-1">当前仓位均价</div>
+                        <div class="text-md font-bold text-dark" id="top-bottom-avg-price"> USDT</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-500 mb-1">浮盈</div>
+                        <div class="text-md font-bold" id="top-bottom-float-profit">0.00 USDT</div>
+                    </div>
+                </div>
+                
+                <h4 class="text-lg font-semibold text-dark mb-4">交易记录</h4>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    建仓时间
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    模式
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    仓位
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    均价
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    是否平仓
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    平仓时间
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    盈亏
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="top-bottom-tbody">
+                            <tr>
+                                <td colspan="7" class="px-3 py-4 text-center text-gray-500">
+                                    <i class="fa fa-info-circle text-lg mb-1"></i>
+                                    <p>暂无交易记录</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 现货策略模块 -->
+        <section class="mb-12 bg-gray-100 rounded-xl p-6">
+            <div class="mb-6">
+                <div class="flex items-center mb-3">
+                    <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mr-3">
+                        <i class="fa fa-shopping-cart text-purple-600 text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-dark">现货策略</h3>
+                </div>
+                <p class="text-gray-600 mb-3">现货市场交易策略，熊市买入牛市卖出。</p>
+                <div class="flex items-center mb-4">
+                    <span class="text-xs font-medium text-gray-500 mr-2">状态:</span>
+                    <span class="px-2 py-1 rounded-full text-xs font-semibold" id="spot-status">空仓</span>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-md p-6">
+                <h4 class="text-lg font-semibold text-dark mb-3">当前持仓状态</h4>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-500 mb-1">当前仓位数量</div>
+                        <div class="text-md font-bold text-dark" id="spot-quantity"> BTC</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-500 mb-1">当前仓位均价</div>
+                        <div class="text-md font-bold text-dark" id="spot-avg-price"> USDT</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-500 mb-1">浮盈</div>
+                        <div class="text-md font-bold" id="spot-float-profit">0.00 USDT</div>
+                    </div>
+                </div>
+                
+                <h4 class="text-lg font-semibold text-dark mb-4">交易记录</h4>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    建仓时间
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    仓位
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    均价
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    是否平仓
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    平仓时间
+                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    盈亏
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="spot-tbody">
+                            <tr>
+                                <td colspan="6" class="px-3 py-4 text-center text-gray-500">
+                                    <i class="fa fa-info-circle text-lg mb-1"></i>
+                                    <p>暂无交易记录</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+         <!-- 交易报告 -->
+        <section class="mb-12">
+            <div class="bg-white rounded-xl shadow-md p-6">
+                <h3 class="text-xl font-semibold text-dark mb-4">交易报告</h3>
+                <div class="space-y-4">
+                    <a href="https://seanbtc.github.io/2025/12/29/2025%E5%B9%B4%E5%BA%A6%E4%BA%A4%E6%98%93%E6%8A%A5%E5%91%8A/" target="_blank" class="block p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+                                <i class="fa fa-file-text text-primary text-xl"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-medium text-dark">2025年度交易报告</h4>
+                                <p class="text-gray-500 text-xs mt-1">发布日期：2025年12月29日</p>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </section>
+        
+    </main>
+
+    <footer class="bg-dark text-white py-6 mt-10">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="flex space-x-3">
+                    <a href="#" class="text-gray-400 hover:text-white"><i class="fa fa-github text-lg"></i></a>
+                    <a href="#" class="text-gray-400 hover:text-white"><i class="fa fa-envelope text-lg"></i></a>
+                    <a href="#" class="text-gray-400 hover:text-white"><i class="fa fa-telegram text-lg"></i></a>
+                </div>
+            </div>
+            <div class="border-t border-gray-700 mt-4 pt-4 text-center text-gray-400 text-sm">
+                <p>&copy; {{ current_datetime.strftime('%Y') }} 项勇·保留一切数据解释权.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // WebSocket连接
+        const socket = io();
+        
+        // 更新TradingView交易记录表格
+        function updateTradingViewTable(data) {
+            const tbody = document.getElementById('tradingview-tbody');
+            if (data.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                            <i class="fa fa-info-circle text-2xl mb-2"></i>
+                            <p>暂无交易记录</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            data.forEach(trade => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50';
+                const symbol = trade.symbol || '-';
+                const side = trade.side || '未知';
+                const quantity = trade.quantity || 0;
+                const price = trade.price || 0;
+                const alertMessage = trade.alert_message ? trade.alert_message.substring(0, 40) + (trade.alert_message.length > 40 ? '...' : '') : '';
+                const timestamp = trade.timestamp || '';
+                const sideClass = (side === 'BUY') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                tr.innerHTML = `
+                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${symbol}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm">
+                        <span class="px-1.5 inline-flex text-xs leading-4 font-semibold rounded-full ${sideClass}">
+                            ${side}
+                        </span>
+                    </td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${quantity}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${price}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${alertMessage}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${timestamp}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        // 更新套利策略交易记录表格
+        function updateArbitrageTable(data) {
+            const tbody = document.getElementById('arbitrage-tbody');
+            // 优先使用 trade_records，如果没有则使用 trade_details
+            let tradeRecords = data.trade_records || [];
+            if (tradeRecords.length === 0 && data.trade_details) {
+                // 从 trade_details 转换为 trade_records 格式
+                tradeRecords = data.trade_details.map(detail => ({
+                    symbol: detail.symbol,
+                    open_side: detail.open_side || '未知', // 默认值
+                    quantity: detail.open_executed_qty || 0,
+                    open_price: detail.open_avg_price || 0,
+                    close_price: detail.close_avg_price || 0,
+                    net_profit: detail.net_profit || 0
+                }));
+            }
+            
+            if (tradeRecords.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                            <i class="fa fa-info-circle text-2xl mb-2"></i>
+                            <p>暂无交易记录</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            tradeRecords.forEach(trade => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50';
+                
+                // 处理交易方向显示
+                const openSide = trade.open_side || '未知';
+                const sideClass = (openSide === 'BUY') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                
+                // 处理数量显示
+                const quantity = trade.quantity || 0;
+                
+                // 处理价格显示
+                const openPrice = trade.open_price || 0;
+                const closePrice = trade.close_price || 0;
+                
+                // 处理净收益显示
+                const netProfit = trade.net_profit || 0;
+                const profitClass = (netProfit >= 0) ? 'green-600' : 'red-600';
+                
+                tr.innerHTML = `
+                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${trade.symbol || '-'}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm">
+                        <span class="px-1.5 inline-flex text-xs leading-4 font-semibold rounded-full ${sideClass}">
+                            ${openSide}
+                        </span>
+                    </td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${quantity}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${openPrice}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${closePrice}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-${profitClass}">${netProfit} USDT</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        // 更新交易对连续盈利次数
+        function updateSymbolProfitTracker(data) {
+            const container = document.getElementById('symbol-profit-tracker');
+            // 检查容器是否存在
+            if (!container) return;
+            
+            const symbolProfitTracker = data.symbol_profit_tracker || {};
+            if (Object.keys(symbolProfitTracker).length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full text-center py-8 text-gray-500">
+                        <i class="fa fa-info-circle text-2xl mb-2"></i>
+                        <p>暂无交易对连续盈利数据</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = '';
+            Object.entries(symbolProfitTracker).forEach(([symbol, count]) => {
+                const div = document.createElement('div');
+                div.className = 'bg-gray-50 rounded-lg p-4';
+                div.innerHTML = `
+                    <div class="text-sm font-medium text-gray-500 mb-1">${symbol}</div>
+                    <div class="text-xl font-bold text-primary">${count}</div>
+                    <div class="text-xs text-gray-500">连续盈利次数</div>
+                `;
+                container.appendChild(div);
+            });
+        }
+        
+        // 更新套利策略盈亏摘要
+        function updateArbitrageSummary(data) {
+            // 检查数据结构，处理两种可能的格式
+            const summary = data.profit_summary || data;
+            
+            // 处理总收益率，确保显示为百分比格式
+            let totalReturnRate = summary.total_return_rate || 0;
+            if (typeof totalReturnRate === 'number') {
+                totalReturnRate = totalReturnRate.toFixed(4) + '%';
+            }
+            
+            // 更新套利策略模块中的盈亏摘要
+            document.getElementById('arbitrage-initial-funds').textContent = (summary.initial_funds || 1000.0) + ' USDT';
+            document.getElementById('arbitrage-total-net-profit').textContent = (summary.total_net_profit || 0).toFixed(4) + ' USDT';
+            document.getElementById('arbitrage-total-return-rate').textContent = totalReturnRate;
+        }
+        
+        // 更新顶部策略盈亏摘要
+        function updateTopSummary(data) {
+            // 使用总盈亏数据
+            const totalProfitSummary = data.total_profit.profit_summary || {};
+            
+            // 处理总收益率，确保显示为百分比格式
+            let totalReturnRate = totalProfitSummary.total_return_rate || 0;
+            if (typeof totalReturnRate === 'number') {
+                totalReturnRate = totalReturnRate.toFixed(4) + '%';
+            }
+            
+            // 处理本年收益率，确保显示为百分比格式
+            let yearlyReturnRate = totalProfitSummary.yearly_return_rate || totalProfitSummary.round_return_rate || 0;
+            if (typeof yearlyReturnRate === 'number') {
+                yearlyReturnRate = yearlyReturnRate.toFixed(4) + '%';
+            }
+            
+            // 处理本年净收益，使用累计净收益作为默认值
+            let yearlyReturnProfit = totalProfitSummary.yearly_return_profit || totalProfitSummary.total_net_profit || 0;
+            
+            // 更新顶部策略盈亏摘要
+            document.getElementById('total-margin').textContent = (totalProfitSummary.total_margin || 0) + ' USD';
+            document.getElementById('total-net-profit').textContent = (totalProfitSummary.total_net_profit || 0) + ' USD';
+            document.getElementById('total-return-rate').textContent = totalReturnRate;
+            document.getElementById('yearly-return-rate').textContent = yearlyReturnRate;
+            document.getElementById('yearly-return-profit').textContent = yearlyReturnProfit + ' USD';
+        }
+        
+        // 更新策略状态
+        function updateStrategyStatus(data) {
+            if (!data.strategy_status) return;
+            
+            const statusMap = {
+                'tradingview': 'tradingview-status',
+                'arbitrage': 'arbitrage-status',
+                'top_bottom': 'top-bottom-status',
+                'spot': 'spot-status'
+            };
+            
+            Object.entries(data.strategy_status).forEach(([strategy, status]) => {
+                const elementId = statusMap[strategy];
+                if (elementId) {
+                    const element = document.getElementById(elementId);
+                    if (element) {
+                        element.textContent = status;
+                        // 根据状态设置不同的颜色
+                        element.className = 'px-2 py-1 rounded-full text-xs font-semibold';
+                        if (status === '做空' || status === '摸顶做空' || status === '运行' || status === '满仓' || status === '建仓' || status === '做多' || status === '抄底做多') {
+                            element.classList.add('bg-green-100', 'text-green-800');
+                        } else if (status === '暂停' || status === '空仓') {
+                            element.classList.add('bg-red-100', 'text-red-800');
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 更新市场数据
+        function updateMarketData(data) {
+            if (!data.market_data) return;
+            
+            const marketData = data.market_data;
+            
+            // 更新市场周期
+            const cycleElement = document.getElementById('market-cycle');
+            if (cycleElement) {
+                // 根据周期设置不同的图标和颜色
+                cycleElement.className = 'px-3 py-1 rounded-full text-sm font-semibold flex items-center';
+                if (marketData.cycle === '牛') {
+                    cycleElement.innerHTML = '<i class="fa fa-arrow-up mr-1"></i> 牛';
+                    cycleElement.classList.add('bg-green-100', 'text-green-800');
+                } else if (marketData.cycle === '熊') {
+                    cycleElement.innerHTML = '<i class="fa fa-arrow-down mr-1"></i> 熊';
+                    cycleElement.classList.add('bg-red-100', 'text-red-800');
+                }
+            }
+            
+            // 不更新BTC价格，保留通过API获取的真实价格
+            // 这样可以避免WebSocket数据覆盖真实价格
+        }
+        
+        // 更新摸顶抄底策略数据
+        function updateTopBottomData(data) {
+            // 检查data是否存在
+            if (!data) return;
+            
+            // 检查数据结构，top_bottom可能是直接在根级别
+            const topBottomData = data.top_bottom || data;
+            
+            if (!topBottomData) return;
+            
+            console.log('摸顶抄底数据:', topBottomData);
+            
+            // 更新仓位状态
+            const statusElement = document.getElementById('top-bottom-status-display');
+            if (statusElement) {
+                statusElement.textContent = topBottomData.position_status || '未知';
+            }
+            
+            // 更新仓位数量
+            const quantityElement = document.getElementById('top-bottom-quantity');
+            if (quantityElement) {
+                quantityElement.textContent = (topBottomData.position_quantity || 0) + ' BTC';
+            }
+            
+            // 更新仓位均价
+            const avgPriceElement = document.getElementById('top-bottom-avg-price');
+            if (avgPriceElement) {
+                const avgPrice = parseFloat(topBottomData.position_avg_price) || 0;
+                avgPriceElement.textContent = avgPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT';
+            }
+            
+            // 计算并更新浮盈
+            calculateFloatProfit(topBottomData);
+        }
+        
+        // 更新摸顶抄底策略交易记录表格
+        function updateTopBottomTable(data) {
+            const tbody = document.getElementById('top-bottom-tbody');
+            // 检查数据结构，top_bottom可能是直接在根级别
+            const topBottomData = data.top_bottom || data;
+            const tradeRecords = topBottomData.trade_records || [];
+            
+            if (tradeRecords.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                            <i class="fa fa-info-circle text-2xl mb-2"></i>
+                            <p>暂无交易记录</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            tradeRecords.forEach(trade => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50';
+                tr.innerHTML = `
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.timestamp || '-'}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm">
+                        <span class="px-1.5 inline-flex text-xs leading-4 font-semibold rounded-full ${(trade.mode === '摸顶做空' || trade.mode === '做空') ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
+                            ${trade.mode || '-'}
+                        </span>
+                    </td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.quantity || 0} BTC</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${(parseFloat(trade.avg_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm">
+                        <span class="px-1.5 inline-flex text-xs leading-4 font-semibold rounded-full ${trade.is_closed ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                            ${trade.is_closed ? '已平仓' : '未平仓'}
+                        </span>
+                    </td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.close_timestamp || '-'}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-${(parseFloat(trade.profit) >= 0) ? 'green-600' : 'red-600'}">${(parseFloat(trade.profit) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        // 计算浮盈
+        function calculateFloatProfit(topBottomData) {
+            // 获取当前BTC价格
+            const priceElement = document.getElementById('btc-price');
+            if (!priceElement) return;
+            
+            const priceText = priceElement.textContent;
+            const currentPrice = parseFloat(priceText.replace('$', '').replace(',', ''));
+            
+            if (isNaN(currentPrice)) return;
+            
+            const positionStatus = topBottomData.position_status;
+            const positionQuantity = topBottomData.position_quantity;
+            const positionAvgPrice = topBottomData.position_avg_price;
+            
+            let floatProfit = 0;
+            
+            // 根据仓位状态计算浮盈
+            if (positionStatus === '摸顶做空' || positionStatus === '做空') {
+                // 做空：(开仓价格 - 当前价格) * 数量
+                floatProfit = (positionAvgPrice - currentPrice) * positionQuantity;
+            } else if (positionStatus === '抄底做多' || positionStatus === '做多') {
+                // 做多：(当前价格 - 开仓价格) * 数量
+                floatProfit = (currentPrice - positionAvgPrice) * positionQuantity;
+            }
+            
+            // 更新浮盈显示
+            const floatProfitElement = document.getElementById('top-bottom-float-profit');
+            if (floatProfitElement) {
+                floatProfitElement.textContent = floatProfit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT';
+                
+                // 根据浮盈正负设置颜色
+                floatProfitElement.className = 'text-md font-bold';
+                if (floatProfit >= 0) {
+                    floatProfitElement.classList.add('text-green-600');
+                } else {
+                    floatProfitElement.classList.add('text-red-600');
+                }
+            }
+        }
+        
+        // 计算现货策略浮盈
+        function calculateSpotFloatProfit(spotData) {
+            // 获取当前BTC价格
+            const priceElement = document.getElementById('btc-price');
+            if (!priceElement) return;
+            
+            const priceText = priceElement.textContent;
+            const currentPrice = parseFloat(priceText.replace('$', '').replace(',', ''));
+            
+            if (isNaN(currentPrice)) return;
+            
+            const positionQuantity = spotData.position_quantity;
+            const positionAvgPrice = spotData.position_avg_price;
+            
+            // 现货策略只有做多
+            const floatProfit = (currentPrice - positionAvgPrice) * positionQuantity;
+            
+            // 更新浮盈显示
+            const floatProfitElement = document.getElementById('spot-float-profit');
+            if (floatProfitElement) {
+                floatProfitElement.textContent = floatProfit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT';
+                
+                // 根据浮盈正负设置颜色
+                floatProfitElement.className = 'text-md font-bold';
+                if (floatProfit >= 0) {
+                    floatProfitElement.classList.add('text-green-600');
+                } else {
+                    floatProfitElement.classList.add('text-red-600');
+                }
+            }
+        }
+        
+        // 更新现货策略数据
+        function updateSpotData(data) {
+            // 检查data是否存在
+            if (!data) return;
+            
+            // 检查数据结构，spot可能是直接在根级别
+            const spotData = data.spot || data;
+            
+            if (!spotData) return;
+            
+            console.log('现货策略数据:', spotData);
+            
+            // 更新仓位数量
+            const quantityElement = document.getElementById('spot-quantity');
+            if (quantityElement) {
+                quantityElement.textContent = (spotData.position_quantity || 0) + ' BTC';
+            }
+            
+            // 更新仓位均价
+            const avgPriceElement = document.getElementById('spot-avg-price');
+            if (avgPriceElement) {
+                const avgPrice = parseFloat(spotData.position_avg_price) || 0;
+                avgPriceElement.textContent = avgPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT';
+            }
+            
+            // 计算并更新浮盈
+            calculateSpotFloatProfit(spotData);
+        }
+        
+        // 更新现货策略交易记录表格
+        function updateSpotTable(data) {
+            const tbody = document.getElementById('spot-tbody');
+            // 检查数据结构，spot可能是直接在根级别
+            const spotData = data.spot || data;
+            const tradeRecords = spotData.trade_records || [];
+            
+            if (tradeRecords.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                            <i class="fa fa-info-circle text-2xl mb-2"></i>
+                            <p>暂无交易记录</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            tradeRecords.forEach(trade => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50';
+                tr.innerHTML = `
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.timestamp || '-'}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.quantity || 0} BTC</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${(parseFloat(trade.avg_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm">
+                        <span class="px-1.5 inline-flex text-xs leading-4 font-semibold rounded-full ${trade.is_closed ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                            ${trade.is_closed ? '已平仓' : '未平仓'}
+                        </span>
+                    </td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.close_timestamp || '-'}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-${(parseFloat(trade.profit) >= 0) ? 'green-600' : 'red-600'}">${(parseFloat(trade.profit) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        // 定期获取BTC价格
+        function fetchBtcPrice() {
+            // 使用Binance API获取BTC/USDT价格
+            fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT')
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.price) {
+                        const price = parseFloat(data.price);
+                        const priceElement = document.getElementById('btc-price');
+                        if (priceElement) {
+                            priceElement.textContent = '$' + price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            
+                            // 价格更新后重新计算浮盈
+                            // 获取策略数据
+                            fetch('/api/get_data')
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.top_bottom) {
+                                        calculateFloatProfit(data.top_bottom);
+                                    }
+                                    if (data.spot) {
+                                        calculateSpotFloatProfit(data.spot);
+                                    }
+                                })
+                                .catch(error => console.error('获取数据失败:', error));
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('获取BTC价格失败:', error);
+                });
+        }
+        
+        // 每30秒更新一次BTC价格
+        setInterval(fetchBtcPrice, 30000);
+        
+        // 页面加载时获取一次BTC价格
+        window.addEventListener('load', fetchBtcPrice);
+        
+        // 接收数据更新
+        socket.on('all_data', function(data) {
+            updateTradingViewTable(data.tradingview);
+            updateArbitrageTable(data.arbitrage);
+            updateArbitrageSummary(data.arbitrage);
+            updateSymbolProfitTracker(data.arbitrage);
+            updateStrategyStatus(data);
+            updateMarketData(data);
+            updateTopBottomData(data);
+            updateTopBottomTable(data);
+            updateSpotData(data);
+            updateSpotTable(data);
+            updateTopSummary(data);
+        })
+        
+        // 页面加载时获取初始数据
+        window.onload = function() {
+            fetch('/api/get_data')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('初始数据:', data);
+                    updateTradingViewTable(data.tradingview);
+                    updateArbitrageTable(data.arbitrage);
+                    updateArbitrageSummary(data.arbitrage);
+                    updateSymbolProfitTracker(data.arbitrage);
+                    updateStrategyStatus(data);
+                    updateMarketData(data);
+                    updateTopBottomData(data);
+                    updateTopBottomTable(data);
+                    updateSpotData(data);
+                    updateSpotTable(data);
+                    updateTopSummary(data);
+                })
+                .catch(error => console.error('获取数据失败:', error));
+        };
+    </script>
+</body>
+</html>

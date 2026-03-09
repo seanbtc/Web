@@ -1,0 +1,17 @@
+{
+  "position_status": "做空",
+  "position_quantity": 0.17,
+  "position_avg_price": 116300,
+  "position_symbol": "BTCUSDT",
+  "trade_records": [
+    {
+      "timestamp": "2025-8至2026-1",
+      "mode": "摸顶做空",
+      "quantity": 0.17,
+      "avg_price": 116300.0,
+      "is_closed": false,
+      "profit": 0.0,
+      "close_timestamp": "-"
+    }
+  ]
+}
