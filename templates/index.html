@@ -97,7 +97,7 @@
                 </div>
                 <div class="flex items-center">
                     <span class="text-sm font-semibold text-gray-700 mr-2">价格:</span>
-                    <span class="text-sm font-bold text-dark" id="btc-price">$68,000.00</span>
+                    <span class="text-sm font-bold text-dark" id="btc-price">$68,888.00</span>
                 </div>
             </div>
             <div class="flex items-center">
@@ -111,7 +111,7 @@
         <section class="mb-12">
             <div class="bg-white rounded-xl shadow-md p-6">
                 <h3 class="text-xl font-semibold text-dark mb-4">策略盈亏摘要</h3>
-                <p class="text-gray-600 mb-3">起点:2025-8</p>
+                <p class="text-gray-600 mb-3">起点:2025年3月</p>
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-3 mb-6">
                     <div class="bg-gray-50 rounded-lg p-3">
                         <div class="text-xs text-gray-500 mb-1">当前总资金</div>
@@ -135,6 +135,28 @@
                     </div>
                 </div>
                 
+                <!-- 盈利曲线 -->
+                <div class="mt-8">
+                    <h4 class="text-lg font-semibold text-dark mb-4">盈利曲线</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <div class="h-80">
+                                <canvas id="profitCurveChart"></canvas>
+                            </div>
+                            <div class="mt-2 text-sm text-gray-600">
+                                <p><strong>总收益</strong>：从初始投资开始的累计收益情况</p>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <div class="h-80">
+                                <canvas id="yearlyProfitCurveChart"></canvas>
+                            </div>
+                            <div class="mt-2 text-sm text-gray-600">
+                                <p><strong>本年收益</strong>：当本年份的收益情况</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
             </div>
         </section>
@@ -489,6 +511,10 @@
         let topBottomDisplayCount = 5;
         let spotDisplayCount = 5;
         
+        // 盈利曲线图表实例
+        let profitCurveChart = null;
+        let yearlyProfitCurveChart = null;
+        
         // 处理所有数据更新
         socket.on('all_data', function(data) {
             console.log('收到数据更新:', data);
@@ -521,6 +547,10 @@
             
             // 更新市场数据
             updateMarketData(data);
+            
+            // 更新盈利曲线
+            updateProfitCurve(data);
+            updateYearlyProfitCurve(data);
         });
         
         // 更新TradingView交易记录表格
@@ -758,31 +788,75 @@
                 return;
             }
             
-            // 使用总盈亏数据
-            const totalProfitSummary = data.total_profit.profit_summary || data.total_profit;
-            console.log('总盈亏摘要数据:', totalProfitSummary);
+            let totalMargin = 0;
+            let totalNetProfit = 0;
+            let totalReturnRate = 0;
+            let yearlyReturnRate = 0;
+            let yearlyReturnProfit = 0;
+            
+            if (data.total_profit.profit_curve_data && data.total_profit.profit_curve_data.data_points) {
+                // 直接从data_points计算
+                console.log('从data_points计算数据');
+                const dataPoints = data.total_profit.profit_curve_data.data_points;
+                
+                if (dataPoints.length > 0) {
+                    // 计算总收益率
+                    const lastData = dataPoints[dataPoints.length - 1];
+                    const totalPrincipal = lastData.principal; // 使用最后一个数据点的本金作为总成本
+                    totalMargin = lastData.total_funds;
+                    totalNetProfit = totalMargin - totalPrincipal;
+                    totalReturnRate = totalPrincipal > 0 ? (totalNetProfit / totalPrincipal * 100) : 0;
+                    
+                    // 计算本年收益率（以上一年12月份的总资金为本金）
+                    const currentYear = new Date().getFullYear().toString();
+                    const lastYear = (parseInt(currentYear) - 1).toString();
+                    
+                    // 找到上一年12月份的数据
+                    let lastYearDecemberData = null;
+                    for (const point of dataPoints) {
+                        if (point.date.startsWith(lastYear + '-12')) {
+                            lastYearDecemberData = point;
+                            break;
+                        }
+                    }
+                    
+                    // 找到本年的数据
+                    const yearlyDataPoints = dataPoints.filter(point => point.date.startsWith(currentYear));
+                    
+                    if (yearlyDataPoints.length > 0) {
+                        let yearlyPrincipal;
+                        if (lastYearDecemberData) {
+                            // 以上一年12月份的总资金为本金
+                            yearlyPrincipal = lastYearDecemberData.total_funds;
+                        } else {
+                            // 如果没有上一年12月份的数据，使用本年第一个数据点的本金
+                            yearlyPrincipal = yearlyDataPoints[0].principal;
+                        }
+                        
+                        const lastYearlyData = yearlyDataPoints[yearlyDataPoints.length - 1];
+                        const yearlyFunds = lastYearlyData.total_funds;
+                        yearlyReturnProfit = yearlyFunds - yearlyPrincipal;
+                        yearlyReturnRate = yearlyPrincipal > 0 ? (yearlyReturnProfit / yearlyPrincipal * 100) : 0;
+                    }
+                }
+            }
             
             // 处理总收益率，确保显示为百分比格式
-            let totalReturnRate = totalProfitSummary.total_return_rate || 0;
             if (typeof totalReturnRate === 'number') {
-                totalReturnRate = totalReturnRate.toFixed(4) + '%';
+                totalReturnRate = totalReturnRate.toFixed(2) + '%';
             }
             
             // 处理本年收益率，确保显示为百分比格式
-            let yearlyReturnRate = totalProfitSummary.yearly_return_rate || totalProfitSummary.round_return_rate || 0;
             if (typeof yearlyReturnRate === 'number') {
-                yearlyReturnRate = yearlyReturnRate.toFixed(4) + '%';
+                yearlyReturnRate = yearlyReturnRate.toFixed(2) + '%';
             }
             
-            // 处理本年净收益，使用累计净收益作为默认值
-            let yearlyReturnProfit = totalProfitSummary.yearly_return_profit || totalProfitSummary.total_net_profit || 0;
-            
             // 更新顶部策略盈亏摘要
-            document.getElementById('total-margin').textContent = (totalProfitSummary.total_margin || 0) + ' USD';
-            document.getElementById('total-net-profit').textContent = (totalProfitSummary.total_net_profit || 0) + ' USD';
+            document.getElementById('total-margin').textContent = Math.round(totalMargin) + ' USD';
+            document.getElementById('total-net-profit').textContent = Math.round(totalNetProfit) + ' USD';
             document.getElementById('total-return-rate').textContent = totalReturnRate;
             document.getElementById('yearly-return-rate').textContent = yearlyReturnRate;
-            document.getElementById('yearly-return-profit').textContent = yearlyReturnProfit + ' USD';
+            document.getElementById('yearly-return-profit').textContent = Math.round(yearlyReturnProfit) + ' USD';
         }
         
         // 更新策略状态
@@ -1146,8 +1220,332 @@
         // 页面加载时更新时间
         window.addEventListener('load', updateCurrentTime);
         
-
+        // 更新盈利曲线
+        function updateProfitCurve(data) {
+            console.log('更新盈利曲线:', data);
+            
+            // 检查是否有总盈亏数据
+            if (!data.total_profit) {
+                console.error('没有总盈亏数据');
+                return;
+            }
+            
+            // 检查是否有盈利曲线数据
+            const totalProfitData = data.total_profit;
+            if (!totalProfitData.profit_curve_data) {
+                console.error('没有盈利曲线数据');
+                return;
+            }
+            
+            const profitCurveData = totalProfitData.profit_curve_data;
+            const dataPoints = profitCurveData.data_points || [];
+            
+            if (dataPoints.length === 0) {
+                console.error('盈利曲线数据为空');
+                return;
+            }
+            
+            // 提取数据
+            const labels = dataPoints.map(point => point.date);
+            const principalData = dataPoints.map(point => point.principal);
+            const totalFundsData = dataPoints.map(point => point.total_funds);
+            
+            // 计算收益率数据
+            const returnRateData = dataPoints.map(point => {
+                const principal = point.principal;
+                const totalFunds = point.total_funds;
+                return principal > 0 ? ((totalFunds - principal) / principal * 100) : 0;
+            });
+            
+            const ctx = document.getElementById('profitCurveChart');
+            if (!ctx) {
+                console.error('找不到 profitCurveChart 元素');
+                return;
+            }
+            
+            const canvasCtx = ctx.getContext('2d');
+            if (!canvasCtx) {
+                console.error('无法获取 canvas 上下文');
+                return;
+            }
+            
+            // 销毁旧图表
+            if (profitCurveChart) {
+                profitCurveChart.destroy();
+            }
+            
+            // 创建新图表
+            profitCurveChart = new Chart(canvasCtx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '本金 (USDT)',
+                            data: principalData,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            yAxisID: 'y',
+                            borderWidth: 2,
+                            pointRadius: 1.5
+                        },
+                        {
+                            label: '总资金 (USDT)',
+                            data: totalFundsData,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            yAxisID: 'y',
+                            borderWidth: 2,
+                            pointRadius: 1.5
+                        },
+                        {
+                            label: '收益率 (%)',
+                            data: returnRateData,
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            yAxisID: 'y1',
+                            borderWidth: 2,
+                            pointRadius: 1.5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    stacked: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        if (context.dataset.yAxisID === 'y1') {
+                                            label += context.parsed.y.toFixed(2) + '%';
+                                        } else {
+                                            label += Math.round(context.parsed.y) + ' USDT';
+                                        }
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: '资金 (K USDT)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return Math.round(value / 1000) + 'K';
+                                }
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: '收益率 (%)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
         
+        // 更新本年收益曲线
+        function updateYearlyProfitCurve(data) {
+            console.log('更新本年收益曲线:', data);
+            
+            // 检查是否有总盈亏数据
+            if (!data.total_profit) {
+                console.error('没有总盈亏数据');
+                return;
+            }
+            
+            // 检查是否有盈利曲线数据
+            const totalProfitData = data.total_profit;
+            if (!totalProfitData.profit_curve_data) {
+                console.error('没有盈利曲线数据');
+                return;
+            }
+            
+            const profitCurveData = totalProfitData.profit_curve_data;
+            const dataPoints = profitCurveData.data_points || [];
+            
+            if (dataPoints.length === 0) {
+                console.error('盈利曲线数据为空');
+                return;
+            }
+            
+            // 获取当前年份
+            const currentYear = new Date().getFullYear().toString();
+            console.log('当前年份:', currentYear);
+            
+            // 提取本年数据
+            const yearlyDataPoints = dataPoints.filter(point => point.date.startsWith(currentYear));
+            
+            if (yearlyDataPoints.length === 0) {
+                console.error('本年没有盈利曲线数据');
+                return;
+            }
+            
+            // 提取数据
+            const labels = yearlyDataPoints.map(point => point.date);
+            const principalData = yearlyDataPoints.map(point => point.principal);
+            const totalFundsData = yearlyDataPoints.map(point => point.total_funds);
+            
+            // 计算收益率数据
+            // 找到上一年12月份的总资金作为本年的本金
+            const lastYear = (parseInt(currentYear) - 1).toString();
+            const lastYearDecemberData = dataPoints.find(point => point.date.startsWith(lastYear + '-12'));
+            const yearlyPrincipal = lastYearDecemberData ? lastYearDecemberData.total_funds : yearlyDataPoints[0].principal;
+            
+            const returnRateData = yearlyDataPoints.map(point => {
+                const totalFunds = point.total_funds;
+                return yearlyPrincipal > 0 ? ((totalFunds - yearlyPrincipal) / yearlyPrincipal * 100) : 0;
+            });
+            
+            const ctx = document.getElementById('yearlyProfitCurveChart');
+            if (!ctx) {
+                console.error('找不到 yearlyProfitCurveChart 元素');
+                return;
+            }
+            
+            const canvasCtx = ctx.getContext('2d');
+            if (!canvasCtx) {
+                console.error('无法获取 canvas 上下文');
+                return;
+            }
+            
+            // 销毁旧图表
+            if (yearlyProfitCurveChart) {
+                yearlyProfitCurveChart.destroy();
+            }
+            
+            // 创建新图表
+            yearlyProfitCurveChart = new Chart(canvasCtx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '本金 (USDT)',
+                            data: principalData,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            yAxisID: 'y',
+                            borderWidth: 2,
+                            pointRadius: 1.5
+                        },
+                        {
+                            label: '总资金 (USDT)',
+                            data: totalFundsData,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            yAxisID: 'y',
+                            borderWidth: 2,
+                            pointRadius: 1.5
+                        },
+                        {
+                            label: '收益率 (%)',
+                            data: returnRateData,
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            yAxisID: 'y1',
+                            borderWidth: 2,
+                            pointRadius: 1.5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    stacked: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        if (context.dataset.yAxisID === 'y1') {
+                                            label += context.parsed.y.toFixed(2) + '%';
+                                        } else {
+                                            label += Math.round(context.parsed.y) + ' USDT';
+                                        }
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: '资金 (K USDT)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return Math.round(value / 1000) + 'K';
+                                }
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: '收益率 (%)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
         // 页面加载时获取初始数据
         window.onload = function() {
             fetch('/api/get_data')
@@ -1165,6 +1563,8 @@
                     updateSpotData(data);
                     updateSpotTable(data);
                     updateTopSummary(data);
+                    updateProfitCurve(data);
+                    updateYearlyProfitCurve(data);
                 })
                 .catch(error => console.error('获取数据失败:', error));
         };

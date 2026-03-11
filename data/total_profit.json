@@ -1,17 +1,78 @@
 {
-  "profit_summary": {
-    "total_net_profit": 19089,
-    "total_margin": 35000.0,
-    "total_return_rate": "119.7%",
-    "yearly_return_rate": "31.15%",
-    "yearly_return_profit": 8336
-  },
   "trade_records": [],
   "symbol_profit_tracker": {},
   "profit_curve_data": {
-    "initial_funds": 15911.0,
-    "yearly_initial_funds": 26664.0,
-    "monthly_profits": [0, 1200, 800, -500, 1500, 2000, -300, 1800],
-    "months": ["2025-08", "2025-09", "2025-10", "2025-11", "2025-12", "2026-01", "2026-02", "2026-03"]
+    "data_points": [
+      {
+        "date": "2025-03", 
+        "principal": 0.0, 
+        "total_funds": 0.0
+      },
+      {
+        "date": "2025-04", 
+        "principal": 5277.0, 
+        "total_funds": 6514.0
+      },
+      {
+        "date": "2025-05", 
+        "principal": 13397.0, 
+        "total_funds": 15635.0
+      },
+      {
+        "date": "2025-05", 
+        "principal": 13397.0, 
+        "total_funds": 17145.0
+      },
+      {
+        "date": "2025-06", 
+        "principal": 16011.0, 
+        "total_funds": 19145.0
+      }, 
+      {
+        "date": "2025-07", 
+        "principal": 16011.0, 
+        "total_funds": 20011.0
+      },
+      {
+        "date": "2025-08", 
+        "principal": 16011.0, 
+        "total_funds": 20617.0
+      },
+      {
+        "date": "2025-09", 
+        "principal": 16011.0, 
+        "total_funds": 21917.0
+      },
+      {
+        "date": "2025-10", 
+        "principal": 16011.0, 
+        "total_funds": 22046.0
+      },
+      {
+        "date": "2025-11", 
+        "principal": 16011.0, 
+        "total_funds": 26058.0
+      },
+      {
+        "date": "2025-12", 
+        "principal": 16011.0, 
+        "total_funds": 26165.0
+      },
+      {
+        "date": "2026-1", 
+        "principal": 16011.0, 
+        "total_funds": 30271.0
+      },
+      {
+        "date": "2026-02", 
+        "principal": 16011.0, 
+        "total_funds": 34996.0
+      },
+      {
+        "date": "2026-03", 
+        "principal": 16011.0, 
+        "total_funds": 35000.0
+      }
+    ]
   }
 }

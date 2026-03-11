@@ -55,16 +55,46 @@ def load_total_profit_data():
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 
-                # 如果文件中已经存在 profit_summary，直接使用它
-                if 'profit_summary' not in data:
-                    # 如果文件中没有 profit_summary，构建默认的
-                    data['profit_summary'] = {
-                        'total_net_profit': 0,
-                        'total_margin': 0.0,
-                        'total_return_rate': "0%",
-                        'yearly_return_rate': "0%",
-                        'yearly_return_profit': 0
-                    }
+                # 计算盈利摘要数据
+                if 'profit_curve_data' in data and 'data_points' in data['profit_curve_data']:
+                    data_points = data['profit_curve_data']['data_points']
+                    if data_points:
+                        # 计算总收益率
+                        first_data = data_points[0]
+                        last_data = data_points[-1]
+                        total_principal = first_data['principal']
+                        total_funds = last_data['total_funds']
+                        total_net_profit = total_funds - total_principal
+                        total_return_rate = (total_net_profit / total_principal * 100) if total_principal > 0 else 0
+                        
+                        # 计算本年收益率（以上一年12月份的总资金为本金）
+                        current_year = datetime.now().year
+                        last_year = current_year - 1
+                        
+                        # 找到上一年12月份的数据
+                        last_year_december_data = None
+                        for point in data_points:
+                            if point['date'].startswith(f'{last_year}-12'):
+                                last_year_december_data = point
+                                break
+                        
+                        # 找到本年的数据
+                        yearly_data_points = [point for point in data_points if point['date'].startswith(f'{current_year}')]
+                        
+                        yearly_return_rate = 0
+                        yearly_return_profit = 0
+                        if yearly_data_points:
+                            if last_year_december_data:
+                                # 以上一年12月份的总资金为本金
+                                yearly_principal = last_year_december_data['total_funds']
+                            else:
+                                # 如果没有上一年12月份的数据，使用本年第一个数据点的本金
+                                yearly_principal = yearly_data_points[0]['principal']
+                            
+                            last_yearly_data = yearly_data_points[-1]
+                            yearly_funds = last_yearly_data['total_funds']
+                            yearly_return_profit = yearly_funds - yearly_principal
+                            yearly_return_rate = (yearly_return_profit / yearly_principal * 100) if yearly_principal > 0 else 0
                 
                 return data
         except Exception as e:
@@ -377,7 +407,8 @@ class DataStorage:
                         'open_price': detail['open_avg_price'],
                         'close_price': detail['close_avg_price'],
                         'net_profit': detail['net_profit'],
-                        'timestamp': detail['open_time_cn']
+                        'timestamp': detail['open_time_cn'],
+                        'order_id': detail.get('order_id', f"{datetime.now().timestamp()}")
                     }
                     new_records.append(record)
         elif 'trade_records' in data:
@@ -390,21 +421,32 @@ class DataStorage:
                         record['timestamp'] = datetime.now().strftime('%Y-%m-%d-%H:%M:%S.%f')[:-3]
                         # 添加微小延迟，确保时间戳不同
                         time.sleep(0.001)
+                    if 'order_id' not in record:
+                        # 添加唯一订单ID
+                        record['order_id'] = f"{datetime.now().timestamp()}"
                     new_records.append(record)
         
-        # 去重处理：根据关键信息组合生成唯一标识符
+        # 去重处理：根据订单ID或更精确的标识符生成唯一标识符
         if new_records:
             # 先获取现有记录的唯一标识符集合
             existing_ids = set()
             for record in self.arbitrage_data['trade_records']:
-                # 使用交易对、时间戳、开仓价格、平仓价格和净利润组合作为唯一标识符
-                record_id = f"{record.get('symbol', '')}_{record.get('timestamp', '')}_{record.get('open_price', '')}_{record.get('close_price', '')}_{record.get('net_profit', '')}"
+                # 使用订单ID作为主要唯一标识符，如果没有则使用其他信息组合
+                if 'order_id' in record:
+                    record_id = record['order_id']
+                else:
+                    # 使用交易对、时间戳、开仓价格、平仓价格、净利润和数量组合作为唯一标识符
+                    record_id = f"{record.get('symbol', '')}_{record.get('timestamp', '')}_{record.get('open_price', '')}_{record.get('close_price', '')}_{record.get('net_profit', '')}_{record.get('quantity', '')}"
                 existing_ids.add(record_id)
             
             # 过滤掉重复的新记录
             unique_new_records = []
             for record in new_records:
-                record_id = f"{record.get('symbol', '')}_{record.get('timestamp', '')}_{record.get('open_price', '')}_{record.get('close_price', '')}_{record.get('net_profit', '')}"
+                if 'order_id' in record:
+                    record_id = record['order_id']
+                else:
+                    # 使用交易对、时间戳、开仓价格、平仓价格、净利润和数量组合作为唯一标识符
+                    record_id = f"{record.get('symbol', '')}_{record.get('timestamp', '')}_{record.get('open_price', '')}_{record.get('close_price', '')}_{record.get('net_profit', '')}_{record.get('quantity', '')}"
                 if record_id not in existing_ids:
                     unique_new_records.append(record)
                     existing_ids.add(record_id)
