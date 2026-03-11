@@ -260,7 +260,6 @@ arbitrage_data = {
         'initial_funds': 0.0
     },
     'trade_records': [],
-    'symbol_loss_tracker': {}
 }
 # 加载TradingView策略数据
 tradingview_data = load_tradingview_data()
@@ -396,60 +395,36 @@ class DataStorage:
             # 从trade_details中提取交易记录信息
             trade_details = data['trade_details']
             for detail in trade_details:
-                # 构建交易记录
-                # 只添加卖单的交易记录
-                # 这里假设当close_avg_price > open_avg_price时是卖单
-                if detail['close_avg_price'] > detail['open_avg_price']:
-                    record = {
-                        'symbol': detail['symbol'],
-                        'open_side': 'SELL',
-                        'quantity': detail['open_executed_qty'],
-                        'open_price': detail['open_avg_price'],
-                        'close_price': detail['close_avg_price'],
-                        'net_profit': detail['net_profit'],
-                        'timestamp': detail['open_time_cn'],
-                        'order_id': detail.get('order_id', f"{datetime.now().timestamp()}")
-                    }
-                    new_records.append(record)
-        elif 'trade_records' in data:
-            # 为每条交易记录添加时间戳
-            for record in data['trade_records']:
-                # 只添加卖单的交易记录
-                if record.get('open_side') == 'SELL':
-                    if 'timestamp' not in record:
-                        # 使用更精确的时间戳，包含毫秒
-                        record['timestamp'] = datetime.now().strftime('%Y-%m-%d-%H:%M:%S.%f')[:-3]
-                        # 添加微小延迟，确保时间戳不同
-                        time.sleep(0.001)
-                    if 'order_id' not in record:
-                        # 添加唯一订单ID
-                        record['order_id'] = f"{datetime.now().timestamp()}"
-                    new_records.append(record)
+                # 使用交易对+close_time_cn作为唯一标识
+                close_time = detail.get('close_time_cn', f"{datetime.now().timestamp()}")
+                order_id = f"{detail['symbol']}_{close_time}"
+                record = {
+                    'symbol': detail['symbol'],
+                    'open_side': detail.get('open_side', 'SELL'),
+                    'quantity': detail['open_executed_qty'],
+                    'open_price': detail['open_avg_price'],
+                    'close_price': detail['close_avg_price'],
+                    'net_profit': detail['net_profit'],
+                    'timestamp': detail['close_time_cn'],
+                    'order_id': order_id
+                }
+                new_records.append(record)
         
-        # 去重处理：根据订单ID或更精确的标识符生成唯一标识符
+        # 去重处理：根据订单ID作为唯一标识符
         if new_records:
             # 先获取现有记录的唯一标识符集合
             existing_ids = set()
             for record in self.arbitrage_data['trade_records']:
-                # 使用订单ID作为主要唯一标识符，如果没有则使用其他信息组合
+                # 优先使用order_id作为唯一标识符
                 if 'order_id' in record:
-                    record_id = record['order_id']
+                    existing_ids.add(record['order_id'])
                 else:
-                    # 使用交易对、时间戳、开仓价格、平仓价格、净利润和数量组合作为唯一标识符
+                    # 兼容旧数据，使用组合标识符
                     record_id = f"{record.get('symbol', '')}_{record.get('timestamp', '')}_{record.get('open_price', '')}_{record.get('close_price', '')}_{record.get('net_profit', '')}_{record.get('quantity', '')}"
-                existing_ids.add(record_id)
+                    existing_ids.add(record_id)
             
             # 过滤掉重复的新记录
-            unique_new_records = []
-            for record in new_records:
-                if 'order_id' in record:
-                    record_id = record['order_id']
-                else:
-                    # 使用交易对、时间戳、开仓价格、平仓价格、净利润和数量组合作为唯一标识符
-                    record_id = f"{record.get('symbol', '')}_{record.get('timestamp', '')}_{record.get('open_price', '')}_{record.get('close_price', '')}_{record.get('net_profit', '')}_{record.get('quantity', '')}"
-                if record_id not in existing_ids:
-                    unique_new_records.append(record)
-                    existing_ids.add(record_id)
+            unique_new_records = [record for record in new_records if record['order_id'] not in existing_ids]
             
             # 将唯一的新记录添加到现有列表中
             if unique_new_records:
@@ -457,9 +432,6 @@ class DataStorage:
                 # 限制存储的记录数量，保持文件大小合理
                 if len(self.arbitrage_data['trade_records']) > 100:
                     self.arbitrage_data['trade_records'] = self.arbitrage_data['trade_records'][-100:]
-        
-        if 'symbol_loss_tracker' in data:
-            self.arbitrage_data['symbol_loss_tracker'] = data['symbol_loss_tracker']
         
         self.update_global_data()
         # 保存套利策略数据到本地文件

@@ -1,117 +1,52 @@
 {
   "profit_summary": {
-    "round_net_profit": 5.736300000000001,
-    "total_net_profit": 7.0333000000000006,
+    "round_net_profit": 2.6001,
+    "total_net_profit": 2.6681999999999997,
     "initial_funds": 5000,
-    "total_return_rate": 0.140666,
-    "round_return_rate": 0.11472600000000002,
-    "total_margin": 5007.0333
+    "total_return_rate": 0.053363999999999995,
+    "round_return_rate": 0.05200199999999999,
+    "total_margin": 5002.6682
   },
   "trade_records": [
     {
-      "symbol": "BNBUSDT",
-      "open_side": "SELL",
-      "quantity": 0.9075,
-      "open_price": 318.526649,
-      "close_price": 318.671076,
-      "net_profit": 0.1311,
-      "timestamp": "2026-03-11-00:09:30"
-    },
-    {
       "symbol": "PIXELUSDT",
       "open_side": "SELL",
-      "quantity": 969.0,
-      "open_price": 0.006175,
-      "close_price": 0.006176,
-      "net_profit": 0.0274,
-      "timestamp": "2026-03-10 23:59:57"
+      "quantity": 22434.0,
+      "open_price": 0.011186,
+      "close_price": 0.011187,
+      "net_profit": 0.7741,
+      "timestamp": "2026-03-11 15:59:57",
+      "order_id": "1773216049.563439"
     },
     {
-      "symbol": "DYMUSDT",
+      "symbol": "XAIUSDT",
       "open_side": "SELL",
-      "quantity": 167.7,
-      "open_price": 0.03577,
-      "close_price": 0.03578,
-      "net_profit": 0.014,
-      "timestamp": "2026-03-10 23:59:57"
+      "quantity": 20194.0,
+      "open_price": 0.01245,
+      "close_price": 0.01246,
+      "net_profit": 1.1297,
+      "timestamp": "2026-03-11 15:59:57",
+      "order_id": "1773216594.239965"
     },
     {
-      "symbol": "SLPUSDT",
+      "symbol": "LAUSDT",
       "open_side": "SELL",
-      "quantity": 10591.0,
-      "open_price": 0.0005657,
-      "close_price": 0.0005658,
-      "net_profit": 0.009,
-      "timestamp": "2026-03-11 03:59:57"
+      "quantity": 24.6,
+      "open_price": 0.2439,
+      "close_price": 0.2443,
+      "net_profit": 0.0194,
+      "timestamp": "2026-03-11 15:59:57",
+      "order_id": "1773216594.239974"
     },
     {
       "symbol": "LYNUSDT",
       "open_side": "SELL",
-      "quantity": 18.0,
-      "open_price": 0.33924,
-      "close_price": 0.33932,
-      "net_profit": 0.0329,
-      "timestamp": "2026-03-11 03:59:57"
-    },
-    {
-      "symbol": "PIXELUSDT",
-      "open_side": "SELL",
-      "quantity": 28652.0,
-      "open_price": 0.008769,
-      "close_price": 0.00877,
-      "net_profit": 0.5906,
-      "timestamp": "2026-03-11 03:59:57"
-    },
-    {
-      "symbol": "LYNUSDT",
-      "open_side": "SELL",
-      "quantity": 716.0,
-      "open_price": 0.3476374,
-      "close_price": 0.34764,
-      "net_profit": 1.1859,
-      "timestamp": "2026-03-11 07:59:57"
-    },
-    {
-      "symbol": "SLPUSDT",
-      "open_side": "SELL",
-      "quantity": 427169.0,
-      "open_price": 0.000586,
-      "close_price": 0.0005861,
-      "net_profit": 0.3878,
-      "timestamp": "2026-03-11 07:59:57"
-    },
-    {
-      "symbol": "DYMUSDT",
-      "open_side": "SELL",
-      "quantity": 6885.0,
-      "open_price": 0.0363098,
-      "close_price": 0.03631,
-      "net_profit": 0.7327,
-      "timestamp": "2026-03-11 07:59:57"
-    },
-    {
-      "symbol": "PIXELUSDT",
-      "open_side": "SELL",
-      "quantity": 56486.0,
-      "open_price": 0.0088436,
-      "close_price": 0.008844,
-      "net_profit": 0.8934,
-      "timestamp": "2026-03-11 07:59:57"
+      "quantity": 692.0,
+      "open_price": 0.3619468,
+      "close_price": 0.36195,
+      "net_profit": 0.6361,
+      "timestamp": "2026-03-11 15:59:57",
+      "order_id": "1773216594.239979"
     }
   ],
-  "symbol_loss_tracker": {
-    "SAHARAUSDT": 0,
-    "PIXELUSDT": 0,
-    "DYMUSDT": 0,
-    "DEGOUSDT": 0,
-    "SXTUSDT": 0,
-    "BULLAUSDT": 0,
-    "RONINUSDT": 0,
-    "SLPUSDT": 0,
-    "LYNUSDT": 0,
-    "XAIUSDT": 0,
-    "PORTALUSDT": 0,
-    "DENTUSDT": 1,
-    "TNSRUSDT": 0
-  }
 }
