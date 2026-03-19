@@ -416,52 +416,79 @@ class DataStorage:
     
     def update_arbitrage_data(self, data):
         # 处理套利策略启动时间
+        arbitrage_data_file = os.path.join(data_dir, 'arbitrage_trades.json')
+        existing_data = None
+        if os.path.exists(arbitrage_data_file):
+            try:
+                with open(arbitrage_data_file, 'r', encoding='utf-8') as f:
+                    existing_data = json.load(f)
+            except Exception as e:
+                print(f"⚠️ 读取套利策略数据文件异常：{e}")
+        
+        # 处理start_time
         if 'start_time' in data:
-            # 检查本地文件中是否已有起始时间和盈亏数据
-            arbitrage_data_file = os.path.join(data_dir, 'arbitrage_trades.json')
-            if os.path.exists(arbitrage_data_file):
-                try:
-                    with open(arbitrage_data_file, 'r', encoding='utf-8') as f:
-                        existing_data = json.load(f)
-                    
-                    # 如果文件中已有起始时间，使用旧的起始时间
-                    if 'start_time' in existing_data:
-                        self.arbitrage_start_time = existing_data['start_time']
-                        print(f"✅ 套利策略已存在起始时间：{self.arbitrage_start_time}")
-                    else:
-                        # 文件中没有起始时间，使用新的起始时间
-                        self.arbitrage_start_time = data['start_time']
-                        # 更新文件中的起始时间
-                        existing_data['start_time'] = self.arbitrage_start_time
+            if existing_data and 'start_time' in existing_data:
+                self.arbitrage_start_time = existing_data['start_time']
+                print(f"✅ 套利策略已存在起始时间：{self.arbitrage_start_time}")
+            else:
+                self.arbitrage_start_time = data['start_time']
+                if existing_data is not None:
+                    existing_data['start_time'] = self.arbitrage_start_time
+                    try:
                         with open(arbitrage_data_file, 'w', encoding='utf-8') as f:
                             json.dump(existing_data, f, ensure_ascii=False, indent=2)
                         print(f"✅ 套利策略起始时间已添加：{self.arbitrage_start_time}")
-                    
-                    # 加载旧的盈亏数据作为初始值
-                    if 'profit_summary' in existing_data:
-                        self.arbitrage_data['profit_summary'] = existing_data['profit_summary']
-                        print(f"✅ 套利策略盈亏数据已加载：总盈亏 {existing_data['profit_summary'].get('total_net_profit', 0.0):.4f} USDT")
-                except Exception as e:
-                    print(f"⚠️ 读取套利策略数据文件异常：{e}")
-                    # 读取失败时使用新的起始时间
-                    self.arbitrage_start_time = data['start_time']
-            else:
-                # 文件不存在，使用新的起始时间
-                self.arbitrage_start_time = data['start_time']
+                    except Exception as e:
+                        print(f"⚠️ 保存套利策略起始时间异常：{e}")
         
-        # 处理盈亏数据
+        # 处理盈亏数据累计
         if 'profit_summary' in data:
-            # 直接使用传过来的profit_summary数据，因为它已经是累计值
-            self.arbitrage_data['profit_summary'] = data['profit_summary']
-            print(f"✅ 套利策略盈亏数据已更新：总盈亏 {data['profit_summary'].get('total_net_profit', 0.0):.4f} USDT")
+            # 先读取本地旧的累计值
+            old_profit = 0.0
+            if existing_data and 'profit_summary' in existing_data:
+                old_profit = existing_data['profit_summary'].get('total_net_profit', 0.0)
+            new_profit = data['profit_summary'].get('total_net_profit', 0.0)
+            # 如果新旧利润不一致且新利润不是累计值，则累加
+            if new_profit != 0.0 and old_profit != 0.0 and new_profit < old_profit:
+                # 传入的是本次增量利润，需累加
+                total_net_profit = old_profit + new_profit
+            else:
+                # 传入的是累计利润或首次
+                total_net_profit = new_profit if new_profit != 0.0 else old_profit
+            
+            # 获取初始资金
+            initial_funds = data['profit_summary'].get('initial_funds', 5000.0)
+            if not initial_funds or initial_funds <= 0:
+                # 如果没有初始资金或初始资金为0，使用旧数据或默认值
+                if existing_data and 'profit_summary' in existing_data:
+                    initial_funds = existing_data['profit_summary'].get('initial_funds', 5000.0)
+                else:
+                    initial_funds = 5000.0
+            
+            # 重新计算总保证金和总收益率
+            total_margin = initial_funds + total_net_profit
+            total_return_rate = (total_net_profit / initial_funds * 100) if initial_funds > 0 else 0
+            
+            # 构建利润摘要
+            profit_summary = data['profit_summary'].copy()
+            profit_summary['total_net_profit'] = total_net_profit
+            profit_summary['initial_funds'] = initial_funds
+            profit_summary['total_margin'] = total_margin
+            profit_summary['total_return_rate'] = total_return_rate
+            
+            # 兼容其他字段
+            for k in ['yearly_return_rate', 'yearly_return_profit']:
+                if k not in profit_summary:
+                    if existing_data and 'profit_summary' in existing_data and k in existing_data['profit_summary']:
+                        profit_summary[k] = existing_data['profit_summary'][k]
+            
+            self.arbitrage_data['profit_summary'] = profit_summary
+            print(f"✅ 套利策略盈亏数据已累计：总盈亏 {total_net_profit:.4f} USDT, 总保证金 {total_margin:.4f} USDT, 总收益率 {total_return_rate:.6f}%")
         
         new_records = []
-        
         if 'trade_details' in data:
-            # 从trade_details中提取交易记录信息
             trade_details = data['trade_details']
             for detail in trade_details:
-                # 使用交易对+close_time_cn作为唯一标识
                 close_time = detail.get('close_time_cn', f"{datetime.now().timestamp()}")
                 order_id = f"{detail['symbol']}_{close_time}"
                 record = {
@@ -475,32 +502,21 @@ class DataStorage:
                     'order_id': order_id
                 }
                 new_records.append(record)
-        
         # 去重处理：根据订单ID作为唯一标识符
         if new_records:
-            # 先获取现有记录的唯一标识符集合
             existing_ids = set()
             for record in self.arbitrage_data['trade_records']:
-                # 优先使用order_id作为唯一标识符
                 if 'order_id' in record:
                     existing_ids.add(record['order_id'])
                 else:
-                    # 兼容旧数据，使用组合标识符
                     record_id = f"{record.get('symbol', '')}_{record.get('timestamp', '')}_{record.get('open_price', '')}_{record.get('close_price', '')}_{record.get('net_profit', '')}_{record.get('quantity', '')}"
                     existing_ids.add(record_id)
-            
-            # 过滤掉重复的新记录
             unique_new_records = [record for record in new_records if record['order_id'] not in existing_ids]
-            
-            # 将唯一的新记录添加到现有列表中
             if unique_new_records:
                 self.arbitrage_data['trade_records'].extend(unique_new_records)
-                # 限制存储的记录数量，保持文件大小合理
                 if len(self.arbitrage_data['trade_records']) > 100:
                     self.arbitrage_data['trade_records'] = self.arbitrage_data['trade_records'][-100:]
-        
         self.update_global_data()
-        # 保存套利策略数据到本地文件
         save_arbitrage_data(self.arbitrage_data)
     
     def update_strategy_status(self, strategy, status):
