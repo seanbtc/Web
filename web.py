@@ -542,6 +542,14 @@ class DataStorage:
     
     def add_tradingview_trade(self, trade_data):
         trade_data['timestamp'] = datetime.now().strftime('%Y-%m-%d-%H:%M:%S')
+        trade_data.setdefault('strategy_type', 'legacy_tradingview')
+        trade_data.setdefault('strategy_label', '4H策略')
+        trade_data.setdefault('web_mode', 'tradingview')
+        trade_data.setdefault('web_category', 'tradingview')
+        trade_data.setdefault('web_strategy_label', '4H策略')
+        trade_data.setdefault('account_id', 'default')
+        trade_data.setdefault('account_label', '默认账号')
+        trade_data.setdefault('account_profile', 'default.json')
         # 插入到列表开头，实现时间从近到远显示
         self.tradingview_data.insert(0, trade_data)
 
