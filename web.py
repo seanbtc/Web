@@ -43,6 +43,7 @@ MAX_TRADINGVIEW_ROUNDS = _env_int('WEB_MAX_TRADINGVIEW_ROUNDS', 1000)
 MAX_TOP_BOTTOM_RECORDS = _env_int('WEB_MAX_TOP_BOTTOM_RECORDS', 3000)
 MAX_SPOT_RECORDS = _env_int('WEB_MAX_SPOT_RECORDS', 3000)
 MAX_ARBITRAGE_RECORDS = _env_int('WEB_MAX_ARBITRAGE_RECORDS', 5000)
+MAX_LEAD_RECORDS = _env_int('WEB_MAX_LEAD_RECORDS', 5000)
 MAX_PROFIT_CURVE_POINTS = _env_int('WEB_MAX_PROFIT_CURVE_POINTS', 4000)
 
 
@@ -228,6 +229,161 @@ def _extract_tradingview_profit_delta(trade_data):
     close_fee = _to_float(trade_data.get('close_fee', 0.0), 0.0)
     return round(gross_pnl_value - open_fee - close_fee, 4)
 
+
+def _trade_type_matches(trade_type, keywords):
+    normalized = str(trade_type or '').strip()
+    if not normalized:
+        return False
+    if normalized in keywords:
+        return True
+    return any(keyword in normalized for keyword in keywords)
+
+
+def _build_lead_record_key(trade_data):
+    account_id = str(trade_data.get('account_id') or 'unknown').strip()
+    order_id = str(trade_data.get('order_id') or '').strip()
+    if order_id:
+        return f'{account_id}:{order_id}'
+
+    signal_id = str(trade_data.get('signal_id') or '').strip()
+    if signal_id:
+        trade_type = str(trade_data.get('trade_type') or '').strip()
+        return f'{account_id}:signal:{signal_id}:{trade_type}'
+
+    return ':'.join([
+        account_id,
+        str(trade_data.get('symbol') or '').strip(),
+        str(trade_data.get('side') or '').strip(),
+        str(trade_data.get('trade_type') or '').strip(),
+        str(trade_data.get('timestamp') or '').strip(),
+        f"{_to_float(trade_data.get('quantity'), 0.0):.8f}",
+        f"{_to_float(trade_data.get('price'), 0.0):.8f}",
+    ])
+
+
+def _normalize_lead_trade_record(trade_data):
+    timestamp = str(
+        trade_data.get('timestamp')
+        or trade_data.get('exit_timestamp')
+        or trade_data.get('entry_timestamp')
+        or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    ).strip()
+    trade_type = str(trade_data.get('trade_type') or '未知').strip() or '未知'
+    order_pnl = _extract_tradingview_profit_delta(trade_data)
+    realized_pnl = trade_data.get('realized_pnl')
+
+    normalized = {
+        'order_key': '',
+        'order_id': str(trade_data.get('order_id') or '').strip(),
+        'account_id': str(trade_data.get('account_id') or '').strip(),
+        'account_label': str(trade_data.get('account_label') or trade_data.get('account_id') or '默认账号').strip(),
+        'account_type': str(trade_data.get('account_type') or '').strip(),
+        'account_profile': str(trade_data.get('account_profile') or '').strip(),
+        'symbol': str(trade_data.get('symbol') or '').strip(),
+        'side': str(trade_data.get('side') or '').strip().upper(),
+        'quantity': round(_to_float(trade_data.get('quantity'), 0.0), 8),
+        'price': _to_float(trade_data.get('price'), 0.0),
+        'trade_type': trade_type,
+        'reason': str(trade_data.get('reason') or trade_data.get('alert_message') or '').strip(),
+        'timestamp': timestamp,
+        'order_status': str(trade_data.get('order_status') or '').strip(),
+        'signal_id': str(trade_data.get('signal_id') or '').strip(),
+        'gross_pnl': trade_data.get('gross_pnl'),
+        'realized_pnl': round(_to_float(realized_pnl, order_pnl), 4) if (realized_pnl is not None or order_pnl is not None) else None,
+        'order_pnl': round(_to_float(order_pnl, 0.0), 4) if order_pnl is not None else None,
+        'open_fee': round(_to_float(trade_data.get('open_fee'), 0.0), 4) if trade_data.get('open_fee') is not None else 0.0,
+        'close_fee': round(_to_float(trade_data.get('close_fee'), 0.0), 4) if trade_data.get('close_fee') is not None else 0.0,
+        'entry_price': _to_float(trade_data.get('entry_price'), None),
+        'exit_price': _to_float(trade_data.get('exit_price'), None),
+        'entry_timestamp': str(trade_data.get('entry_timestamp') or '').strip(),
+        'exit_timestamp': str(trade_data.get('exit_timestamp') or '').strip(),
+    }
+    normalized['order_key'] = _build_lead_record_key(normalized)
+    return normalized
+
+
+def _build_lead_summary(trade_records, initial_funds=0.0, archived_realized_pnl=0.0):
+    total_realized_pnl = _to_float(archived_realized_pnl, 0.0)
+    close_trade_count = 0
+    win_trades = 0
+    lose_trades = 0
+
+    if isinstance(trade_records, list):
+        for record in trade_records:
+            if not isinstance(record, dict):
+                continue
+            profit_value = record.get('order_pnl')
+            if profit_value is None:
+                profit_value = _extract_tradingview_profit_delta(record)
+            if profit_value is None and not _trade_type_matches(record.get('trade_type'), TRADINGVIEW_CLOSE_TYPES):
+                continue
+
+            profit = _to_float(profit_value, 0.0)
+            total_realized_pnl += profit
+            close_trade_count += 1
+            if profit > 0:
+                win_trades += 1
+            elif profit < 0:
+                lose_trades += 1
+
+    initial_funds_value = _to_float(initial_funds, 0.0)
+    current_funds = initial_funds_value + total_realized_pnl
+    total_return_rate = (total_realized_pnl / initial_funds_value * 100) if initial_funds_value > 0 else 0.0
+
+    return {
+        'initial_funds': round(initial_funds_value, 4),
+        'total_realized_pnl': round(total_realized_pnl, 4),
+        'current_funds': round(current_funds, 4),
+        'total_return_rate': round(total_return_rate, 6),
+        'close_trade_count': close_trade_count,
+        'win_trades': win_trades,
+        'lose_trades': lose_trades,
+        'archived_realized_pnl': round(_to_float(archived_realized_pnl, 0.0), 4),
+        'retained_record_count': len(trade_records) if isinstance(trade_records, list) else 0,
+    }
+
+
+def load_lead_data():
+    file_path = os.path.join(data_dir, 'lead_trades.json')
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                raw_records = data.get('trade_records', []) if isinstance(data, dict) else []
+                summary = data.get('summary', {}) if isinstance(data, dict) else {}
+                normalized_records = []
+                seen_keys = set()
+                for raw_record in raw_records:
+                    if not isinstance(raw_record, dict):
+                        continue
+                    record = _normalize_lead_trade_record(raw_record)
+                    if record['order_key'] in seen_keys:
+                        continue
+                    seen_keys.add(record['order_key'])
+                    normalized_records.append(record)
+                archived_realized_pnl = _to_float(summary.get('archived_realized_pnl', 0.0), 0.0)
+                initial_funds = _to_float(summary.get('initial_funds', 0.0), 0.0)
+                return {
+                    'summary': _build_lead_summary(normalized_records, initial_funds=initial_funds, archived_realized_pnl=archived_realized_pnl),
+                    'trade_records': normalized_records,
+                }
+        except Exception as e:
+            print(f"读取带单策略数据失败: {e}")
+    return {
+        'summary': _build_lead_summary([], initial_funds=0.0, archived_realized_pnl=0.0),
+        'trade_records': [],
+    }
+
+
+def save_lead_data(data):
+    file_path = os.path.join(data_dir, 'lead_trades.json')
+    try:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print("带单策略数据已保存")
+    except Exception as e:
+        print(f"保存带单策略数据失败: {e}")
+
 # 从本地文件读取摸顶抄底策略数据
 def load_top_bottom_data():
     file_path = os.path.join(data_dir, 'top_bottom_trades.json')
@@ -344,11 +500,13 @@ def check_file_updates():
     spot_file_path = os.path.join(data_dir, 'spot_trades.json')
     total_profit_file_path = os.path.join(data_dir, 'total_profit.json')
     tradingview_file_path = os.path.join(data_dir, 'tradingview_trades.json')
+    lead_file_path = os.path.join(data_dir, 'lead_trades.json')
     arbitrage_file_path = os.path.join(data_dir, 'arbitrage_trades.json')
     last_modified_top_bottom = 0
     last_modified_spot = 0
     last_modified_total_profit = 0
     last_modified_tradingview = 0
+    last_modified_lead = 0
     last_modified_arbitrage = 0
     
     while True:
@@ -428,6 +586,18 @@ def check_file_updates():
                     # 广播更新
                     socketio.emit('all_data', data_storage.get_all_data())
                     print("TradingView策略数据已更新")
+
+            # 检查带单策略数据文件
+            if os.path.exists(lead_file_path):
+                current_modified = os.path.getmtime(lead_file_path)
+                if current_modified > last_modified_lead:
+                    last_modified_lead = current_modified
+                    new_data = load_lead_data()
+                    data_storage.lead_data = new_data
+                    data_storage.strategy_status['lead'] = '运行'
+                    data_storage.update_global_data()
+                    socketio.emit('all_data', data_storage.get_all_data())
+                    print("带单策略数据已更新")
             
             # 检查套利策略数据文件
             if os.path.exists(arbitrage_file_path):
@@ -458,6 +628,8 @@ spot_file_data = load_spot_data()
 total_profit_data = load_total_profit_data()
 # 加载套利策略数据
 arbitrage_data = load_arbitrage_data()
+# 加载带单策略数据
+lead_data = load_lead_data()
 # 加载TradingView策略数据
 tradingview_data = load_tradingview_data()
 tradingview_trade_records = tradingview_data.get('trade_records', [])
@@ -510,6 +682,7 @@ global_data = {
     'tradingview_rounds': tradingview_round_records,  # TradingView过去几轮盈利记录
     'tradingview_summary': tradingview_summary,  # TradingView策略盈亏摘要
     'arbitrage_data': arbitrage_data,  # 套利策略数据
+    'lead_data': lead_data,  # 带单策略数据
     'total_profit_data': total_profit_data,  # 总仓盈亏数据
     'top_bottom_data': {
         'position_status': top_bottom_file_data.get('position_status', '摸顶做空'),  # 当前仓位状态：摸顶做空/抄底做多
@@ -525,6 +698,7 @@ global_data = {
         'trade_records': spot_file_data.get('trade_records', [])  # 从本地文件读取交易记录
     },
     'strategy_status': {
+        'lead': '运行',         # 带单策略状态：运行/暂停
         'tradingview': '做空',  # 4H多空策略状态：做空/做多/暂停
         'arbitrage': '运行',     # 套利策略状态：运行/暂停
         'top_bottom': top_bottom_file_data.get('position_status', '摸顶做空'),  # 摸顶抄底策略状态：摸顶做空/抄底做多/空仓
@@ -543,6 +717,7 @@ class DataStorage:
         self.tradingview_rounds = global_data.get('tradingview_rounds', [])
         self.tradingview_summary = global_data['tradingview_summary']
         self.arbitrage_data = global_data['arbitrage_data']
+        self.lead_data = global_data['lead_data']
         self.total_profit_data = global_data['total_profit_data']
         self.top_bottom_data = global_data['top_bottom_data']
         self.spot_data = global_data['spot_data']
@@ -586,6 +761,31 @@ class DataStorage:
                 summary['archived_net_profit'] = round(archived, 4)
                 summary['retained_record_count'] = len(records)
 
+        if not isinstance(self.lead_data, dict):
+            self.lead_data = {'summary': _build_lead_summary([], 0.0, 0.0), 'trade_records': []}
+        self.lead_data.setdefault('trade_records', [])
+        self.lead_data.setdefault('summary', {})
+        lead_records = self.lead_data.get('trade_records')
+        if isinstance(lead_records, list) and len(lead_records) > MAX_LEAD_RECORDS:
+            lead_summary = self.lead_data.get('summary')
+            if not isinstance(lead_summary, dict):
+                lead_summary = {}
+                self.lead_data['summary'] = lead_summary
+
+            archived_realized_pnl = _to_float(lead_summary.get('archived_realized_pnl', 0.0), 0.0)
+            dropped_records = lead_records[MAX_LEAD_RECORDS:]
+            archived_realized_pnl += sum(
+                _to_float(record.get('order_pnl'), _extract_tradingview_profit_delta(record) or 0.0)
+                for record in dropped_records
+                if isinstance(record, dict)
+            )
+            del lead_records[MAX_LEAD_RECORDS:]
+            self.lead_data['summary'] = _build_lead_summary(
+                lead_records,
+                initial_funds=lead_summary.get('initial_funds', 0.0),
+                archived_realized_pnl=archived_realized_pnl,
+            )
+
         _trim_profit_curve_points(self.total_profit_data)
         if isinstance(self.total_profit_data, dict):
             self.total_profit_data['profit_summary'] = _build_total_profit_summary(self.total_profit_data)
@@ -597,6 +797,7 @@ class DataStorage:
         global_data['tradingview_rounds'] = self.tradingview_rounds
         global_data['tradingview_summary'] = self.tradingview_summary
         global_data['arbitrage_data'] = self.arbitrage_data
+        global_data['lead_data'] = self.lead_data
         global_data['total_profit_data'] = self.total_profit_data
         global_data['top_bottom_data'] = self.top_bottom_data
         global_data['spot_data'] = self.spot_data
@@ -672,6 +873,74 @@ class DataStorage:
             'round_records': self.tradingview_rounds,
             'summary': self.tradingview_summary
         })
+
+    def update_lead_data(self, data):
+        if not isinstance(self.lead_data, dict):
+            self.lead_data = load_lead_data()
+        self.lead_data.setdefault('trade_records', [])
+        self.lead_data.setdefault('summary', {})
+
+        raw_records = data.get('trade_records') if isinstance(data, dict) and isinstance(data.get('trade_records'), list) else [data]
+        existing_records = []
+        existing_keys = set()
+
+        for current in self.lead_data.get('trade_records', []):
+            if not isinstance(current, dict):
+                continue
+            record = _normalize_lead_trade_record(current)
+            if record['order_key'] in existing_keys:
+                continue
+            existing_keys.add(record['order_key'])
+            existing_records.append(record)
+
+        added_records = 0
+        duplicate_records = 0
+        for raw_record in raw_records:
+            if not isinstance(raw_record, dict):
+                continue
+            record = _normalize_lead_trade_record(raw_record)
+            if record['order_key'] in existing_keys:
+                duplicate_records += 1
+                continue
+            existing_keys.add(record['order_key'])
+            existing_records.insert(0, record)
+            added_records += 1
+
+        summary = self.lead_data.get('summary', {}) if isinstance(self.lead_data.get('summary'), dict) else {}
+        initial_funds = _to_float(summary.get('initial_funds', data.get('initial_funds', 0.0) if isinstance(data, dict) else 0.0), 0.0)
+        archived_realized_pnl = _to_float(summary.get('archived_realized_pnl', 0.0), 0.0)
+
+        if len(existing_records) > MAX_LEAD_RECORDS:
+            dropped_records = existing_records[MAX_LEAD_RECORDS:]
+            archived_realized_pnl += sum(
+                _to_float(record.get('order_pnl'), _extract_tradingview_profit_delta(record) or 0.0)
+                for record in dropped_records
+                if isinstance(record, dict)
+            )
+            del existing_records[MAX_LEAD_RECORDS:]
+
+        self.lead_data = {
+            'summary': _build_lead_summary(
+                existing_records,
+                initial_funds=initial_funds,
+                archived_realized_pnl=archived_realized_pnl,
+            ),
+            'trade_records': existing_records,
+        }
+        self.strategy_status['lead'] = '运行'
+
+        latest_record = existing_records[0] if existing_records else {}
+        latest_symbol = latest_record.get('symbol', '-') if isinstance(latest_record, dict) else '-'
+        latest_account = latest_record.get('account_label', '-') if isinstance(latest_record, dict) else '-'
+        latest_type = latest_record.get('trade_type', '-') if isinstance(latest_record, dict) else '-'
+        latest_pnl = _to_float(latest_record.get('order_pnl'), 0.0) if isinstance(latest_record, dict) else 0.0
+        print(
+            f"带单更新 | 新增:{added_records} 重复:{duplicate_records} 最新:{latest_account}/{latest_symbol}/{latest_type} "
+            f"订单盈亏:{latest_pnl:.4f}USDT"
+        )
+
+        self.update_global_data()
+        save_lead_data(self.lead_data)
     
     def update_arbitrage_data(self, data):
         """更新套利数据：只以唯一订单的 net_profit 作为总额计算来源。"""
@@ -897,6 +1166,7 @@ class DataStorage:
             'tradingview': self.tradingview_data,
             'tradingview_rounds': self.tradingview_rounds,
             'tradingview_summary': self.tradingview_summary,
+            'lead': self.lead_data,
             'arbitrage': self.arbitrage_data,
             'total_profit': self.total_profit_data,
             'top_bottom': self.top_bottom_data,
@@ -933,6 +1203,15 @@ def update_tradingview_data():
     data = request.json
     if data:
         data_storage.add_tradingview_trade(data)
+        socketio.emit('all_data', data_storage.get_all_data())
+        return jsonify({'status': 'success'})
+    return jsonify({'status': 'error'}), 400
+
+@app.route('/api/update_lead', methods=['POST'])
+def update_lead_data():
+    data = request.json
+    if data:
+        data_storage.update_lead_data(data)
         socketio.emit('all_data', data_storage.get_all_data())
         return jsonify({'status': 'success'})
     return jsonify({'status': 'error'}), 400

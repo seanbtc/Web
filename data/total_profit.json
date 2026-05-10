@@ -66,7 +66,12 @@
       {
         "date": "2026-03", 
         "principal": 16011, 
-        "total_funds": 36666
+        "total_funds": 36200
+      },
+      {
+        "date": "2026-04", 
+        "principal": 30651, 
+        "total_funds": 45000
       }
     ]
   }
