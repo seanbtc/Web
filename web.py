@@ -27,7 +27,7 @@ socketio = SocketIO(app, cors_allowed_origins='*')
 
 
 def _env_int(name, default):
-    """读取正整数环境变量，非法值回退默认。"""
+    """Read a positive integer environment variable with fallback."""
     raw = os.getenv(name, '')
     try:
         value = int(raw)
@@ -38,17 +38,18 @@ def _env_int(name, default):
     return default
 
 
-MAX_TRADINGVIEW_RECORDS = _env_int('WEB_MAX_TRADINGVIEW_RECORDS', 3000)
-MAX_TRADINGVIEW_ROUNDS = _env_int('WEB_MAX_TRADINGVIEW_ROUNDS', 1000)
+MAX_TRIANGLE_RECORDS = _env_int('WEB_MAX_TRIANGLE_RECORDS', 3000)
+MAX_TRIANGLE_ROUNDS = _env_int('WEB_MAX_TRIANGLE_ROUNDS', 1000)
 MAX_TOP_BOTTOM_RECORDS = _env_int('WEB_MAX_TOP_BOTTOM_RECORDS', 3000)
 MAX_SPOT_RECORDS = _env_int('WEB_MAX_SPOT_RECORDS', 3000)
 MAX_ARBITRAGE_RECORDS = _env_int('WEB_MAX_ARBITRAGE_RECORDS', 5000)
 MAX_LEAD_RECORDS = _env_int('WEB_MAX_LEAD_RECORDS', 5000)
 MAX_PROFIT_CURVE_POINTS = _env_int('WEB_MAX_PROFIT_CURVE_POINTS', 4000)
+TRIANGLE_OPEN_TYPES = {'开仓', '加仓'}
 
 
 def _trim_list_inplace(items, limit, keep='head'):
-    """原地裁剪列表，避免历史数据无限增长。"""
+    """Trim list in place to prevent unbounded growth."""
     if not isinstance(items, list) or limit <= 0:
         return
     if len(items) <= limit:
@@ -176,10 +177,10 @@ def _build_total_profit_summary(total_profit_data):
     return summary
 
 
-TRADINGVIEW_CLOSE_TYPES = {'平仓', '止盈', '止损'}
+TRIANGLE_CLOSE_TYPES = {'平仓', '止盈', '止损'}
 
 
-def _sum_tradingview_round_profit(round_records):
+def _sum_triangle_round_profit(round_records):
     if not isinstance(round_records, list):
         return 0.0
 
@@ -191,7 +192,7 @@ def _sum_tradingview_round_profit(round_records):
     return total_profit
 
 
-def _extract_tradingview_profit_delta(trade_data):
+def _extract_triangle_profit_delta(trade_data):
     if not isinstance(trade_data, dict):
         return None
 
@@ -208,7 +209,7 @@ def _extract_tradingview_profit_delta(trade_data):
         return round(gross_pnl_value - open_fee - close_fee, 4)
 
     trade_type = str(trade_data.get('trade_type') or '').strip()
-    if trade_type not in TRADINGVIEW_CLOSE_TYPES and not any(keyword in trade_type for keyword in TRADINGVIEW_CLOSE_TYPES):
+    if trade_type not in TRIANGLE_CLOSE_TYPES and not any(keyword in trade_type for keyword in TRIANGLE_CLOSE_TYPES):
         return None
 
     entry_price = _to_float(trade_data.get('entry_price'), None)
@@ -269,14 +270,14 @@ def _normalize_lead_trade_record(trade_data):
         or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     ).strip()
     trade_type = str(trade_data.get('trade_type') or '未知').strip() or '未知'
-    order_pnl = _extract_tradingview_profit_delta(trade_data)
+    order_pnl = _extract_triangle_profit_delta(trade_data)
     realized_pnl = trade_data.get('realized_pnl')
 
     normalized = {
         'order_key': '',
         'order_id': str(trade_data.get('order_id') or '').strip(),
         'account_id': str(trade_data.get('account_id') or '').strip(),
-        'account_label': str(trade_data.get('account_label') or trade_data.get('account_id') or '默认账号').strip(),
+        'account_label': str(trade_data.get('account_label') or trade_data.get('account_id') or '默认账户').strip(),
         'account_type': str(trade_data.get('account_type') or '').strip(),
         'account_profile': str(trade_data.get('account_profile') or '').strip(),
         'symbol': str(trade_data.get('symbol') or '').strip(),
@@ -314,8 +315,8 @@ def _build_lead_summary(trade_records, initial_funds=0.0, archived_realized_pnl=
                 continue
             profit_value = record.get('order_pnl')
             if profit_value is None:
-                profit_value = _extract_tradingview_profit_delta(record)
-            if profit_value is None and not _trade_type_matches(record.get('trade_type'), TRADINGVIEW_CLOSE_TYPES):
+                profit_value = _extract_triangle_profit_delta(record)
+            if profit_value is None and not _trade_type_matches(record.get('trade_type'), TRIANGLE_CLOSE_TYPES):
                 continue
 
             profit = _to_float(profit_value, 0.0)
@@ -343,6 +344,215 @@ def _build_lead_summary(trade_records, initial_funds=0.0, archived_realized_pnl=
     }
 
 
+def _normalize_triangle_trade_record(trade_data):
+    normalized = _normalize_lead_trade_record(trade_data)
+    strategy_type = str(trade_data.get('strategy_type') or '').strip().lower()
+    if strategy_type in {'', 'legacy_triangle', 'triangle', 'multistrategy_4h', 'multi'}:
+        strategy_type = 'triangle'
+
+    normalized['strategy_type'] = strategy_type
+    normalized['strategy_label'] = str(trade_data.get('strategy_label') or '三角策略').strip() or '三角策略'
+    normalized['web_mode'] = 'triangle'
+    normalized['web_category'] = 'triangle'
+    normalized['web_strategy_label'] = str(trade_data.get('web_strategy_label') or '三角策略').strip() or '三角策略'
+    return normalized
+
+
+def _parse_triangle_trade_timestamp(value):
+    raw_value = str(value or '').strip()
+    if not raw_value:
+        return None
+
+    for format_pattern in ('%Y-%m-%d-%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(raw_value, format_pattern)
+        except ValueError:
+            continue
+    return None
+
+
+def _triangle_position_bucket_key(trade_data):
+    account_id = str(trade_data.get('account_id') or trade_data.get('account_label') or 'unknown').strip()
+    symbol = str(trade_data.get('symbol') or '').strip()
+    return f'{account_id}:{symbol}'
+
+
+def _triangle_get_position_bucket(position_buckets, trade_data, side):
+    bucket_key = _triangle_position_bucket_key(trade_data)
+    bucket = position_buckets.setdefault(bucket_key, {
+        'BUY': {'quantity': 0.0, 'avg_price': 0.0},
+        'SELL': {'quantity': 0.0, 'avg_price': 0.0},
+    })
+    return bucket[side]
+
+
+def _triangle_apply_open_trade(position_buckets, trade_data):
+    side = str(trade_data.get('side') or '').strip().upper()
+    if side not in {'BUY', 'SELL'}:
+        return None
+
+    quantity = _to_float(trade_data.get('quantity'), 0.0)
+    if quantity <= 0:
+        return None
+
+    price = _to_float(trade_data.get('price'), 0.0)
+    bucket = _triangle_get_position_bucket(position_buckets, trade_data, side)
+    current_quantity = _to_float(bucket.get('quantity', 0.0), 0.0)
+    new_quantity = current_quantity + quantity
+    if new_quantity <= 0:
+        bucket['quantity'] = 0.0
+        bucket['avg_price'] = 0.0
+        return None
+
+    bucket['avg_price'] = round((bucket.get('avg_price', 0.0) * current_quantity + price * quantity) / new_quantity, 8)
+    bucket['quantity'] = round(new_quantity, 8)
+    return None
+
+
+def _triangle_apply_close_trade(position_buckets, trade_data, update_record=True):
+    side = str(trade_data.get('side') or '').strip().upper()
+    if side not in {'BUY', 'SELL'}:
+        return None
+
+    quantity = _to_float(trade_data.get('quantity'), 0.0)
+    if quantity <= 0:
+        return None
+
+    open_side = 'SELL' if side == 'BUY' else 'BUY'
+    bucket = _triangle_get_position_bucket(position_buckets, trade_data, open_side)
+    available_quantity = _to_float(bucket.get('quantity', 0.0), 0.0)
+    if available_quantity <= 0:
+        return None
+
+    matched_quantity = min(quantity, available_quantity)
+    entry_price = _to_float(bucket.get('avg_price', 0.0), 0.0)
+    exit_price = _to_float(trade_data.get('price'), 0.0)
+    if open_side == 'SELL':
+        gross_pnl = (entry_price - exit_price) * matched_quantity
+    else:
+        gross_pnl = (exit_price - entry_price) * matched_quantity
+
+    open_fee = _to_float(trade_data.get('open_fee', 0.0), 0.0)
+    close_fee = _to_float(trade_data.get('close_fee', 0.0), 0.0)
+    order_pnl = round(gross_pnl - open_fee - close_fee, 4)
+
+    if update_record:
+        trade_data['entry_price'] = round(entry_price, 4)
+        trade_data['exit_price'] = round(exit_price, 4)
+        trade_data['open_price'] = round(entry_price, 4)
+        trade_data['close_price'] = round(exit_price, 4)
+        trade_data['gross_pnl'] = round(gross_pnl, 4)
+        trade_data['realized_pnl'] = order_pnl
+        trade_data['order_pnl'] = order_pnl
+        trade_data['open_fee'] = round(open_fee, 4) if open_fee else 0.0
+        trade_data['close_fee'] = round(close_fee, 4) if close_fee else 0.0
+
+    remaining_quantity = round(available_quantity - matched_quantity, 8)
+    if remaining_quantity <= 0:
+        bucket['quantity'] = 0.0
+        bucket['avg_price'] = 0.0
+    else:
+        bucket['quantity'] = remaining_quantity
+
+    return order_pnl
+
+
+def _rebuild_triangle_open_positions(trade_records):
+    position_buckets = {}
+    if not isinstance(trade_records, list):
+        return position_buckets
+
+    ordered_records = sorted(
+        enumerate(trade_records),
+        key=lambda item: (
+            _parse_triangle_trade_timestamp(
+                item[1].get('timestamp')
+                or item[1].get('exit_timestamp')
+                or item[1].get('entry_timestamp')
+            ) or datetime.min,
+            -item[0],
+        ),
+    )
+
+    for _, record in ordered_records:
+        if not isinstance(record, dict):
+            continue
+        trade_type = str(record.get('trade_type') or '').strip()
+        if trade_type in TRIANGLE_OPEN_TYPES:
+            _triangle_apply_open_trade(position_buckets, record)
+        elif _trade_type_matches(trade_type, TRIANGLE_CLOSE_TYPES):
+            _triangle_apply_close_trade(position_buckets, record, update_record=False)
+
+    return position_buckets
+
+
+def _replay_trade_records_with_pnl(trade_records):
+    position_buckets = {}
+    if not isinstance(trade_records, list):
+        return position_buckets
+
+    ordered_records = sorted(
+        enumerate(trade_records),
+        key=lambda item: (
+            _parse_triangle_trade_timestamp(
+                item[1].get('timestamp')
+                or item[1].get('exit_timestamp')
+                or item[1].get('entry_timestamp')
+            ) or datetime.min,
+            -item[0],
+        ),
+    )
+
+    for _, record in ordered_records:
+        if not isinstance(record, dict):
+            continue
+        trade_type = str(record.get('trade_type') or '').strip()
+        if trade_type in TRIANGLE_OPEN_TYPES:
+            _triangle_apply_open_trade(position_buckets, record)
+        elif _trade_type_matches(trade_type, TRIANGLE_CLOSE_TYPES):
+            _triangle_apply_close_trade(position_buckets, record, update_record=True)
+
+    return position_buckets
+
+
+def _normalize_triangle_summary(summary, round_records=None):
+    normalized = dict(summary) if isinstance(summary, dict) else {}
+    round_profit = _sum_triangle_round_profit(round_records)
+    initial_funds = _to_float(normalized.get('initial_funds', 0.0), 0.0)
+
+    total_realized_pnl = normalized.get('total_realized_pnl')
+    if total_realized_pnl is None:
+        total_realized_pnl = normalized.get('total_profit', normalized.get('total_profit_all', 0.0))
+    total_realized_pnl = _to_float(total_realized_pnl, 0.0)
+
+    normalized['initial_funds'] = round(initial_funds, 4)
+    normalized['total_realized_pnl'] = round(total_realized_pnl, 4)
+    normalized['current_funds'] = round(initial_funds + total_realized_pnl, 4)
+    normalized['total_return_rate'] = round((total_realized_pnl / initial_funds * 100) if initial_funds > 0 else 0.0, 6)
+    normalized['total_profit'] = round(_to_float(normalized.get('total_profit', total_realized_pnl), total_realized_pnl), 4)
+    normalized['total_profit_all'] = round(_to_float(normalized.get('total_profit_all', total_realized_pnl + round_profit), total_realized_pnl + round_profit), 4)
+    normalized['close_trade_count'] = int(_to_float(normalized.get('close_trade_count', 0), 0.0))
+    normalized['win_trades'] = int(_to_float(normalized.get('win_trades', 0), 0.0))
+    normalized['lose_trades'] = int(_to_float(normalized.get('lose_trades', 0), 0.0))
+    normalized['archived_realized_pnl'] = round(_to_float(normalized.get('archived_realized_pnl', 0.0), 0.0), 4)
+    normalized['retained_record_count'] = int(_to_float(normalized.get('retained_record_count', 0), 0.0))
+    return normalized
+
+
+def _build_triangle_summary(trade_records, initial_funds=0.0, archived_realized_pnl=0.0, round_records=None):
+    summary = _build_lead_summary(
+        trade_records,
+        initial_funds=initial_funds,
+        archived_realized_pnl=archived_realized_pnl,
+    )
+    total_realized_pnl = _to_float(summary.get('total_realized_pnl', 0.0), 0.0)
+    round_profit = _sum_triangle_round_profit(round_records)
+
+    summary['total_profit'] = round(total_realized_pnl, 4)
+    summary['total_profit_all'] = round(total_realized_pnl + round_profit, 4)
+    return summary
+
+
 def load_lead_data():
     file_path = os.path.join(data_dir, 'lead_trades.json')
     if os.path.exists(file_path):
@@ -361,6 +571,7 @@ def load_lead_data():
                         continue
                     seen_keys.add(record['order_key'])
                     normalized_records.append(record)
+                _replay_trade_records_with_pnl(normalized_records)
                 archived_realized_pnl = _to_float(summary.get('archived_realized_pnl', 0.0), 0.0)
                 initial_funds = _to_float(summary.get('initial_funds', 0.0), 0.0)
                 return {
@@ -408,7 +619,7 @@ def load_spot_data():
             print(f"读取现货策略数据失败: {e}")
     return {'trade_records': []}
 
-# 从本地文件读取总仓盈亏数据
+# 从本地文件读取总盈亏数据
 def load_total_profit_data():
     file_path = os.path.join(data_dir, 'total_profit.json')
     if os.path.exists(file_path):
@@ -418,7 +629,7 @@ def load_total_profit_data():
                 data['profit_summary'] = _build_total_profit_summary(data)
                 return data
         except Exception as e:
-            print(f"读取总仓盈亏数据失败: {e}")
+            print(f"读取总盈亏数据失败: {e}")
     return {
         'profit_summary': {
             'total_net_profit': 0.0,
@@ -434,33 +645,57 @@ def load_total_profit_data():
 
 # 套利策略数据不再从本地文件加载，完全依赖在线数据
 
-# 从本地文件读取TradingView策略数据
-def load_tradingview_data():
-    file_path = os.path.join(data_dir, 'tradingview_trades.json')
-    if os.path.exists(file_path):
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return data
-        except Exception as e:
-            print(f"读取TradingView策略数据失败: {e}")
-    return {'trade_records': [], 'round_records': [], 'summary': {
-        'win_trades': 0,
-        'lose_trades': 0,
-        'total_profit': 0.0,
-        'total_profit_all': 0.0,
-        'initial_funds': 1000.0
-    }}
+# 从本地文件读取三角策略数据
+def load_triangle_data():
+    triangle_file_path = os.path.join(data_dir, 'triangle_trades.json')
+    legacy_triangle_file_path = os.path.join(data_dir, 'triangle_trades.json')
+    source_file_path = triangle_file_path if os.path.exists(triangle_file_path) else legacy_triangle_file_path
 
-# 保存TradingView策略数据到本地文件
-def save_tradingview_data(data):
-    file_path = os.path.join(data_dir, 'tradingview_trades.json')
+    if os.path.exists(source_file_path):
+        try:
+            with open(source_file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            raw_records = data.get('trade_records', []) if isinstance(data, dict) else []
+            round_records = data.get('round_records', []) if isinstance(data, dict) else []
+            summary = data.get('summary', {}) if isinstance(data, dict) else {}
+
+            normalized_records = []
+            seen_keys = set()
+            for raw_record in raw_records:
+                if not isinstance(raw_record, dict):
+                    continue
+                record = _normalize_triangle_trade_record(raw_record)
+                if record['order_key'] in seen_keys:
+                    continue
+                seen_keys.add(record['order_key'])
+                normalized_records.append(record)
+
+            computed_summary = _normalize_triangle_summary(summary, round_records)
+
+            return {
+                'trade_records': normalized_records,
+                'round_records': round_records,
+                'summary': computed_summary,
+            }
+        except Exception as e:
+            print(f"读取三角策略数据失败: {e}")
+
+    return {
+        'trade_records': [],
+        'round_records': [],
+        'summary': _build_triangle_summary([], initial_funds=0.0, archived_realized_pnl=0.0, round_records=[]),
+    }
+
+
+def save_triangle_data(data):
+    file_path = os.path.join(data_dir, 'triangle_trades.json')
     try:
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        print("TradingView策略数据已保存")
+        print("三角策略数据已保存")
     except Exception as e:
-        print(f"保存TradingView策略数据失败: {e}")
+        print(f"保存三角策略数据失败: {e}")
 
 # 从本地文件读取套利策略数据
 def load_arbitrage_data():
@@ -484,7 +719,7 @@ def load_arbitrage_data():
         'trade_records': [],
     }
 
-# 保存套利策略数据到本地文件
+# 将套利策略数据保存到本地文件
 def save_arbitrage_data(data):
     file_path = os.path.join(data_dir, 'arbitrage_trades.json')
     try:
@@ -499,13 +734,15 @@ def check_file_updates():
     top_bottom_file_path = os.path.join(data_dir, 'top_bottom_trades.json')
     spot_file_path = os.path.join(data_dir, 'spot_trades.json')
     total_profit_file_path = os.path.join(data_dir, 'total_profit.json')
-    tradingview_file_path = os.path.join(data_dir, 'tradingview_trades.json')
+    triangle_file_path = os.path.join(data_dir, 'triangle_trades.json')
+    legacy_triangle_file_path = os.path.join(data_dir, 'triangle_trades.json')
     lead_file_path = os.path.join(data_dir, 'lead_trades.json')
     arbitrage_file_path = os.path.join(data_dir, 'arbitrage_trades.json')
     last_modified_top_bottom = 0
     last_modified_spot = 0
     last_modified_total_profit = 0
-    last_modified_tradingview = 0
+    last_modified_triangle = 0
+    last_modified_triangle_legacy = 0
     last_modified_lead = 0
     last_modified_arbitrage = 0
     
@@ -548,44 +785,58 @@ def check_file_updates():
                     socketio.emit('all_data', data_storage.get_all_data())
                     print("现货策略数据已更新")
             
-            # 检查总仓盈亏数据文件
+            # 检查总盈亏数据文件
             if os.path.exists(total_profit_file_path):
                 current_modified = os.path.getmtime(total_profit_file_path)
                 if current_modified > last_modified_total_profit:
                     last_modified_total_profit = current_modified
                     # 重新加载数据
                     new_data = load_total_profit_data()
-                    # 更新总仓盈亏数据
+                    # 更新总盈亏数据
                     data_storage.total_profit_data = new_data
                     data_storage.update_global_data()
                     # 广播更新
                     socketio.emit('all_data', data_storage.get_all_data())
-                    print("总仓盈亏数据已更新")
+                    print("总盈利数据已更新")
             
 
             
-            # 检查TradingView策略数据文件
-            if os.path.exists(tradingview_file_path):
-                current_modified = os.path.getmtime(tradingview_file_path)
-                if current_modified > last_modified_tradingview:
-                    last_modified_tradingview = current_modified
+            # 检查三角策略数据文件
+            triangle_source_file_path = triangle_file_path if os.path.exists(triangle_file_path) else legacy_triangle_file_path
+            if os.path.exists(triangle_source_file_path):
+                current_modified = os.path.getmtime(triangle_source_file_path)
+                last_modified_ref = last_modified_triangle if triangle_source_file_path == triangle_file_path else last_modified_triangle_legacy
+
+                if current_modified > last_modified_ref:
+                    if triangle_source_file_path == triangle_file_path:
+                        last_modified_triangle = current_modified
+                    else:
+                        last_modified_triangle_legacy = current_modified
+
                     # 重新加载数据
-                    new_data = load_tradingview_data()
-                    # 更新TradingView策略数据
-                    data_storage.tradingview_data = new_data.get('trade_records', [])
-                    data_storage.tradingview_rounds = new_data.get('round_records', [])
-                    data_storage.tradingview_summary = new_data.get('summary', {
+                    new_data = load_triangle_data()
+                    # 更新三角策略数据
+                    data_storage.triangle_data = new_data.get('trade_records', [])
+                    data_storage.triangle_rounds = new_data.get('round_records', [])
+                    data_storage.triangle_summary = new_data.get('summary', {
+                        'initial_funds': 0.0,
+                        'total_realized_pnl': 0.0,
+                        'current_funds': 0.0,
+                        'total_return_rate': 0.0,
+                        'close_trade_count': 0,
                         'win_trades': 0,
                         'lose_trades': 0,
-                        'total_profit': 0.0,
-                        'total_profit_all': 0.0,
-                        'initial_funds': 1000.0
+                        'archived_realized_pnl': 0.0,
+                        'retained_record_count': 0,
                     })
-                    data_storage._refresh_tradingview_signal_ids()
+                    data_storage._triangle_open_positions = _rebuild_triangle_open_positions(data_storage.triangle_data)
+                    data_storage.strategy_status['triangle'] = '运行'
+                    data_storage.strategy_status['triangle'] = '运行'
+                    data_storage._refresh_triangle_signal_ids()
                     data_storage.update_global_data()
                     # 广播更新
                     socketio.emit('all_data', data_storage.get_all_data())
-                    print("TradingView策略数据已更新")
+                    print("三角策略数据已更新")
 
             # 检查带单策略数据文件
             if os.path.exists(lead_file_path):
@@ -613,7 +864,7 @@ def check_file_updates():
                     socketio.emit('all_data', data_storage.get_all_data())
                     print("套利策略数据已更新")
             
-            # 每5秒检查一次
+            # 每 5 秒检查一次
             time.sleep(5)
         except Exception as e:
             print(f"检查文件更新失败: {e}")
@@ -624,17 +875,17 @@ def check_file_updates():
 top_bottom_file_data = load_top_bottom_data()
 # 加载现货策略数据
 spot_file_data = load_spot_data()
-# 加载总仓盈亏数据
+# 加载总盈亏数据
 total_profit_data = load_total_profit_data()
 # 加载套利策略数据
 arbitrage_data = load_arbitrage_data()
 # 加载带单策略数据
 lead_data = load_lead_data()
-# 加载TradingView策略数据
-tradingview_data = load_tradingview_data()
-tradingview_trade_records = tradingview_data.get('trade_records', [])
-tradingview_round_records = tradingview_data.get('round_records', [])
-tradingview_summary = tradingview_data.get('summary', {
+# 加载三角策略数据
+triangle_data = load_triangle_data()
+triangle_trade_records = triangle_data.get('trade_records', [])
+triangle_round_records = triangle_data.get('round_records', [])
+triangle_summary = triangle_data.get('summary', {
     'win_trades': 0,
     'lose_trades': 0,
     'total_profit': 0.0,
@@ -642,14 +893,14 @@ tradingview_summary = tradingview_data.get('summary', {
     'initial_funds': 1000.0
 })
 
-# 定期获取BTC价格的函数
+# 定期获取 BTC 价格
 def fetch_btc_price():
     # 延迟启动，确保服务已经完全启动
     time.sleep(10)
     
     while True:
         try:
-            # 尝试使用Binance API
+            # 优先尝试 Binance API
             response = requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', timeout=3)
             if response.status_code == 200:
                 data = response.json()
@@ -659,9 +910,9 @@ def fetch_btc_price():
                     data_storage.update_market_data({'btc_price': btc_price})
                     # 广播更新
                     socketio.emit('all_data', data_storage.get_all_data())
-                    # print(f"BTC价格更新: ${btc_price}")
+                    # print(f"BTC 价格更新: ${btc_price}")
             else:
-                # 如果Binance API失败，尝试使用CoinGecko API
+                # Binance 失败时尝试 CoinGecko API
                 response = requests.get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd', timeout=3)
                 if response.status_code == 200:
                     data = response.json()
@@ -671,19 +922,25 @@ def fetch_btc_price():
                         data_storage.update_market_data({'btc_price': btc_price})
                         # 广播更新
                         socketio.emit('all_data', data_storage.get_all_data())
-                        # print(f"BTC价格更新 (CoinGecko): ${btc_price}")
+                        # print(f"BTC 价格更新 (CoinGecko): ${btc_price}")
         except Exception as e:
-            print(f"获取BTC价格失败: {e}")
-        # 每30秒获取一次价格
+            print(f"获取 BTC 价格失败: {e}")
+        # 每 30 秒拉取一次价格
         time.sleep(30)
 
 global_data = {
-    'tradingview': tradingview_trade_records,  # TradingView交易数据
-    'tradingview_rounds': tradingview_round_records,  # TradingView过去几轮盈利记录
-    'tradingview_summary': tradingview_summary,  # TradingView策略盈亏摘要
+    'triangle': {
+        'trade_records': triangle_trade_records,
+        'round_records': triangle_round_records,
+        'summary': triangle_summary,
+    },
+    'triangle_summary': triangle_summary,
+    'triangle': triangle_trade_records,  # 三角策略交易数据
+    'triangle_rounds': triangle_round_records,  # 三角策略历史轮次记录
+    'triangle_summary': triangle_summary,  # 三角策略盈亏摘要
     'arbitrage_data': arbitrage_data,  # 套利策略数据
     'lead_data': lead_data,  # 带单策略数据
-    'total_profit_data': total_profit_data,  # 总仓盈亏数据
+    'total_profit_data': total_profit_data,  # 总盈亏数据
     'top_bottom_data': {
         'position_status': top_bottom_file_data.get('position_status', '摸顶做空'),  # 当前仓位状态：摸顶做空/抄底做多
         'position_quantity': top_bottom_file_data.get('position_quantity', 0.17),  # 当前仓位数量
@@ -699,23 +956,26 @@ global_data = {
     },
     'strategy_status': {
         'lead': '运行',         # 带单策略状态：运行/暂停
-        'tradingview': '做空',  # 4H多空策略状态：做空/做多/暂停
+        'triangle': '运行',     # 三角策略状态：运行/暂停
+        'triangle': '运行',  # 兼容旧键，保留相同状态值
         'arbitrage': '运行',     # 套利策略状态：运行/暂停
         'top_bottom': top_bottom_file_data.get('position_status', '摸顶做空'),  # 摸顶抄底策略状态：摸顶做空/抄底做多/空仓
-        'spot': '空仓'           # 现货策略状态：运行满仓/建仓/空仓
+        'spot': '空仓'           # 现货策略状态：满仓/建仓/空仓
     },
     'market_data': {
         'cycle': '熊',  # 牛熊周期判断：牛/熊
-        'btc_price': 68000.0  # 当前BTCUSDT价格
+        'btc_price': 68000.0  # 当前 BTCUSDT 价格
     }
 }
 
-# 数据存储类
+    # 数据存储类
 class DataStorage:
     def __init__(self):
-        self.tradingview_data = global_data['tradingview']
-        self.tradingview_rounds = global_data.get('tradingview_rounds', [])
-        self.tradingview_summary = global_data['tradingview_summary']
+        self.triangle_data = global_data['triangle']
+        self.triangle_rounds = global_data.get('triangle_rounds', [])
+        self.triangle_summary = global_data['triangle_summary']
+        self.triangle_data = global_data['triangle']
+        self.triangle_summary = global_data['triangle_summary']
         self.arbitrage_data = global_data['arbitrage_data']
         self.lead_data = global_data['lead_data']
         self.total_profit_data = global_data['total_profit_data']
@@ -724,20 +984,21 @@ class DataStorage:
         self.strategy_status = global_data['strategy_status']
         self.market_data = global_data['market_data']
         self.arbitrage_start_time = None  # 套利策略启动时间
-        self._tradingview_signal_ids = set()
+        self._triangle_signal_ids = set()
         self._apply_memory_limits()
-        self._refresh_tradingview_signal_ids()
+        self._refresh_triangle_signal_ids()
+        self._triangle_open_positions = _rebuild_triangle_open_positions(self.triangle_data)
 
-    def _refresh_tradingview_signal_ids(self):
-        self._tradingview_signal_ids = {
+    def _refresh_triangle_signal_ids(self):
+        self._triangle_signal_ids = {
             str(record.get('signal_id')).strip()
-            for record in self.tradingview_data
+            for record in self.triangle_data
             if isinstance(record, dict) and str(record.get('signal_id') or '').strip()
         }
 
     def _apply_memory_limits(self):
-        _trim_list_inplace(self.tradingview_data, MAX_TRADINGVIEW_RECORDS, keep='head')
-        _trim_list_inplace(self.tradingview_rounds, MAX_TRADINGVIEW_ROUNDS, keep='head')
+        _trim_list_inplace(self.triangle_data, MAX_TRIANGLE_RECORDS, keep='head')
+        _trim_list_inplace(self.triangle_rounds, MAX_TRIANGLE_ROUNDS, keep='head')
 
         if isinstance(self.top_bottom_data, dict):
             _trim_list_inplace(self.top_bottom_data.get('trade_records'), MAX_TOP_BOTTOM_RECORDS, keep='head')
@@ -775,7 +1036,7 @@ class DataStorage:
             archived_realized_pnl = _to_float(lead_summary.get('archived_realized_pnl', 0.0), 0.0)
             dropped_records = lead_records[MAX_LEAD_RECORDS:]
             archived_realized_pnl += sum(
-                _to_float(record.get('order_pnl'), _extract_tradingview_profit_delta(record) or 0.0)
+                _to_float(record.get('order_pnl'), _extract_triangle_profit_delta(record) or 0.0)
                 for record in dropped_records
                 if isinstance(record, dict)
             )
@@ -793,9 +1054,14 @@ class DataStorage:
     def update_global_data(self):
         global global_data
         self._apply_memory_limits()
-        global_data['tradingview'] = self.tradingview_data
-        global_data['tradingview_rounds'] = self.tradingview_rounds
-        global_data['tradingview_summary'] = self.tradingview_summary
+        triangle_payload = {
+            'trade_records': self.triangle_data,
+            'round_records': self.triangle_rounds,
+            'summary': self.triangle_summary,
+        }
+        global_data['triangle'] = self.triangle_data
+        global_data['triangle_summary'] = self.triangle_summary
+        global_data['triangle_rounds'] = self.triangle_rounds
         global_data['arbitrage_data'] = self.arbitrage_data
         global_data['lead_data'] = self.lead_data
         global_data['total_profit_data'] = self.total_profit_data
@@ -805,73 +1071,121 @@ class DataStorage:
         global_data['market_data'] = self.market_data
         global_data['arbitrage_start_time'] = self.arbitrage_start_time
     
-    def add_tradingview_trade(self, trade_data):
+    def add_triangle_trade(self, trade_data):
         signal_id = str(trade_data.get('signal_id') or '').strip()
-        if signal_id and signal_id in self._tradingview_signal_ids:
-            print(f"TradingView重复信号已忽略: {signal_id}")
+        if signal_id and signal_id in self._triangle_signal_ids:
+            print(f"三角策略重复信号已忽略: {signal_id}")
             return
 
-        trade_data['timestamp'] = datetime.now().strftime('%Y-%m-%d-%H:%M:%S')
-        trade_data.setdefault('strategy_type', 'legacy_tradingview')
-        trade_data.setdefault('strategy_label', '4H策略')
-        trade_data.setdefault('web_mode', 'tradingview')
-        trade_data.setdefault('web_category', 'tradingview')
-        trade_data.setdefault('web_strategy_label', '4H策略')
-        trade_data.setdefault('account_id', 'default')
-        trade_data.setdefault('account_label', '默认账号')
-        trade_data.setdefault('account_profile', 'default.json')
-        # 插入到列表开头，实现时间从近到远显示
-        self.tradingview_data.insert(0, trade_data)
+        if not isinstance(self.triangle_data, list):
+            self.triangle_data = []
+        if not isinstance(self.triangle_rounds, list):
+            self.triangle_rounds = []
+        if not isinstance(self.triangle_summary, dict):
+            self.triangle_summary = {}
+        if not isinstance(getattr(self, '_triangle_open_positions', None), dict):
+            self._triangle_open_positions = _rebuild_triangle_open_positions(self.triangle_data)
+
+        raw_records = trade_data.get('trade_records') if isinstance(trade_data, dict) and isinstance(trade_data.get('trade_records'), list) else [trade_data]
+        existing_records = []
+        existing_keys = set()
+
+        for current in self.triangle_data:
+            if not isinstance(current, dict):
+                continue
+            record = _normalize_triangle_trade_record(current)
+            if record['order_key'] in existing_keys:
+                continue
+            existing_keys.add(record['order_key'])
+            existing_records.append(record)
+
+        added_records = 0
+        duplicate_records = 0
+        added_close_profit = 0.0
+        added_close_count = 0
+        added_win_count = 0
+        added_lose_count = 0
+        for raw_record in raw_records:
+            if not isinstance(raw_record, dict):
+                continue
+            record = _normalize_triangle_trade_record(raw_record)
+            if record['order_key'] in existing_keys:
+                duplicate_records += 1
+                continue
+            existing_keys.add(record['order_key'])
+
+            trade_type = str(record.get('trade_type') or '').strip()
+            if trade_type in TRIANGLE_OPEN_TYPES:
+                _triangle_apply_open_trade(self._triangle_open_positions, record)
+            elif _trade_type_matches(trade_type, TRIANGLE_CLOSE_TYPES):
+                computed_pnl = _triangle_apply_close_trade(self._triangle_open_positions, record, update_record=True)
+                if computed_pnl is not None:
+                    added_close_profit += _to_float(computed_pnl, 0.0)
+                    added_close_count += 1
+                    if computed_pnl > 0:
+                        added_win_count += 1
+                    elif computed_pnl < 0:
+                        added_lose_count += 1
+
+            existing_records.insert(0, record)
+            added_records += 1
+
+        summary = self.triangle_summary if isinstance(self.triangle_summary, dict) else {}
+        initial_funds = _to_float(summary.get('initial_funds', trade_data.get('initial_funds', 0.0) if isinstance(trade_data, dict) else 0.0), 0.0)
+
+        if isinstance(trade_data, dict) and isinstance(trade_data.get('round_record'), dict):
+            self.triangle_rounds.insert(0, trade_data['round_record'])
+        if isinstance(trade_data, dict) and isinstance(trade_data.get('round_records'), list):
+            self.triangle_rounds = trade_data['round_records']
+
+        if len(existing_records) > MAX_TRIANGLE_RECORDS:
+            del existing_records[MAX_TRIANGLE_RECORDS:]
+
+        self.triangle_data = existing_records
+        current_total_realized_pnl = _to_float(summary.get('total_realized_pnl', summary.get('total_profit', 0.0)), 0.0) + added_close_profit
+        round_profit = _sum_triangle_round_profit(self.triangle_rounds)
+        current_return_rate = (current_total_realized_pnl / initial_funds * 100) if initial_funds > 0 else 0.0
+        current_funds = initial_funds + current_total_realized_pnl
+
+        updated_summary = dict(summary)
+        updated_summary.update({
+            'initial_funds': round(initial_funds, 4),
+            'total_realized_pnl': round(current_total_realized_pnl, 4),
+            'current_funds': round(current_funds, 4),
+            'total_return_rate': round(current_return_rate, 6),
+            'total_profit': round(current_total_realized_pnl, 4),
+            'total_profit_all': round(current_total_realized_pnl + round_profit, 4),
+            'retained_record_count': len(existing_records),
+            'close_trade_count': int(_to_float(summary.get('close_trade_count', 0), 0.0)) + added_close_count,
+            'win_trades': int(_to_float(summary.get('win_trades', 0), 0.0)) + added_win_count,
+            'lose_trades': int(_to_float(summary.get('lose_trades', 0), 0.0)) + added_lose_count,
+        })
+
+        if 'archived_realized_pnl' not in updated_summary:
+            updated_summary['archived_realized_pnl'] = 0.0
+
+        self.triangle_summary = updated_summary
+        self.strategy_status['triangle'] = '运行'
+        self.strategy_status['triangle'] = '运行'
         if signal_id:
-            self._tradingview_signal_ids.add(signal_id)
+            self._triangle_signal_ids.add(signal_id)
 
-        # 支持通过接口附带更新过去几轮盈利记录
-        if isinstance(trade_data.get('round_record'), dict):
-            self.tradingview_rounds.insert(0, trade_data['round_record'])
-        if isinstance(trade_data.get('round_records'), list):
-            self.tradingview_rounds = trade_data['round_records']
-
-        profit_delta = _extract_tradingview_profit_delta(trade_data)
-        if profit_delta is not None:
-            current_total_profit = _to_float(self.tradingview_summary.get('total_profit', 0.0), 0.0)
-            self.tradingview_summary['total_profit'] = round(current_total_profit + profit_delta, 4)
-
-            current_win_trades = int(_to_float(self.tradingview_summary.get('win_trades', 0), 0.0))
-            current_lose_trades = int(_to_float(self.tradingview_summary.get('lose_trades', 0), 0.0))
-            if profit_delta > 0:
-                self.tradingview_summary['win_trades'] = current_win_trades + 1
-                self.tradingview_summary['lose_trades'] = current_lose_trades
-            elif profit_delta < 0:
-                self.tradingview_summary['win_trades'] = current_win_trades
-                self.tradingview_summary['lose_trades'] = current_lose_trades + 1
-            else:
-                self.tradingview_summary['win_trades'] = current_win_trades
-                self.tradingview_summary['lose_trades'] = current_lose_trades
-        else:
-            # 兼容旧版手工推送：如果上游已经给了累计总盈亏，仍然直接采用。
-            if 'win_trades' in trade_data:
-                self.tradingview_summary['win_trades'] = trade_data['win_trades']
-            if 'lose_trades' in trade_data:
-                self.tradingview_summary['lose_trades'] = trade_data['lose_trades']
-            if 'total_profit' in trade_data:
-                self.tradingview_summary['total_profit'] = trade_data['total_profit']
-            if 'initial_funds' in trade_data:
-                self.tradingview_summary['initial_funds'] = trade_data['initial_funds']
-
-        self.tradingview_summary['total_profit_all'] = round(
-            _to_float(self.tradingview_summary.get('total_profit', 0.0), 0.0)
-            + _sum_tradingview_round_profit(self.tradingview_rounds),
-            4,
+        self.update_global_data()
+        latest_record = existing_records[0] if existing_records else {}
+        latest_symbol = latest_record.get('symbol', '-') if isinstance(latest_record, dict) else '-'
+        latest_account = latest_record.get('account_label', '-') if isinstance(latest_record, dict) else '-'
+        latest_type = latest_record.get('trade_type', '-') if isinstance(latest_record, dict) else '-'
+        latest_pnl = _to_float(latest_record.get('order_pnl'), 0.0) if isinstance(latest_record, dict) else 0.0
+        print(
+            f"三角更新 | 新增:{added_records} 重复:{duplicate_records} 最新:{latest_account}/{latest_symbol}/{latest_type} "
+            f"订单盈亏:{latest_pnl:.4f}USDT"
         )
 
-        self._apply_memory_limits()
-        
-        self.update_global_data()
-        # 保存TradingView策略数据到本地文件
-        save_tradingview_data({
-            'trade_records': self.tradingview_data,
-            'round_records': self.tradingview_rounds,
-            'summary': self.tradingview_summary
+        # 保存三角策略数据到本地文件
+        save_triangle_data({
+            'trade_records': self.triangle_data,
+            'round_records': self.triangle_rounds,
+            'summary': self.triangle_summary,
         })
 
     def update_lead_data(self, data):
@@ -910,14 +1224,18 @@ class DataStorage:
         initial_funds = _to_float(summary.get('initial_funds', data.get('initial_funds', 0.0) if isinstance(data, dict) else 0.0), 0.0)
         archived_realized_pnl = _to_float(summary.get('archived_realized_pnl', 0.0), 0.0)
 
+        _replay_trade_records_with_pnl(existing_records)
+
         if len(existing_records) > MAX_LEAD_RECORDS:
             dropped_records = existing_records[MAX_LEAD_RECORDS:]
             archived_realized_pnl += sum(
-                _to_float(record.get('order_pnl'), _extract_tradingview_profit_delta(record) or 0.0)
+                _to_float(record.get('order_pnl'), _extract_triangle_profit_delta(record) or 0.0)
                 for record in dropped_records
                 if isinstance(record, dict)
             )
             del existing_records[MAX_LEAD_RECORDS:]
+
+        _replay_trade_records_with_pnl(existing_records)
 
         self.lead_data = {
             'summary': _build_lead_summary(
@@ -943,7 +1261,7 @@ class DataStorage:
         save_lead_data(self.lead_data)
     
     def update_arbitrage_data(self, data):
-        """更新套利数据：只以唯一订单的 net_profit 作为总额计算来源。"""
+        """更新套利数据：仅以单笔订单的 net_profit 作为总额计算来源。"""
         arbitrage_data_file = os.path.join(data_dir, 'arbitrage_trades.json')
         existing_data = {}
         if os.path.exists(arbitrage_data_file):
@@ -951,7 +1269,7 @@ class DataStorage:
                 with open(arbitrage_data_file, 'r', encoding='utf-8') as f:
                     existing_data = json.load(f)
             except Exception as e:
-                print(f"⚠️ 读取套利策略数据文件异常：{e}")
+                print(f"读取套利策略数据文件异常: {e}")
 
         def build_record(detail):
             symbol = detail.get('symbol', 'UNKNOWN')
@@ -987,7 +1305,7 @@ class DataStorage:
         current_summary = self.arbitrage_data.get('profit_summary', {}) if isinstance(self.arbitrage_data.get('profit_summary'), dict) else {}
         existing_summary = existing_data.get('profit_summary', {}) if isinstance(existing_data.get('profit_summary'), dict) else {}
 
-        # 初始资金优先使用本地已填写值，其次才使用请求中的值
+        # 初始资金优先使用本地已落盘的值，其次才使用请求中的值
         initial_funds = _to_float(
             existing_summary.get(
                 'initial_funds',
@@ -1028,7 +1346,7 @@ class DataStorage:
             0.0
         )
 
-        # 套利记录按最新优先保留尾部，同时将被裁剪部分利润归档，保证累计收益不丢失。
+        # 套利记录按最新优先保留尾部，被裁剪部分的利润并入归档，保证累计收益不丢失
         records = self.arbitrage_data['trade_records']
         if len(records) > MAX_ARBITRAGE_RECORDS:
             drop_count = len(records) - MAX_ARBITRAGE_RECORDS
@@ -1108,7 +1426,7 @@ class DataStorage:
         return True
     
     def add_top_bottom_trade(self, trade_data):
-        # 确保trade_data包含必要的字段
+        # 确保 trade_data 包含必要字段
         required_fields = ['mode', 'quantity', 'avg_price', 'is_closed', 'profit']
         for field in required_fields:
             if field not in trade_data:
@@ -1117,11 +1435,11 @@ class DataStorage:
         # 添加时间戳
         trade_data['timestamp'] = datetime.now().strftime('%Y-%m-%d-%H:%M:%S')
         
-        # 如果已平仓，添加平仓时间戳
+        # 如果已平仓，补充平仓时间戳
         if trade_data.get('is_closed'):
             trade_data['close_timestamp'] = trade_data.get('close_timestamp', datetime.now().strftime('%Y-%m-%d-%H:%M:%S'))
         
-        # 插入到列表开头，实现时间从近到远显示
+        # 插入到列表头部，实现最新记录优先显示
         self.top_bottom_data['trade_records'].insert(0, trade_data)
         _trim_list_inplace(self.top_bottom_data.get('trade_records'), MAX_TOP_BOTTOM_RECORDS, keep='head')
         
@@ -1141,7 +1459,7 @@ class DataStorage:
         return True
     
     def add_spot_trade(self, trade_data):
-        # 确保trade_data包含必要的字段
+        # 确保 trade_data 包含必要字段
         required_fields = ['quantity', 'avg_price', 'is_closed', 'profit']
         for field in required_fields:
             if field not in trade_data:
@@ -1150,11 +1468,11 @@ class DataStorage:
         # 添加时间戳
         trade_data['timestamp'] = datetime.now().strftime('%Y-%m-%d-%H:%M:%S')
         
-        # 如果已平仓，添加平仓时间戳
+        # 如果已平仓，补充平仓时间戳
         if trade_data.get('is_closed'):
             trade_data['close_timestamp'] = trade_data.get('close_timestamp', datetime.now().strftime('%Y-%m-%d-%H:%M:%S'))
         
-        # 插入到列表开头，实现时间从近到远显示
+        # 插入到列表头部，实现最新记录优先显示
         self.spot_data['trade_records'].insert(0, trade_data)
         _trim_list_inplace(self.spot_data.get('trade_records'), MAX_SPOT_RECORDS, keep='head')
         
@@ -1163,9 +1481,11 @@ class DataStorage:
     
     def get_all_data(self):
         return {
-            'tradingview': self.tradingview_data,
-            'tradingview_rounds': self.tradingview_rounds,
-            'tradingview_summary': self.tradingview_summary,
+            'triangle': self.triangle_data,
+            'triangle_summary': self.triangle_summary,
+            'triangle': self.triangle_data,
+            'triangle_rounds': self.triangle_rounds,
+            'triangle_summary': self.triangle_summary,
             'lead': self.lead_data,
             'arbitrage': self.arbitrage_data,
             'total_profit': self.total_profit_data,
@@ -1183,11 +1503,11 @@ data_storage = DataStorage()
 file_update_thread = threading.Thread(target=check_file_updates, daemon=True)
 file_update_thread.start()
 
-# 启动获取BTC价格的线程
+# 启动获取 BTC 价格的线程
 btc_price_thread = threading.Thread(target=fetch_btc_price, daemon=True)
 btc_price_thread.start()
 
-# WebSocket事件处理
+# WebSocket 事件处理
 @socketio.on('connect')
 def handle_connect():
     # print('Client connected')
@@ -1197,12 +1517,12 @@ def handle_connect():
 def handle_disconnect():
     pass
 
-# API端点
-@app.route('/api/update_tradingview', methods=['POST'])
-def update_tradingview_data():
+# API 端点
+@app.route('/api/update_triangle', methods=['POST'])
+def update_triangle_data():
     data = request.json
     if data:
-        data_storage.add_tradingview_trade(data)
+        data_storage.add_triangle_trade(data)
         socketio.emit('all_data', data_storage.get_all_data())
         return jsonify({'status': 'success'})
     return jsonify({'status': 'error'}), 400
@@ -1299,12 +1619,12 @@ def index():
 def inject_datetime():
     return {'current_datetime': datetime.now()}
 
-# 为data目录添加静态文件路由
+# 为 data 目录添加静态文件路由
 @app.route('/data/<path:filename>')
 def serve_data_file(filename):
     return send_from_directory(data_dir, filename)
 
-# 为static目录添加静态文件路由
+# 为 static 目录添加静态文件路由
 @app.route('/static/<path:filename>')
 def serve_static_file(filename):
     static_dir = os.path.join(os.path.dirname(__file__), 'static')
@@ -1324,7 +1644,7 @@ if __name__ == '__main__':
             if 'code 400, message' in message:
                 return
 
-            # 过滤含有控制字符的异常协议噪音行
+            # 过滤包含控制字符的异常协议噪音行
             has_ctrl = any((ord(ch) < 32 and ch not in '\r\n\t') for ch in message)
             if has_ctrl:
                 return
@@ -1340,3 +1660,4 @@ if __name__ == '__main__':
     app.logger.disabled = True
     sys.stderr = FilteredStderr(sys.stderr)
     socketio.run(app, host='0.0.0.0', port=5000, debug=False, log_output=False)
+

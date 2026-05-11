@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -96,14 +96,14 @@
         .panel-shell,
         #lead-section,
         #arbitrage-section,
-        #tradingview-section,
+        #triangle-section,
         #top-bottom-section {
             border: 1px solid rgba(226, 232, 240, 0.95);
             box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06), 0 2px 8px rgba(15, 23, 42, 0.04);
         }
         #lead-section,
         #arbitrage-section,
-        #tradingview-section,
+        #triangle-section,
         #top-bottom-section {
             position: relative;
             overflow: hidden;
@@ -111,7 +111,7 @@
         }
         #lead-section::before,
         #arbitrage-section::before,
-        #tradingview-section::before,
+        #triangle-section::before,
         #top-bottom-section::before {
             content: '';
             position: absolute;
@@ -126,8 +126,8 @@
         #arbitrage-section::before {
             background: linear-gradient(90deg, #10b981, #34d399);
         }
-        #tradingview-section::before {
-            background: linear-gradient(90deg, #3b82f6, #60a5fa);
+        #triangle-section::before {
+            background: linear-gradient(90deg, #06b6d4, #22d3ee);
         }
         #top-bottom-section::before {
             background: linear-gradient(90deg, #f59e0b, #fbbf24);
@@ -135,7 +135,7 @@
         .panel-shell .bg-gray-50,
         #lead-section .bg-gray-50,
         #arbitrage-section .bg-gray-50,
-        #tradingview-section .bg-gray-50,
+        #triangle-section .bg-gray-50,
         #top-bottom-section .bg-gray-50 {
             background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
             border: 1px solid rgba(226, 232, 240, 0.85);
@@ -352,7 +352,7 @@
                 overflow: hidden;
             }
 
-            #tradingview-section {
+            #triangle-section {
                 grid-column: 1;
                 grid-row: 3 / 5;
                 display: flex;
@@ -388,35 +388,35 @@
             #yearly-curve-section .p-6,
             #lead-section,
             #arbitrage-section,
-            #tradingview-section,
+            #triangle-section,
             #top-bottom-section {
                 padding: 0.5rem;
             }
 
             #lead-section > .mb-6,
             #arbitrage-section > .mb-6,
-            #tradingview-section > .mb-6,
+            #triangle-section > .mb-6,
             #top-bottom-section > .mb-6 {
                 margin-bottom: 0.35rem !important;
             }
 
             #lead-section > .mb-6 p,
             #arbitrage-section > .mb-6 p,
-            #tradingview-section > .mb-6 p,
+            #triangle-section > .mb-6 p,
             #top-bottom-section > .mb-6 p {
                 display: none;
             }
 
             #lead-section > .bg-white,
             #arbitrage-section > .bg-white,
-            #tradingview-section > .grid,
+            #triangle-section > .bg-white,
             #top-bottom-section > .grid {
                 margin-bottom: 0.35rem !important;
             }
 
             #lead-section .bg-white.p-6,
             #arbitrage-section .bg-white.p-6,
-            #tradingview-section .bg-white.p-6,
+            #triangle-section .bg-white.p-6,
             #top-bottom-section .bg-white.p-6,
             #report-section .p-6 {
                 padding: 0.46rem !important;
@@ -426,10 +426,6 @@
                 display: grid;
                 grid-template-rows: auto minmax(0, 1fr);
                 min-height: 0;
-            }
-
-            #tradingview-round-card {
-                display: none;
             }
 
             #summary-section .grid {
@@ -544,7 +540,6 @@
             <div class="bg-white rounded-xl shadow-md p-6 panel-shell">
                 <h3 class="text-xl font-semibold text-dark mb-4">交易系统总盈亏</h3>
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
-                    <!-- 隐藏当前总资金 -->
                     <div class="bg-gray-50 rounded-lg p-3 min-w-0">
                         <div class="text-xs text-gray-500 mb-1">累计净收益</div>
                         <div class="text-lg font-bold text-green-600 break-all" id="total-net-profit">$0.00</div>
@@ -557,7 +552,7 @@
                         <div class="text-xs text-gray-500 mb-1">本年收益率</div>
                         <div class="text-lg font-bold text-green-600 break-all" id="yearly-return-rate">0.00%</div>
                     </div>
-                     <div class="bg-gray-50 rounded-lg p-3 min-w-0">
+                    <div class="bg-gray-50 rounded-lg p-3 min-w-0">
                         <div class="text-xs text-gray-500 mb-1">本年净收益</div>
                         <div class="text-lg font-bold text-green-600 break-all" id="yearly-return-profit">$0.00</div>
                     </div>
@@ -593,7 +588,7 @@
             </div>
         </section>
 
-   <!-- 带单策略模块 -->
+        <!-- 带单策略模块 -->
         <section id="lead-section" class="mb-12 bg-gray-100 rounded-xl p-6 panel-section">
             <div class="mb-6">
                 <div class="flex items-center mb-3">
@@ -657,7 +652,7 @@
             </div>
         </section>
 
-   <!-- 套利策略模块 -->
+        <!-- 套利策略模块 -->
         <section id="arbitrage-section" class="mb-12 bg-gray-100 rounded-xl p-6 panel-section">
             <div class="mb-6">
                 <div class="flex items-center mb-3">
@@ -672,7 +667,7 @@
                     <span class="px-2 py-1 rounded-full text-xs font-semibold" id="arbitrage-status">运行</span>
                 </div>
             </div>
-            
+
             <div class="bg-white rounded-xl shadow-md p-6 mb-6">
                 <h4 class="text-lg font-semibold text-dark mb-4">本轮盈亏</h4>
                 <p class="text-gray-600 mb-3" id="arbitrage-start-time">2026年3月11日 至今</p>
@@ -691,34 +686,20 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="bg-white rounded-xl shadow-md p-6 flex-1 min-h-0 record-card">
                 <h4 class="text-lg font-semibold text-dark mb-4">交易记录</h4>
                 <div class="table-container overflow-x-auto compact-table-container">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    时间
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    交易对
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    方向
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    价值($)
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    开仓价格
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    平仓价格
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    净收益
-                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易对</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">方向</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">价值($)</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">开仓价格</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">平仓价格</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">净收益</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200" id="arbitrage-tbody">
@@ -734,131 +715,62 @@
             </div>
         </section>
 
-        <!-- 4H多空策略模块 -->
-        <section id="tradingview-section" class="mb-12 bg-gray-100 rounded-xl p-6 panel-section">
+        <!-- 三角策略模块 -->
+        <section id="triangle-section" class="mb-12 bg-gray-100 rounded-xl p-6 panel-section">
             <div class="mb-6">
                 <div class="flex items-center mb-3">
-                    <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                        <i class="fa fa-signal text-primary text-xl"></i>
+                    <div class="w-10 h-10 bg-cyan-100 rounded-full flex items-center justify-center mr-3">
+                        <i class="fa fa-sitemap text-cyan-600 text-xl"></i>
                     </div>
-                    <h3 class="text-lg font-semibold text-dark">4H策略</h3>
+                    <h3 class="text-lg font-semibold text-dark">三角策略</h3>
                 </div>
-                <p class="text-gray-600 mb-3">低频趋势波段交易。</p>
+                <p class="text-gray-600 mb-3">TradeSync 同步的 triangle 账号和三角策略订单。</p>
                 <div class="flex items-center mb-4">
                     <span class="text-xs font-medium text-gray-500 mr-2">状态:</span>
-                    <span class="px-2 py-1 rounded-full text-xs font-semibold" id="tradingview-status">做空</span>
+                    <span class="px-2 py-1 rounded-full text-xs font-semibold" id="triangle-status">运行</span>
                 </div>
             </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
-                <div class="bg-white rounded-xl shadow-md p-6 md:col-span-1">
-                    <h4 class="text-lg font-semibold text-dark mb-4">策略总盈亏</h4>
-                    <div class="grid grid-cols-1 gap-3">
-                        <div class="bg-gray-50 rounded-lg p-3">
-                            <div class="text-xs text-gray-500 mb-1">收益</div>
-                            <div class="text-lg font-bold text-green-600" id="tradingview-all-total-profit">$0.00</div>
-                        </div>
-                    </div>
-                </div>
 
-                <div class="bg-white rounded-xl shadow-md p-6 md:col-span-4">
-                    <h4 class="text-lg font-semibold text-dark mb-4">本轮盈亏#1.5</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-                        <div class="bg-gray-50 rounded-lg p-3">
-                            <div class="text-xs text-gray-500 mb-1">本金</div>
-                            <div class="text-lg font-bold text-dark" id="tradingview-initial-funds">$1000.00</div>
-                        </div>
-                        <div class="bg-gray-50 rounded-lg p-3">
-                            <div class="text-xs text-gray-500 mb-1">收益</div>
-                            <div class="text-lg font-bold text-green-600" id="tradingview-total-profit">$0.00</div>
-                        </div>
-                        <div class="bg-gray-50 rounded-lg p-3">
-                            <div class="text-xs text-gray-500 mb-1">收益率</div>
-                            <div class="text-lg font-bold text-green-600" id="tradingview-return-rate">0.00%</div>
-                        </div>
-                        <div class="bg-gray-50 rounded-lg p-3">
-                            <div class="text-xs text-gray-500 mb-1">胜率</div>
-                            <div class="text-lg font-bold text-green-600" id="tradingview-win-rate">100.0%</div>
-                        </div>
+            <div class="bg-white rounded-xl shadow-md p-6 mb-6">
+                <h4 class="text-lg font-semibold text-dark mb-4">本轮盈亏</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-500 mb-1">本金</div>
+                        <div class="text-lg font-bold text-dark" id="triangle-initial-funds">$0.00</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-500 mb-1">累计净收益</div>
+                        <div class="text-lg font-bold text-green-600" id="triangle-total-net-profit">$0.00</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-500 mb-1">累计收益率</div>
+                        <div class="text-lg font-bold text-green-600" id="triangle-total-return-rate">0.00%</div>
                     </div>
                 </div>
             </div>
-            
+
             <div class="bg-white rounded-xl shadow-md p-6 flex-1 min-h-0 record-card">
-                <h4 class="text-lg font-semibold text-dark mb-4">交易记录</h4>
+                <h4 class="text-lg font-semibold text-dark mb-4">订单记录</h4>
                 <div class="table-container overflow-x-auto compact-table-container">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    交易对
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    方向
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    数量
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    价格
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    本笔盈亏
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    交易类型
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    时间
-                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">账号</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易对</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">方向</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">数量</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">价格</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">订单盈亏</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">备注</th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200" id="tradingview-tbody">
+                        <tbody class="bg-white divide-y divide-gray-200" id="triangle-tbody">
                             <tr>
-                                <td colspan="7" class="px-3 py-4 text-center text-gray-500">
+                                <td colspan="9" class="px-3 py-4 text-center text-gray-500">
                                     <i class="fa fa-info-circle text-lg mb-1"></i>
-                                    <p>暂无交易记录</p>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div id="tradingview-round-card" class="bg-white rounded-xl shadow-md p-6 mt-6 flex-1 min-h-0">
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
-                    <h4 class="text-lg font-semibold text-dark">过去几轮盈利记录</h4>
-                    
-                </div>
-                <div class="table-container overflow-x-auto compact-table-container">
-                    <table class="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    标识
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    方向
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    本金
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    盈亏
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    收益率
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    时间跨度
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200" id="tradingview-round-tbody">
-                            <tr>
-                                <td colspan="6" class="px-3 py-4 text-center text-gray-500">
-                                    <i class="fa fa-info-circle text-lg mb-1"></i>
-                                    <p>暂无过去几轮盈利记录</p>
+                                    <p>暂无订单记录</p>
                                 </td>
                             </tr>
                         </tbody>
@@ -882,7 +794,7 @@
                     <span class="px-2 py-1 rounded-full text-xs font-semibold" id="top-bottom-status">摸顶做空</span>
                 </div>
             </div>
-            
+
             <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
                 <div class="bg-white rounded-xl shadow-md p-6 md:col-span-1">
                     <h4 class="text-lg font-semibold text-dark mb-4">策略总盈亏</h4>
@@ -899,11 +811,11 @@
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                         <div class="bg-gray-50 rounded-lg p-3">
                             <div class="text-xs text-gray-500 mb-1">当前仓位状态</div>
-                            <div class="text-md font-bold text-dark" id="top-bottom-status-display">做空</div>
+                            <div class="text-md font-bold text-dark" id="top-bottom-status-display">摸顶做空</div>
                         </div>
                         <div class="bg-gray-50 rounded-lg p-3">
                             <div class="text-xs text-gray-500 mb-1">当前仓位数量</div>
-                            <div class="text-md font-bold text-dark" id="top-bottom-quantity"> </div>
+                            <div class="text-md font-bold text-dark" id="top-bottom-quantity"></div>
                         </div>
                         <div class="bg-gray-50 rounded-lg p-3">
                             <div class="text-xs text-gray-500 mb-1">当前仓位均价</div>
@@ -923,27 +835,13 @@
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    建仓时间
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    模式
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    仓位
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    均价
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    是否平仓
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    平仓时间
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    盈亏
-                                </th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">建仓时间</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">模式</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">仓位</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">均价</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">是否平仓</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">平仓时间</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">盈亏</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200" id="top-bottom-tbody">
@@ -959,9 +857,7 @@
             </div>
         </section>
 
-
-     
-         <!-- 交易报告 -->
+        <!-- 交易报告 -->
         <section id="report-section" class="mb-12 panel-section">
             <div class="bg-white rounded-xl shadow-md p-6 panel-shell">
                 <h3 class="text-xl font-semibold text-dark mb-4">交易报告</h3>
@@ -980,13 +876,12 @@
                 </div>
             </div>
         </section>
-        
     </main>
 
     <footer class="bg-dark text-white py-6 mt-10">
         <div class="container mx-auto px-4">
             <div class="text-center text-gray-400 text-sm">
-                <p>&copy; {{ current_datetime.strftime('%Y') }} 项勇 · 一个人就是一支军队.</p>
+                <p>&copy; {{ current_datetime.strftime('%Y') }} 项勇 · 一个人就是一支军队</p>
             </div>
         </div>
     </footer>
@@ -1172,14 +1067,11 @@
                 updateArbitrageTable(data.arbitrage);
             }
             
-            // 更新TradingView策略数据
-            if (data.tradingview_summary) {
-                updateTradingViewSummary(data.tradingview_summary, data.tradingview_rounds || []);
+            // 更新三角策略数据
+            if (data.triangle || data.triangle_summary) {
+                updateTriangleSummary(data.triangle_summary || data.triangle || {});
+                updateTriangleTable(data.triangle || {});
             }
-            if (data.tradingview) {
-                updateTradingViewTable(data.tradingview);
-            }
-            updateTradingViewRoundTable(data.tradingview_rounds || [], data.tradingview_summary?.initial_funds || 0);
             
             // 更新摸顶抄底策略数据
             updateTopBottomData(data);
@@ -1196,154 +1088,120 @@
             updateYearlyProfitCurve(data);
         });
         
-        // 更新TradingView交易记录表格
-        function updateTradingViewTable(data) {
-            const tbody = document.getElementById('tradingview-tbody');
-            if (data.length === 0) {
+        // 更新三角策略订单记录表格
+        function updateTriangleTable(data) {
+            const tbody = document.getElementById('triangle-tbody');
+            if (!tbody) {
+                return;
+            }
+
+            const tradeRecords = Array.isArray(data)
+                ? data
+                : Array.isArray(data?.trade_records)
+                    ? data.trade_records
+                    : [];
+
+            if (tradeRecords.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                        <td colspan="9" class="px-6 py-8 text-center text-gray-500">
                             <i class="fa fa-info-circle text-2xl mb-2"></i>
-                            <p>暂无交易记录</p>
+                            <p>暂无订单记录</p>
                         </td>
                     </tr>
                 `;
                 return;
             }
-            
-            // 按时间戳排序，最新的记录在前面
-            const sortedData = [...data].sort((a, b) => {
-                // 确保时间戳格式正确
-                const timeA = a.timestamp ? new Date(a.timestamp.replace(/-/g, '/')) : 0;
-                const timeB = b.timestamp ? new Date(b.timestamp.replace(/-/g, '/')) : 0;
+
+            const sortedData = [...tradeRecords].sort((a, b) => {
+                const timeA = a.timestamp ? new Date(String(a.timestamp).replace(/-/g, '/')) : 0;
+                const timeB = b.timestamp ? new Date(String(b.timestamp).replace(/-/g, '/')) : 0;
                 return timeB - timeA;
             });
-            
-            // 仅显示最近100条，完整历史仍保留在存储中
+
             const displayData = sortedData.slice(0, MAX_DISPLAY_RECORDS);
-            
             tbody.innerHTML = '';
+
             displayData.forEach(trade => {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-gray-50';
-                const symbol = trade.symbol || '-';
+
                 const side = trade.side || '未知';
-                const quantity = trade.quantity || 0;
-                const price = trade.price || 0;
-                const profitValue = trade.realized_pnl ?? trade.gross_pnl ?? trade.net_profit;
                 const tradeType = trade.trade_type || '未知';
-                const timestamp = trade.timestamp || '';
-                const sideClass = (side === 'BUY') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                const orderPnl = trade.order_pnl ?? trade.realized_pnl ?? trade.net_profit;
+                const pnl = orderPnl === undefined || orderPnl === null || orderPnl === '' ? null : Number(orderPnl);
+                const pnlClass = pnl === null
+                    ? 'text-gray-500'
+                    : pnl >= 0
+                        ? 'text-green-600'
+                        : 'text-red-600';
+                const pnlPrefix = pnl !== null && pnl >= 0 ? '+' : '';
+
+                const sideClass = side === 'BUY'
+                    ? 'bg-green-100 text-green-800'
+                    : side === 'SELL'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-gray-100 text-gray-800';
+
                 const tradeTypeClass = {
                     '开仓': 'bg-blue-100 text-blue-800',
+                    '加仓': 'bg-cyan-100 text-cyan-800',
                     '止盈': 'bg-green-100 text-green-800',
                     '止损': 'bg-red-100 text-red-800',
                     '平仓': 'bg-yellow-100 text-yellow-800',
                     '未知': 'bg-gray-100 text-gray-800'
                 }[tradeType] || 'bg-gray-100 text-gray-800';
-                const hasProfit = profitValue !== undefined && profitValue !== null && profitValue !== '';
-                const profit = hasProfit ? Number(profitValue) : null;
-                const profitClass = profit === null
-                    ? 'text-gray-500'
-                    : profit > 0
-                        ? 'text-green-600'
-                        : profit < 0
-                            ? 'text-red-600'
-                            : 'text-gray-500';
-                const profitPrefix = profit !== null && profit > 0 ? '+' : '';
-                tr.innerHTML = `
-                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${symbol}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm">
-                        <span class="px-1.5 inline-flex text-xs leading-4 font-semibold rounded-full ${sideClass}">
-                            ${side}
-                        </span>
-                    </td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${quantity}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${price}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium ${profitClass}">${profit === null ? '-' : `${profitPrefix}$${profit.toFixed(4)}`}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm">
-                        <span class="px-1.5 inline-flex text-xs leading-4 font-semibold rounded-full ${tradeTypeClass}">
-                            ${tradeType}
-                        </span>
-                    </td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${timestamp}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-            
-        }
 
-        // 更新TradingView过去几轮盈利记录表格
-        function updateTradingViewRoundTable(data, defaultPrincipal = 0) {
-            const tbody = document.getElementById('tradingview-round-tbody');
-            if (!tbody) {
-                return;
-            }
-
-            if (!Array.isArray(data) || data.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">
-                            <i class="fa fa-info-circle text-2xl mb-2"></i>
-                            <p>暂无过去几轮盈利记录</p>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-
-            const sortedData = [...data].sort((a, b) => {
-                const timeA = (a.end_time || a.timestamp || '').replace(/-/g, '/');
-                const timeB = (b.end_time || b.timestamp || '').replace(/-/g, '/');
-                return new Date(timeB) - new Date(timeA);
-            });
-
-            const displayData = sortedData.slice(0, MAX_DISPLAY_RECORDS);
-            tbody.innerHTML = '';
-
-            displayData.forEach(item => {
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-gray-50';
-
-                const identifier = item.identifier || item.id || item.label || '-';
-                const directionRaw = String(item.direction || '-').toUpperCase();
-                let direction = item.direction || '-';
-                if (['BUY', 'LONG', '多', '做多'].includes(directionRaw) || ['多', '做多'].includes(item.direction)) {
-                    direction = '做多';
-                } else if (['SELL', 'SHORT', '空', '做空'].includes(directionRaw) || ['空', '做空'].includes(item.direction)) {
-                    direction = '做空';
+                let priceText = '-';
+                if (trade.entry_price !== undefined && trade.entry_price !== null && trade.exit_price !== undefined && trade.exit_price !== null && ['平仓', '止盈', '止损'].includes(tradeType)) {
+                    priceText = `${Number(trade.entry_price).toFixed(4)} -> ${Number(trade.exit_price).toFixed(4)}`;
+                } else if (trade.price !== undefined && trade.price !== null) {
+                    priceText = Number(trade.price).toFixed(4);
                 }
 
-                const pnl = Number(item.pnl ?? item.profit ?? 0);
-                const principal = Number(item.principal ?? item.initial_funds ?? defaultPrincipal ?? 0);
-                const hasPrincipal = principal > 0;
-                const returnRate = hasPrincipal ? (pnl / principal) * 100 : null;
-                const timespan = item.timespan || item.time_span || item.duration || '-';
-
-                const directionClass = direction === '做多'
-                    ? 'bg-green-100 text-green-800'
-                    : direction === '做空'
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-gray-100 text-gray-800';
-
-                const pnlClass = pnl >= 0 ? 'text-green-600' : 'text-red-600';
-                const pnlPrefix = pnl >= 0 ? '+' : '';
-                const returnClass = returnRate !== null && returnRate < 0 ? 'text-red-600' : 'text-green-600';
-                const returnPrefix = returnRate !== null && returnRate >= 0 ? '+' : '';
-
                 tr.innerHTML = `
-                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${identifier}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.timestamp || '-'}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${trade.account_label || trade.account_id || '-'}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${trade.symbol || '-'}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm">
-                        <span class="px-1.5 inline-flex text-xs leading-4 font-semibold rounded-full ${directionClass}">${direction}</span>
+                        <span class="px-1.5 inline-flex text-xs leading-4 font-semibold rounded-full ${sideClass}">${side}</span>
                     </td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${hasPrincipal ? ('$' + principal.toFixed(1)) : '-'}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium ${pnlClass}">${pnlPrefix}$${pnl.toFixed(1)}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium ${returnClass}">${returnRate !== null ? (returnPrefix + returnRate.toFixed(2) + '%') : '-'}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${timespan}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm">
+                        <span class="px-1.5 inline-flex text-xs leading-4 font-semibold rounded-full ${tradeTypeClass}">${tradeType}</span>
+                    </td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.quantity || 0}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${priceText}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium ${pnlClass}">${pnl === null ? '-' : `${pnlPrefix}$${pnl.toFixed(4)}`}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.reason || '-'}</td>
                 `;
                 tbody.appendChild(tr);
             });
+        }
 
+        // 更新三角策略盈亏摘要
+        function updateTriangleSummary(data) {
+            const summary = data?.summary || data || {};
+            const initialFunds = Number(summary.initial_funds || 0);
+            const totalProfit = Number(summary.total_realized_pnl ?? summary.total_profit ?? 0);
+            const totalReturnRate = Number(summary.total_return_rate || 0);
+
+            const initialFundsEl = document.getElementById('triangle-initial-funds');
+            const totalProfitEl = document.getElementById('triangle-total-net-profit');
+            const totalReturnRateEl = document.getElementById('triangle-total-return-rate');
+
+            if (!initialFundsEl || !totalProfitEl || !totalReturnRateEl) {
+                return;
+            }
+
+            initialFundsEl.textContent = '$' + initialFunds.toFixed(2);
+            totalProfitEl.textContent = (totalProfit >= 0 ? '+' : '') + '$' + totalProfit.toFixed(4);
+            totalProfitEl.className = 'text-lg font-bold ' + (totalProfit >= 0 ? 'text-green-600' : 'text-red-600');
+            totalReturnRateEl.textContent = (totalReturnRate >= 0 ? '+' : '') + totalReturnRate.toFixed(2) + '%';
+            totalReturnRateEl.className = 'text-lg font-bold ' + (totalReturnRate >= 0 ? 'text-green-600' : 'text-red-600');
+        }
+
+        function updateTriangleRoundTable() {
+            return;
         }
 
         function updateLeadSummary(data) {
@@ -1468,15 +1326,15 @@
                 return;
             }
             
-            // 按时间戳排序，最新的记录在前面
+            // 按时间倒序排列，最新记录在前
             const sortedTradeRecords = [...tradeRecords].sort((a, b) => {
-                // 确保时间戳格式正确
+                // 确保时间格式可解析
                 const timeA = a.timestamp ? new Date(a.timestamp.replace(/-/g, '/')) : 0;
                 const timeB = b.timestamp ? new Date(b.timestamp.replace(/-/g, '/')) : 0;
                 return timeB - timeA;
             });
             
-            // 仅显示最近100条，完整历史仍保留在存储中
+            // 仅显示最近记录，完整历史仍保留在存储中
             const displayTradeRecords = sortedTradeRecords.slice(0, MAX_DISPLAY_RECORDS);
             
             tbody.innerHTML = '';
@@ -1520,10 +1378,10 @@
        
         // 更新套利策略盈亏摘要
         function updateArbitrageSummary(data) {
-            // 检查数据结构，处理两种可能的格式
+            // 兼容两种可能的数据结构
             const summary = data.profit_summary || data;
             
-            // 处理总收益率，确保显示为百分比格式
+            // 统一总收益率显示格式
             let totalReturnRate = summary.total_return_rate || 0;
             if (typeof totalReturnRate === 'number') {
                 totalReturnRate = totalReturnRate.toFixed(1) + '%';
@@ -1533,40 +1391,6 @@
             document.getElementById('arbitrage-initial-funds').textContent = '$' + (summary.initial_funds || 1000.0);
             document.getElementById('arbitrage-total-net-profit').textContent = '$' + (summary.total_net_profit || 0).toFixed(1);
             document.getElementById('arbitrage-total-return-rate').textContent = totalReturnRate;
-        }
-        
-        // 更新TradingView策略盈亏摘要
-        function updateTradingViewSummary(data, roundRecords = []) {
-            // 从数据中提取必要的信息
-            const winTrades = data.win_trades || 0;
-            const loseTrades = data.lose_trades || 0;
-            const totalProfit = Number(data.total_profit || 0);
-            const roundsProfitSum = Array.isArray(roundRecords)
-                ? roundRecords.reduce((sum, item) => sum + Number(item?.pnl ?? item?.profit ?? 0), 0)
-                : 0;
-            const totalProfitAll = totalProfit + roundsProfitSum;
-            const initialFunds = data.initial_funds || 1000.0;
-            
-            // 计算胜率
-            const totalTrades = winTrades + loseTrades;
-            const winRate = totalTrades > 0 ? (winTrades / totalTrades) * 100 : 0;
-            
-            // 计算总收益率
-            const returnRate = initialFunds > 0 ? (totalProfit / initialFunds) * 100 : 0;
-
-            // 更新总策略盈亏模块
-            const totalProfitAllEl = document.getElementById('tradingview-all-total-profit');
-            if (totalProfitAllEl) {
-                totalProfitAllEl.textContent = '$' + totalProfitAll.toFixed(1);
-                totalProfitAllEl.classList.remove('text-green-600', 'text-red-600');
-                totalProfitAllEl.classList.add(totalProfitAll >= 0 ? 'text-green-600' : 'text-red-600');
-            }
-            
-            // 更新TradingView策略模块中的盈亏摘要
-            document.getElementById('tradingview-total-profit').textContent = '$' + totalProfit.toFixed(1);
-            document.getElementById('tradingview-return-rate').textContent = returnRate.toFixed(1) + '%';
-            document.getElementById('tradingview-win-rate').textContent = winRate.toFixed(1) + '%';
-            document.getElementById('tradingview-initial-funds').textContent = '$' + initialFunds.toFixed(1);
         }
         
         // 更新顶部策略盈亏摘要
@@ -1610,7 +1434,8 @@
             
             const statusMap = {
                 'lead': 'lead-status',
-                'tradingview': 'tradingview-status',
+                'triangle': 'triangle-status',
+                'triangle': 'triangle-status',
                 'arbitrage': 'arbitrage-status',
                 'top_bottom': 'top-bottom-status'
             };
@@ -1653,7 +1478,7 @@
                 }
             }
             
-            // 更新BTC价格
+            // 更新 BTC 价格
             if (marketData.btc_price) {
                 const priceElement = document.getElementById('btc-price');
                 if (priceElement) {
@@ -1666,17 +1491,17 @@
         
         // 更新摸顶抄底策略数据
         function updateTopBottomData(data) {
-            // 检查data是否存在
+            // 检查数据是否存在
             if (!data) return;
             
-            // 检查数据结构，top_bottom是正确的键名
+            // top_bottom 是当前使用的数据键
             const topBottomData = data.top_bottom || data;
             
             if (!topBottomData) return;
             
             console.log('摸顶抄底数据:', topBottomData);
 
-            // 更新总策略盈亏（累计交易记录盈亏）
+            // 更新策略总盈亏（累计交易记录盈亏）
             const topBottomTotalProfit = (topBottomData.trade_records || []).reduce((sum, trade) => {
                 return sum + (parseFloat(trade.profit) || 0);
             }, 0);
@@ -1712,7 +1537,7 @@
         // 更新摸顶抄底策略交易记录表格
         function updateTopBottomTable(data) {
             const tbody = document.getElementById('top-bottom-tbody');
-            // 检查数据结构，top_bottom是正确的键名
+            // top_bottom 是当前使用的数据键
             const topBottomData = data.top_bottom || data;
             const tradeRecords = topBottomData.trade_records || [];
             
@@ -1728,15 +1553,15 @@
                 return;
             }
             
-            // 按时间戳排序，最新的记录在前面
+            // 按时间倒序排列，最新记录在前
             const sortedTradeRecords = [...tradeRecords].sort((a, b) => {
-                // 确保时间戳格式正确
+                // 确保时间格式可解析
                 const timeA = a.timestamp ? new Date(a.timestamp.replace(/-/g, '/')) : 0;
                 const timeB = b.timestamp ? new Date(b.timestamp.replace(/-/g, '/')) : 0;
                 return timeB - timeA;
             });
             
-            // 仅显示最近100条，完整历史仍保留在存储中
+            // 仅显示最近记录，完整历史仍保留在存储中
             const displayTradeRecords = sortedTradeRecords.slice(0, MAX_DISPLAY_RECORDS);
             
             tbody.innerHTML = '';
@@ -1767,7 +1592,7 @@
         
         // 计算浮盈
         function calculateFloatProfit(topBottomData) {
-            // 获取当前BTC价格
+            // 获取当前 BTC 价格
             const priceElement = document.getElementById('btc-price');
             if (!priceElement) return;
             
@@ -1784,10 +1609,10 @@
             
             // 根据仓位状态计算浮盈
             if (positionStatus === '摸顶做空' || positionStatus === '做空') {
-                // 做空：(开仓价格 - 当前价格) * 数量
+                // 做空: (开仓价格 - 当前价格) * 数量
                 floatProfit = (positionAvgPrice - currentPrice) * positionQuantity;
             } else if (positionStatus === '抄底做多' || positionStatus === '做多') {
-                // 做多：(当前价格 - 开仓价格) * 数量
+                // 做多: (当前价格 - 开仓价格) * 数量
                 floatProfit = (currentPrice - positionAvgPrice) * positionQuantity;
             }
             
@@ -1821,7 +1646,7 @@
             document.getElementById('current-time').textContent = now.toLocaleString('zh-CN', options);
         }
         
-        // 每1秒更新一次时间
+        // 每秒更新一次时间
         setInterval(updateCurrentTime, 1000);
         
         // 页面加载时更新时间
@@ -2137,9 +1962,9 @@
                     console.log('初始数据:', data);
                     updateLeadSummary(data.lead || {});
                     updateLeadTable(data.lead || {});
-                    updateTradingViewTable(data.tradingview);
-                    updateTradingViewRoundTable(data.tradingview_rounds || [], data.tradingview_summary?.initial_funds || 0);
-                    updateTradingViewSummary(data.tradingview_summary || {}, data.tradingview_rounds || []);
+                    updateTriangleTable(data.triangle);
+                    updateTriangleRoundTable(data.triangle_rounds || [], data.triangle_summary?.initial_funds || 0);
+                    updateTriangleSummary(data.triangle_summary || {}, data.triangle_rounds || []);
                     updateArbitrageTable(data.arbitrage);
                     updateArbitrageSummary(data.arbitrage);
                     updateStrategyStatus(data);

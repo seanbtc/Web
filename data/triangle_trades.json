@@ -1,0 +1,55 @@
+{
+  "trade_records": [
+   
+  ],
+  "round_records": [
+    {
+      "identifier": "1.5",
+      "direction": "做空",
+      "principal": 20000,
+      "pnl": 2400,
+      "timespan": "2025-09-09 ~ 2025-10-17"
+    },
+    {
+      "identifier": "1.4",
+      "direction": "做多",
+      "principal": 14311,
+      "pnl": 2210,
+      "timespan": "2025-09-09 ~ 2025-10-17"
+    },
+    {
+      "identifier": "1.3",
+      "direction": "做空",
+      "principal": 15211,
+      "pnl": -900,
+      "timespan": "2025-08-29 ~ 2025-09-09"
+    },
+    {
+      "identifier": "1.2",
+      "direction": "做多",
+      "principal": 14011,
+      "pnl": 1200,
+      "timespan": "2025-05-23 ~ 2025-08-29"
+    },
+    {
+      "identifier": "1.1",
+      "direction": "做空",
+      "principal": 16011,
+      "pnl": -2000,
+      "timespan": "2025-03-13 ~ 2025-05-23"
+    }
+  ],
+  "summary": {
+    "initial_funds": 40000.0,
+    "total_realized_pnl": 0.0,
+    "current_funds": 40000.0,
+    "total_return_rate": 0,
+    "close_trade_count": 0,
+    "win_trades": 0,
+    "lose_trades": 0,
+    "archived_realized_pnl": 0.0,
+    "retained_record_count": 0,
+    "total_profit": 0,
+    "total_profit_all": 0
+  }
+}
