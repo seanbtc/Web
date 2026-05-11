@@ -97,7 +97,6 @@
         #lead-section,
         #arbitrage-section,
         #tradingview-section,
-        #spot-section,
         #top-bottom-section {
             border: 1px solid rgba(226, 232, 240, 0.95);
             box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06), 0 2px 8px rgba(15, 23, 42, 0.04);
@@ -105,7 +104,6 @@
         #lead-section,
         #arbitrage-section,
         #tradingview-section,
-        #spot-section,
         #top-bottom-section {
             position: relative;
             overflow: hidden;
@@ -114,7 +112,6 @@
         #lead-section::before,
         #arbitrage-section::before,
         #tradingview-section::before,
-        #spot-section::before,
         #top-bottom-section::before {
             content: '';
             position: absolute;
@@ -132,9 +129,6 @@
         #tradingview-section::before {
             background: linear-gradient(90deg, #3b82f6, #60a5fa);
         }
-        #spot-section::before {
-            background: linear-gradient(90deg, #a855f7, #c084fc);
-        }
         #top-bottom-section::before {
             background: linear-gradient(90deg, #f59e0b, #fbbf24);
         }
@@ -142,7 +136,6 @@
         #lead-section .bg-gray-50,
         #arbitrage-section .bg-gray-50,
         #tradingview-section .bg-gray-50,
-        #spot-section .bg-gray-50,
         #top-bottom-section .bg-gray-50 {
             background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
             border: 1px solid rgba(226, 232, 240, 0.85);
@@ -351,17 +344,17 @@
                 overflow: hidden;
             }
 
-            #tradingview-section {
-                grid-column: 1;
-                grid-row: 3 / 5;
+            #arbitrage-section {
+                grid-column: 3;
+                grid-row: 1 / 3;
                 display: flex;
                 flex-direction: column;
                 overflow: hidden;
             }
 
-            #spot-section {
-                grid-column: 3;
-                grid-row: 1 / 3;
+            #tradingview-section {
+                grid-column: 1;
+                grid-row: 3 / 5;
                 display: flex;
                 flex-direction: column;
                 overflow: hidden;
@@ -396,7 +389,6 @@
             #lead-section,
             #arbitrage-section,
             #tradingview-section,
-            #spot-section,
             #top-bottom-section {
                 padding: 0.5rem;
             }
@@ -404,7 +396,6 @@
             #lead-section > .mb-6,
             #arbitrage-section > .mb-6,
             #tradingview-section > .mb-6,
-            #spot-section > .mb-6,
             #top-bottom-section > .mb-6 {
                 margin-bottom: 0.35rem !important;
             }
@@ -412,7 +403,6 @@
             #lead-section > .mb-6 p,
             #arbitrage-section > .mb-6 p,
             #tradingview-section > .mb-6 p,
-            #spot-section > .mb-6 p,
             #top-bottom-section > .mb-6 p {
                 display: none;
             }
@@ -420,7 +410,6 @@
             #lead-section > .bg-white,
             #arbitrage-section > .bg-white,
             #tradingview-section > .grid,
-            #spot-section > .grid,
             #top-bottom-section > .grid {
                 margin-bottom: 0.35rem !important;
             }
@@ -428,7 +417,6 @@
             #lead-section .bg-white.p-6,
             #arbitrage-section .bg-white.p-6,
             #tradingview-section .bg-white.p-6,
-            #spot-section .bg-white.p-6,
             #top-bottom-section .bg-white.p-6,
             #report-section .p-6 {
                 padding: 0.46rem !important;
@@ -670,7 +658,7 @@
         </section>
 
    <!-- 套利策略模块 -->
-        <section id="arbitrage-section" class="hidden mb-12 bg-gray-100 rounded-xl p-6 panel-section">
+        <section id="arbitrage-section" class="mb-12 bg-gray-100 rounded-xl p-6 panel-section">
             <div class="mb-6">
                 <div class="flex items-center mb-3">
                     <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
@@ -871,91 +859,6 @@
                                 <td colspan="6" class="px-3 py-4 text-center text-gray-500">
                                     <i class="fa fa-info-circle text-lg mb-1"></i>
                                     <p>暂无过去几轮盈利记录</p>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
-
-        <!-- 现货策略模块 -->
-        <section id="spot-section" class="mb-12 bg-gray-100 rounded-xl p-6 panel-section">
-            <div class="mb-6">
-                <div class="flex items-center mb-3">
-                    <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mr-3">
-                        <i class="fa fa-shopping-cart text-purple-600 text-xl"></i>
-                    </div>
-                    <h3 class="text-lg font-semibold text-dark">现货策略</h3>
-                </div>
-                <p class="text-gray-600 mb-3">左侧抄底现货，牛顶卖出。</p>
-                <div class="flex items-center mb-4">
-                    <span class="text-xs font-medium text-gray-500 mr-2">状态:</span>
-                    <span class="px-2 py-1 rounded-full text-xs font-semibold" id="spot-status">空仓</span>
-                </div>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
-                <div class="bg-white rounded-xl shadow-md p-6 md:col-span-1">
-                    <h4 class="text-lg font-semibold text-dark mb-4">策略总盈亏</h4>
-                    <div class="grid grid-cols-1 gap-3">
-                        <div class="bg-gray-50 rounded-lg p-3">
-                            <div class="text-xs text-gray-500 mb-1">收益</div>
-                            <div class="text-lg font-bold text-green-600" id="spot-total-profit">$0.00</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-xl shadow-md p-6 md:col-span-4">
-                    <h4 class="text-lg font-semibold text-dark mb-3">本轮持仓</h4>
-                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        <div class="bg-gray-50 rounded-lg p-3">
-                            <div class="text-xs text-gray-500 mb-1">当前仓位数量</div>
-                            <div class="text-md font-bold text-dark" id="spot-quantity"> BTC</div>
-                        </div>
-                        <div class="bg-gray-50 rounded-lg p-3">
-                            <div class="text-xs text-gray-500 mb-1">当前仓位均价</div>
-                            <div class="text-md font-bold text-dark" id="spot-avg-price">$</div>
-                        </div>
-                        <div class="bg-gray-50 rounded-lg p-3">
-                            <div class="text-xs text-gray-500 mb-1">浮盈</div>
-                            <div class="text-md font-bold" id="spot-float-profit">$0.00</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-md p-6 flex-1 min-h-0 record-card">
-                <h4 class="text-lg font-semibold text-dark mb-4">交易记录</h4>
-                <div class="table-container overflow-x-auto compact-table-container">
-                    <table class="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    建仓时间
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    仓位
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    均价
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    是否平仓
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    平仓时间
-                                </th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    盈亏
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200" id="spot-tbody">
-                            <tr>
-                                <td colspan="6" class="px-3 py-4 text-center text-gray-500">
-                                    <i class="fa fa-info-circle text-lg mb-1"></i>
-                                    <p>暂无交易记录</p>
                                 </td>
                             </tr>
                         </tbody>
@@ -1709,8 +1612,7 @@
                 'lead': 'lead-status',
                 'tradingview': 'tradingview-status',
                 'arbitrage': 'arbitrage-status',
-                'top_bottom': 'top-bottom-status',
-                'spot': 'spot-status'
+                'top_bottom': 'top-bottom-status'
             };
             
             Object.entries(data.strategy_status).forEach(([strategy, status]) => {
@@ -1902,135 +1804,6 @@
                     floatProfitElement.classList.add('text-red-600');
                 }
             }
-        }
-        
-        // 计算现货策略浮盈
-        function calculateSpotFloatProfit(spotData) {
-            // 获取当前BTC价格
-            const priceElement = document.getElementById('btc-price');
-            if (!priceElement) return;
-            
-            const priceText = priceElement.textContent;
-            const currentPrice = parseFloat(priceText.replace('$', '').replace(',', ''));
-            
-            if (isNaN(currentPrice)) return;
-            
-            const positionQuantity = spotData.position_quantity;
-            const positionAvgPrice = spotData.position_avg_price;
-            
-            // 现货策略只有做多
-            const floatProfit = (currentPrice - positionAvgPrice) * positionQuantity;
-            
-            // 更新浮盈显示
-            const floatProfitElement = document.getElementById('spot-float-profit');
-            if (floatProfitElement) {
-                floatProfitElement.textContent = '$' + floatProfit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                
-                // 根据浮盈正负设置颜色
-                floatProfitElement.className = 'text-md font-bold';
-                if (floatProfit >= 0) {
-                    floatProfitElement.classList.add('text-green-600');
-                } else {
-                    floatProfitElement.classList.add('text-red-600');
-                }
-            }
-        }
-        
-        // 更新现货策略数据
-        function updateSpotData(data) {
-            // 检查data是否存在
-            if (!data) return;
-            
-            // 检查数据结构，spot可能是直接在根级别
-            const spotData = data.spot || data;
-            
-            if (!spotData) return;
-            
-            console.log('现货策略数据:', spotData);
-
-            // 更新总策略盈亏：优先使用 total_profit_history 最新值，否则回退为交易记录累计盈亏。
-            let spotTotalProfit = 0;
-            if (Array.isArray(spotData.total_profit_history) && spotData.total_profit_history.length > 0) {
-                const latest = spotData.total_profit_history[spotData.total_profit_history.length - 1];
-                spotTotalProfit = parseFloat(latest.total_profit) || 0;
-            } else {
-                spotTotalProfit = (spotData.trade_records || []).reduce((sum, trade) => {
-                    return sum + (parseFloat(trade.profit) || 0);
-                }, 0);
-            }
-
-            const spotTotalProfitElement = document.getElementById('spot-total-profit');
-            if (spotTotalProfitElement) {
-                spotTotalProfitElement.textContent = '$' + spotTotalProfit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                spotTotalProfitElement.className = 'text-lg font-bold ' + (spotTotalProfit >= 0 ? 'text-green-600' : 'text-red-600');
-            }
-            
-            // 更新仓位数量
-            const quantityElement = document.getElementById('spot-quantity');
-            if (quantityElement) {
-                quantityElement.textContent = (spotData.position_quantity || 0) + ' BTC';
-            }
-            
-            // 更新仓位均价
-            const avgPriceElement = document.getElementById('spot-avg-price');
-            if (avgPriceElement) {
-                const avgPrice = parseFloat(spotData.position_avg_price) || 0;
-                avgPriceElement.textContent = '$' + avgPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            }
-            
-            // 计算并更新浮盈
-            calculateSpotFloatProfit(spotData);
-        }
-        
-        // 更新现货策略交易记录表格
-        function updateSpotTable(data) {
-            const tbody = document.getElementById('spot-tbody');
-            // 检查数据结构，spot可能是直接在根级别
-            const spotData = data.spot || data;
-            const tradeRecords = spotData.trade_records || [];
-            
-            if (tradeRecords.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">
-                            <i class="fa fa-info-circle text-2xl mb-2"></i>
-                            <p>暂无交易记录</p>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-            
-            // 按时间戳排序，最新的记录在前面
-            const sortedTradeRecords = [...tradeRecords].sort((a, b) => {
-                // 确保时间戳格式正确
-                const timeA = a.timestamp ? new Date(a.timestamp.replace(/-/g, '/')) : 0;
-                const timeB = b.timestamp ? new Date(b.timestamp.replace(/-/g, '/')) : 0;
-                return timeB - timeA;
-            });
-            
-            // 仅显示最近100条，完整历史仍保留在存储中
-            const displayTradeRecords = sortedTradeRecords.slice(0, MAX_DISPLAY_RECORDS);
-            
-            tbody.innerHTML = '';
-            displayTradeRecords.forEach(trade => {
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-gray-50';
-                tr.innerHTML = `
-                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.timestamp || '-'}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.quantity || 0} BTC</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">$${(parseFloat(trade.avg_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm">
-                        <span class="px-1.5 inline-flex text-xs leading-4 font-semibold rounded-full ${trade.is_closed ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
-                            ${trade.is_closed ? '已平仓' : '未平仓'}
-                        </span>
-                    </td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.close_timestamp || '-'}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-${(parseFloat(trade.profit) >= 0) ? 'green-600' : 'red-600'}">$${(parseFloat(trade.profit) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-            
         }
         
         // 更新当前时间
@@ -2373,8 +2146,6 @@
                     updateMarketData(data);
                     updateTopBottomData(data);
                     updateTopBottomTable(data);
-                    updateSpotData(data);
-                    updateSpotTable(data);
                     updateTopSummary(data);
                     updateProfitCurve(data);
                     updateYearlyProfitCurve(data);
