@@ -1,3 +1,14 @@
+import importlib
+
+SOCKETIO_ASYNC_MODE = 'threading'
+eventlet = None
+try:
+    eventlet = importlib.import_module('eventlet')
+    eventlet.monkey_patch()
+    SOCKETIO_ASYNC_MODE = 'eventlet'
+except ImportError:
+    pass
+
 from flask import Flask, render_template, jsonify, request, send_from_directory
 import os
 import json
@@ -23,7 +34,7 @@ def after_request(response):
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     return response
-socketio = SocketIO(app, cors_allowed_origins='*')
+socketio = SocketIO(app, cors_allowed_origins='*', async_mode=SOCKETIO_ASYNC_MODE)
 
 
 def _env_int(name, default):
@@ -1659,5 +1670,12 @@ if __name__ == '__main__':
     log.setLevel(logging.ERROR)
     app.logger.disabled = True
     sys.stderr = FilteredStderr(sys.stderr)
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False, log_output=False)
-
+    run_kwargs = {
+        'host': '0.0.0.0',
+        'port': 5000,
+        'debug': False,
+        'log_output': False,
+    }
+    if SOCKETIO_ASYNC_MODE != 'eventlet':
+        run_kwargs['allow_unsafe_werkzeug'] = True
+    socketio.run(app, **run_kwargs)
