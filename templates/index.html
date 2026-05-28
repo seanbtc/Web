@@ -697,6 +697,18 @@
                 font-size: 0.66rem;
             }
 
+            #triangle-section .triangle-panel-grid {
+                display: flex;
+                flex-direction: column;
+                gap: 0.55rem;
+                min-height: 0;
+            }
+
+            #triangle-section .triangle-order-card,
+            #triangle-section .triangle-round-card {
+                flex: 0 0 auto;
+            }
+
             .record-card {
                 display: grid;
                 grid-template-rows: auto minmax(0, 1fr);
@@ -1293,10 +1305,10 @@
             const diffMs = now - startTime;
             
             // 计算总天数
-            const totalDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            const totalDays = diffMs / (1000 * 60 * 60 * 24);
             
             // 构建运行时长字符串
-            const runtimeString = `已运行: ${totalDays}天`;
+            const runtimeString = `已运行: ${totalDays.toFixed(1)}天`;
             
             // 更新页面显示
             const runtimeElement = document.getElementById('runtime');
@@ -1331,8 +1343,45 @@
             returnRateFill: 'rgba(255, 159, 10, 0.06)'
         };
 
+        function formatDecimal(value, fractionDigits = 1) {
+            const numericValue = Number(value);
+            if (!Number.isFinite(numericValue)) {
+                return '-';
+            }
+            return numericValue.toLocaleString('en-US', {
+                minimumFractionDigits: fractionDigits,
+                maximumFractionDigits: fractionDigits
+            });
+        }
+
+        function formatMoney(value, fractionDigits = 1) {
+            const formattedValue = formatDecimal(value, fractionDigits);
+            return formattedValue === '-' ? '-' : '$' + formattedValue;
+        }
+
+        function formatSignedMoney(value, fractionDigits = 1) {
+            const numericValue = Number(value);
+            if (!Number.isFinite(numericValue)) {
+                return '-';
+            }
+            return `${numericValue >= 0 ? '+' : ''}${formatMoney(numericValue, fractionDigits)}`;
+        }
+
+        function formatPercent(value, fractionDigits = 1) {
+            const formattedValue = formatDecimal(value, fractionDigits);
+            return formattedValue === '-' ? '-' : `${formattedValue}%`;
+        }
+
+        function formatSignedPercent(value, fractionDigits = 1) {
+            const numericValue = Number(value);
+            if (!Number.isFinite(numericValue)) {
+                return '-';
+            }
+            return `${numericValue >= 0 ? '+' : ''}${formatPercent(numericValue, fractionDigits)}`;
+        }
+
         function formatChartMoney(value) {
-            return '$' + Math.round(value).toLocaleString('en-US');
+            return formatMoney(value);
         }
 
         function createAppleChartDataset(label, data, options) {
@@ -1477,7 +1526,7 @@
                                 weight: '500'
                             },
                             callback: function(value) {
-                                return Math.round(value / 1000) + 'K';
+                                return formatDecimal(value / 1000) + 'K';
                             }
                         }
                     },
@@ -1510,7 +1559,7 @@
                                 weight: '500'
                             },
                             callback: function(value) {
-                                return value + '%';
+                                return formatPercent(value);
                             }
                         }
                     }
@@ -1761,9 +1810,9 @@
 
                 let priceText = '-';
                 if (trade.entry_price !== undefined && trade.entry_price !== null && trade.exit_price !== undefined && trade.exit_price !== null && ['平仓', '止盈', '止损'].includes(tradeType)) {
-                    priceText = `${Number(trade.entry_price).toFixed(4)} -> ${Number(trade.exit_price).toFixed(4)}`;
+                    priceText = `${formatDecimal(trade.entry_price)} -> ${formatDecimal(trade.exit_price)}`;
                 } else if (trade.price !== undefined && trade.price !== null) {
-                    priceText = Number(trade.price).toFixed(4);
+                    priceText = formatDecimal(trade.price);
                 }
 
                 tr.innerHTML = `
@@ -1776,9 +1825,9 @@
                     <td class="px-3 py-2 whitespace-nowrap text-sm">
                         <span class="px-1.5 inline-flex text-xs leading-4 font-semibold rounded-full ${tradeTypeClass}">${tradeType}</span>
                     </td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.quantity || 0}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${formatDecimal(trade.quantity || 0)}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${priceText}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium ${pnlClass}">${pnl === null ? '-' : `${pnlPrefix}$${pnl.toFixed(4)}`}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium ${pnlClass}">${pnl === null ? '-' : formatSignedMoney(pnl)}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.reason || '-'}</td>
                 `;
                 tbody.appendChild(tr);
@@ -1877,20 +1926,20 @@
                 return;
             }
 
-            initialFundsEl.textContent = '$' + initialFunds.toFixed(2);
-            totalProfitEl.textContent = (currentNetProfit >= 0 ? '+' : '') + '$' + currentNetProfit.toFixed(4);
+            initialFundsEl.textContent = formatMoney(initialFunds);
+            totalProfitEl.textContent = formatSignedMoney(currentNetProfit);
             totalProfitEl.className = 'text-lg font-bold dashboard-metric-value ' + (currentNetProfit >= 0 ? 'text-green-600' : 'text-red-600');
-            currentReturnRateEl.textContent = (currentReturnRate >= 0 ? '+' : '') + currentReturnRate.toFixed(2) + '%';
+            currentReturnRateEl.textContent = formatSignedPercent(currentReturnRate);
             currentReturnRateEl.className = 'text-lg font-bold dashboard-metric-value ' + (currentReturnRate >= 0 ? 'text-green-600' : 'text-red-600');
-            historyProfitEl.textContent = (historyProfit >= 0 ? '+' : '') + '$' + historyProfit.toFixed(4);
+            historyProfitEl.textContent = formatSignedMoney(historyProfit);
             historyProfitEl.className = 'text-lg font-bold dashboard-metric-value ' + (historyProfit >= 0 ? 'text-green-600' : 'text-red-600');
-            totalProfitAllEl.textContent = (totalProfitAll >= 0 ? '+' : '') + '$' + totalProfitAll.toFixed(4);
+            totalProfitAllEl.textContent = formatSignedMoney(totalProfitAll);
             totalProfitAllEl.className = 'text-lg font-bold dashboard-metric-value ' + (totalProfitAll >= 0 ? 'text-green-600' : 'text-red-600');
             if (roundCountEl) {
-                roundCountEl.textContent = String(roundCount);
+                roundCountEl.textContent = formatDecimal(roundCount);
             }
             if (closeTradeCountEl) {
-                closeTradeCountEl.textContent = String(closeTradeCount);
+                closeTradeCountEl.textContent = formatDecimal(closeTradeCount);
             }
         }
 
@@ -1912,21 +1961,6 @@
                 `;
                 return;
             }
-
-            const formatMoney = value => {
-                const amount = Number(value || 0);
-                return '$' + Math.abs(amount).toLocaleString('en-US', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
-            };
-            const formatSignedMoney = value => {
-                const amount = Number(value || 0);
-                if (amount === 0) {
-                    return formatMoney(0);
-                }
-                return `${amount > 0 ? '+' : '-'}${formatMoney(amount)}`;
-            };
 
             const displayData = records.slice(0, MAX_DISPLAY_RECORDS);
             tbody.innerHTML = '';
@@ -1963,7 +1997,7 @@
                     </td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${formatMoney(principal)}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm font-medium ${pnlClass}">${formatSignedMoney(pnl)}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium ${rateClass}">${returnRate >= 0 ? '+' : ''}${returnRate.toFixed(2)}%</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium ${rateClass}">${formatSignedPercent(returnRate)}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -1983,10 +2017,10 @@
                 return;
             }
 
-            initialFundsEl.textContent = '$' + initialFunds.toFixed(2);
-            totalProfitEl.textContent = (totalProfit >= 0 ? '+' : '') + '$' + totalProfit.toFixed(4);
+            initialFundsEl.textContent = formatMoney(initialFunds);
+            totalProfitEl.textContent = formatSignedMoney(totalProfit);
             totalProfitEl.className = 'text-lg font-bold ' + (totalProfit >= 0 ? 'text-green-600' : 'text-red-600');
-            totalReturnRateEl.textContent = (totalReturnRate >= 0 ? '+' : '') + totalReturnRate.toFixed(2) + '%';
+            totalReturnRateEl.textContent = formatSignedPercent(totalReturnRate);
             totalReturnRateEl.className = 'text-lg font-bold ' + (totalReturnRate >= 0 ? 'text-green-600' : 'text-red-600');
         }
 
@@ -2049,9 +2083,9 @@
 
                 let priceText = '-';
                 if (trade.entry_price !== undefined && trade.entry_price !== null && trade.exit_price !== undefined && trade.exit_price !== null && ['平仓', '止盈', '止损'].includes(tradeType)) {
-                    priceText = `${Number(trade.entry_price).toFixed(4)} -> ${Number(trade.exit_price).toFixed(4)}`;
+                    priceText = `${formatDecimal(trade.entry_price)} -> ${formatDecimal(trade.exit_price)}`;
                 } else if (trade.price !== undefined && trade.price !== null) {
-                    priceText = Number(trade.price).toFixed(4);
+                    priceText = formatDecimal(trade.price);
                 }
 
                 tr.innerHTML = `
@@ -2064,9 +2098,9 @@
                     <td class="px-3 py-2 whitespace-nowrap text-sm">
                         <span class="px-1.5 inline-flex text-xs leading-4 font-semibold rounded-full ${tradeTypeClass}">${tradeType}</span>
                     </td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.quantity || 0}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${formatDecimal(trade.quantity || 0)}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${priceText}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium ${pnlClass}">${pnl === null ? '-' : `${pnlPrefix}$${pnl.toFixed(4)}`}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium ${pnlClass}">${pnl === null ? '-' : formatSignedMoney(pnl)}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.reason || '-'}</td>
                 `;
                 tbody.appendChild(tr);
@@ -2147,15 +2181,12 @@
             const summary = data.profit_summary || data;
             
             // 统一总收益率显示格式
-            let totalReturnRate = summary.total_return_rate || 0;
-            if (typeof totalReturnRate === 'number') {
-                totalReturnRate = totalReturnRate.toFixed(1) + '%';
-            }
+            const totalReturnRate = parseFloat(summary.total_return_rate) || 0;
             
             // 更新套利策略模块中的盈亏摘要
-            document.getElementById('arbitrage-initial-funds').textContent = '$' + (summary.initial_funds || 1000.0);
-            document.getElementById('arbitrage-total-net-profit').textContent = '$' + (summary.total_net_profit || 0).toFixed(1);
-            document.getElementById('arbitrage-total-return-rate').textContent = totalReturnRate;
+            document.getElementById('arbitrage-initial-funds').textContent = formatMoney(summary.initial_funds || 1000.0);
+            document.getElementById('arbitrage-total-net-profit').textContent = formatMoney(summary.total_net_profit || 0);
+            document.getElementById('arbitrage-total-return-rate').textContent = formatPercent(totalReturnRate);
         }
         
         // 更新顶部策略盈亏摘要
@@ -2187,10 +2218,10 @@
             const yearlyReturnRate = toNumber(summary.yearly_return_rate);
             const yearlyReturnProfit = toNumber(summary.yearly_return_profit);
 
-            document.getElementById('total-net-profit').textContent = '$' + Math.round(totalNetProfit);
-            document.getElementById('total-return-rate').textContent = totalReturnRate.toFixed(1) + '%';
-            document.getElementById('yearly-return-rate').textContent = yearlyReturnRate.toFixed(1) + '%';
-            document.getElementById('yearly-return-profit').textContent = '$' + Math.round(yearlyReturnProfit);
+            document.getElementById('total-net-profit').textContent = formatMoney(totalNetProfit);
+            document.getElementById('total-return-rate').textContent = formatPercent(totalReturnRate);
+            document.getElementById('yearly-return-rate').textContent = formatPercent(yearlyReturnRate);
+            document.getElementById('yearly-return-profit').textContent = formatMoney(yearlyReturnProfit);
         }
         
         // 更新策略状态
@@ -2247,7 +2278,7 @@
             if (marketData.btc_price) {
                 const priceElement = document.getElementById('btc-price');
                 if (priceElement) {
-                    priceElement.textContent = '$' + parseFloat(marketData.btc_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    priceElement.textContent = formatMoney(parseFloat(marketData.btc_price));
                 }
             }
         }
@@ -2272,7 +2303,7 @@
             }, 0);
             const topBottomTotalProfitElement = document.getElementById('top-bottom-total-profit');
             if (topBottomTotalProfitElement) {
-                topBottomTotalProfitElement.textContent = '$' + topBottomTotalProfit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                topBottomTotalProfitElement.textContent = formatMoney(topBottomTotalProfit);
                 topBottomTotalProfitElement.className = 'text-lg font-bold ' + (topBottomTotalProfit >= 0 ? 'text-green-600' : 'text-red-600');
             }
             
@@ -2285,14 +2316,14 @@
             // 更新仓位数量
             const quantityElement = document.getElementById('top-bottom-quantity');
             if (quantityElement) {
-                quantityElement.textContent = (topBottomData.position_quantity || 0) + ' BTC';
+                quantityElement.textContent = formatDecimal(topBottomData.position_quantity || 0) + ' BTC';
             }
             
             // 更新仓位均价
             const avgPriceElement = document.getElementById('top-bottom-avg-price');
             if (avgPriceElement) {
                 const avgPrice = parseFloat(topBottomData.position_avg_price) || 0;
-                avgPriceElement.textContent = '$' + avgPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                avgPriceElement.textContent = formatMoney(avgPrice);
             }
             
             // 计算并更新浮盈
@@ -2340,15 +2371,15 @@
                             ${trade.mode || '-'}
                         </span>
                     </td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.quantity || 0} BTC</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">$${(parseFloat(trade.avg_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${formatDecimal(trade.quantity || 0)} BTC</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${formatMoney(parseFloat(trade.avg_price) || 0)}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm">
                         <span class="px-1.5 inline-flex text-xs leading-4 font-semibold rounded-full ${trade.is_closed ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
                             ${trade.is_closed ? '已平仓' : '未平仓'}
                         </span>
                     </td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.close_timestamp || '-'}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-${(parseFloat(trade.profit) >= 0) ? 'green-600' : 'red-600'}">$${(parseFloat(trade.profit) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-${(parseFloat(trade.profit) >= 0) ? 'green-600' : 'red-600'}">${formatMoney(parseFloat(trade.profit) || 0)}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -2384,7 +2415,7 @@
             // 更新浮盈显示
             const floatProfitElement = document.getElementById('top-bottom-float-profit');
             if (floatProfitElement) {
-                floatProfitElement.textContent = '$' + floatProfit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                floatProfitElement.textContent = formatMoney(floatProfit);
                 
                 // 根据浮盈正负设置颜色
                 floatProfitElement.className = 'text-md font-bold';
