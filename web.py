@@ -1,17 +1,21 @@
 import importlib
 import hmac
+import os
 
 SOCKETIO_ASYNC_MODE = 'threading'
 eventlet = None
-try:
-    eventlet = importlib.import_module('eventlet')
-    eventlet.monkey_patch()
-    SOCKETIO_ASYNC_MODE = 'eventlet'
-except ImportError:
-    pass
+# eventlet 的绿色 DNS 在部分服务器环境会导致出站 HTTPS 解析超时（价格无法更新），
+# 可设置 WEB_DISABLE_EVENTLET=1 强制使用 threading 模式。
+_disable_eventlet = str(os.getenv('WEB_DISABLE_EVENTLET', '') or '').strip().lower() in ('1', 'true', 'yes', 'on')
+if not _disable_eventlet:
+    try:
+        eventlet = importlib.import_module('eventlet')
+        eventlet.monkey_patch()
+        SOCKETIO_ASYNC_MODE = 'eventlet'
+    except ImportError:
+        pass
 
 from flask import Flask, render_template, jsonify, request, send_from_directory
-import os
 import json
 import requests
 import logging
@@ -2042,4 +2046,12 @@ if __name__ == '__main__':
         run_kwargs['allow_unsafe_werkzeug'] = True
     if not str(os.getenv('WEB_API_TOKEN', '') or '').strip():
         print('[Web] WARNING: 未设置 WEB_API_TOKEN, 写接口无鉴权 (建议仅内网暴露或尽快配置)')
-    socketio.run(app, **run_kwargs)
+    print(f'[Web] 异步模式: {SOCKETIO_ASYNC_MODE} (WEB_DISABLE_EVENTLET={_disable_eventlet})')
+    try:
+        socketio.run(app, **run_kwargs)
+    except TypeError as exc:
+        # 旧版 Flask (<2.2) 不支持 allow_unsafe_werkzeug 参数, 去掉后重试
+        if 'allow_unsafe_werkzeug' not in str(exc):
+            raise
+        run_kwargs.pop('allow_unsafe_werkzeug', None)
+        socketio.run(app, **run_kwargs)
