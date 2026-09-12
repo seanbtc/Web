@@ -1,4 +1,5 @@
 import importlib
+import hmac
 
 SOCKETIO_ASYNC_MODE = 'threading'
 eventlet = None
@@ -16,6 +17,7 @@ import requests
 import logging
 import sys
 from datetime import datetime, timezone
+from functools import wraps
 import threading
 import time
 from flask_socketio import SocketIO
@@ -82,21 +84,8 @@ def alpha_engine_regime_label(regime):
     return ALPHA_ENGINE_REGIME_LABELS.get(regime, '未知')
 
 
-# Promo 发帖归档目录 (只读, 不修改 Promo 项目)
-_promo_posts_dir = os.getenv('PROMO_POSTS_DIR', '').strip()
-if _promo_posts_dir:
-    promo_posts_dir = (
-        _promo_posts_dir
-        if os.path.isabs(_promo_posts_dir)
-        else os.path.abspath(os.path.join(os.path.dirname(__file__), _promo_posts_dir))
-    )
-else:
-    promo_posts_dir = os.path.abspath(os.path.join(
-        os.path.dirname(__file__), '..', 'Promo', 'history', 'posts'
-    ))
-_promo_alpha_bridge_file = os.path.abspath(os.path.join(
-    os.path.dirname(__file__), '..', 'Promo', 'runtime', 'alphaengine_posts.jsonl'
-))
+# Promo 发帖数据只通过 HTTP 推送进入 Web (POST /api/update_post_feed),
+# Web 不再直读 Promo 项目文件。
 
 # 帖子类型中文标签
 POST_TYPE_LABELS = {
@@ -115,28 +104,6 @@ POST_FEED_PAGE_SIZE = 20
 
 # 过滤掉的发帖类型 (如热点内容, 不展示不加载)
 POST_TYPE_EXCLUDED = {'hot_content', 'hot'}
-
-
-def _read_jsonl_file(file_path, limit=None):
-    """读取 JSONL 文件, 返回 dict 列表。"""
-    items = []
-    if not os.path.exists(file_path):
-        return items
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    items.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
-    except OSError:
-        return items
-    if limit is not None and len(items) > limit:
-        items = items[-limit:]
-    return items
 
 
 def _parse_post_timestamp(value):
@@ -218,10 +185,9 @@ def _normalize_post_record(record, source):
 
 
 def load_promo_posts(limit=200):
-    """加载发帖数据。
+    """加载发帖数据 (只读本地 data/post_feed.json, 由 Promo/AlphaEngine 通过 HTTP 推送维护)。
 
-    优先从本地 data/post_feed.json 读取 (用户可手动编辑管理)。
-    若文件不存在或为空, 回退从 Promo 归档 + AlphaEngine 桥文件回填生成。
+    文件不存在或为空时返回空列表; Web 不再回退读取 Promo 项目文件。
     """
     local_file = os.path.join(data_dir, 'post_feed.json')
     if os.path.exists(local_file):
@@ -239,34 +205,8 @@ def load_promo_posts(limit=200):
                     posts = posts[-limit:]
                 return posts
         except (OSError, json.JSONDecodeError) as exc:
-            print(f'[发帖] 读取本地发帖数据失败, 回退 Promo 归档: {exc}')
-
-    # 回退: 从 Promo 归档 + AlphaEngine 桥文件生成
-    posts = []
-    try:
-        if os.path.isdir(promo_posts_dir):
-            for fn in sorted(os.listdir(promo_posts_dir)):
-                if not fn.lower().endswith('.jsonl'):
-                    continue
-                file_path = os.path.join(promo_posts_dir, fn)
-                for record in _read_jsonl_file(file_path):
-                    item = _normalize_post_record(record, 'promo')
-                    if item:
-                        posts.append(item)
-    except OSError as exc:
-        print(f'[发帖] 读取 Promo 归档失败: {exc}')
-
-    # AlphaEngine 桥帖子
-    for record in _read_jsonl_file(_promo_alpha_bridge_file):
-        item = _normalize_post_record(record, 'alpha_engine')
-        if item:
-            posts.append(item)
-
-    # 按真实时间正序排序
-    posts.sort(key=_post_sort_key)
-    if limit is not None and len(posts) > limit:
-        posts = posts[-limit:]
-    return posts
+            print(f'[发帖] 读取本地发帖数据失败: {exc}')
+    return []
 
 
 def save_post_feed(posts):
@@ -294,6 +234,31 @@ def after_request(response):
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     return response
 socketio = SocketIO(app, cors_allowed_origins='*', async_mode=SOCKETIO_ASYNC_MODE)
+
+
+# ---------------------------------------------------------------------------
+# POST 接口鉴权: 设置环境变量 WEB_API_TOKEN 后强制校验写接口;
+# 未设置时保持旧行为(无鉴权)。只读 GET 接口不受影响。
+# 支持三种携带方式: Authorization: Bearer <token> / X-Webhook-Token / ?token=
+# ---------------------------------------------------------------------------
+def _extract_api_token():
+    auth = str(request.headers.get('Authorization') or '').strip()
+    if auth.lower().startswith('bearer '):
+        return auth[7:].strip()
+    header_token = str(request.headers.get('X-Webhook-Token') or '').strip()
+    if header_token:
+        return header_token
+    return str(request.args.get('token') or '').strip()
+
+
+def require_api_token(view):
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        expected = str(os.getenv('WEB_API_TOKEN', '') or '').strip()
+        if expected and not hmac.compare_digest(_extract_api_token(), expected):
+            return jsonify({'status': 'error', 'message': 'unauthorized'}), 401
+        return view(*args, **kwargs)
+    return wrapper
 
 
 def _env_int(name, default):
@@ -1358,10 +1323,6 @@ global_data = {
     'post_feed': load_promo_posts()
 }
 
-# 首次启动时, 若本地 post_feed.json 不存在, 保存一次回填数据
-if not os.path.exists(os.path.join(data_dir, 'post_feed.json')):
-    save_post_feed(global_data['post_feed'])
-
     # 数据存储类
 class DataStorage:
     def __init__(self):
@@ -1892,6 +1853,7 @@ def handle_disconnect():
 
 # API 端点
 @app.route('/api/update_triangle', methods=['POST'])
+@require_api_token
 def update_triangle_data():
     data = request.json
     if data:
@@ -1901,6 +1863,7 @@ def update_triangle_data():
     return jsonify({'status': 'error'}), 400
 
 @app.route('/api/update_lead', methods=['POST'])
+@require_api_token
 def update_lead_data():
     data = request.json
     if data:
@@ -1910,6 +1873,7 @@ def update_lead_data():
     return jsonify({'status': 'error'}), 400
 
 @app.route('/api/update_arbitrage', methods=['POST'])
+@require_api_token
 def update_arbitrage_data():
     data = request.json
     if data:
@@ -1919,6 +1883,7 @@ def update_arbitrage_data():
     return jsonify({'status': 'error'}), 400
 
 @app.route('/api/update_post_feed', methods=['POST'])
+@require_api_token
 def update_post_feed():
     """接收 Promo / AlphaEngine 推送的单条帖子, 保存到 post_feed.json 并推送前端。"""
     data = request.json
@@ -1960,11 +1925,21 @@ def get_post_feed():
         'post_feed_has_more': len(candidates) > len(page),
     })
 
+@app.route('/health')
+def health():
+    return jsonify({
+        'ok': True,
+        'service': 'Web',
+        'auth_required': bool(str(os.getenv('WEB_API_TOKEN', '') or '').strip()),
+    })
+
+
 @app.route('/api/get_data', methods=['GET'])
 def get_data():
     return jsonify(data_storage.get_all_data())
 
 @app.route('/api/update_strategy_status', methods=['POST'])
+@require_api_token
 def update_strategy_status():
     data = request.json
     if data and 'strategy' in data and 'status' in data:
@@ -1975,6 +1950,7 @@ def update_strategy_status():
     return jsonify({'status': 'error'}), 400
 
 @app.route('/api/update_market_data', methods=['POST'])
+@require_api_token
 def update_market_data():
     data = request.json
     if data:
@@ -1985,6 +1961,7 @@ def update_market_data():
     return jsonify({'status': 'error'}), 400
 
 @app.route('/api/update_top', methods=['POST'])
+@require_api_token
 def update_top_data():
     data = request.json
     if data:
@@ -1995,6 +1972,7 @@ def update_top_data():
     return jsonify({'status': 'error'}), 400
 
 @app.route('/api/update_bottom', methods=['POST'])
+@require_api_token
 def update_bottom_data():
     data = request.json
     if data:
@@ -2062,4 +2040,6 @@ if __name__ == '__main__':
     }
     if SOCKETIO_ASYNC_MODE != 'eventlet':
         run_kwargs['allow_unsafe_werkzeug'] = True
+    if not str(os.getenv('WEB_API_TOKEN', '') or '').strip():
+        print('[Web] WARNING: 未设置 WEB_API_TOKEN, 写接口无鉴权 (建议仅内网暴露或尽快配置)')
     socketio.run(app, **run_kwargs)
