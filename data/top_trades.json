@@ -1,9 +1,9 @@
 {
-  "position_status": "做空",
-  "position_quantity": 0.27,
-  "position_avg_price": 101164.0,
-  "position_symbol": "BTCUSDT",
-  "status": "减仓",
+  "position_status": "空仓",
+  "position_quantity": 0,
+  "position_avg_price": 0,
+  "position_symbol": "",
+  "status": "平仓",
   "trade_records": [
     {
       "id": 1,
@@ -11,9 +11,10 @@
       "mode": "做空",
       "quantity": 0.27,
       "avg_price": 101164.0,
-      "is_closed": false,
-      "close_time": "-",
-      "profit": 0.0
+      "is_closed": true,
+      "close_time": "2026-09",
+      "profit": 6450,
+      "close_avg_price": 77275.11
     }
   ]
 }

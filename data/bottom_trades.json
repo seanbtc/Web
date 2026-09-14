@@ -1,7 +1,7 @@
 {
   "position_status": "现货",
-  "position_quantity": 0.2,
-  "position_avg_price": 78752.0,
+  "position_quantity": 0.25,
+  "position_avg_price": 78552.0,
   "position_symbol": "BTCUSDT",
   "status": "建仓",
   "trade_records": [
@@ -9,11 +9,12 @@
       "id": 1,
       "duration": "2026至2029",
       "mode": "现货",
-      "quantity": 0.2,
-      "avg_price": 78752.0,
+      "quantity": 0.25,
+      "avg_price": 78552.0,
       "is_closed": false,
       "close_time": "-",
-      "profit": 0.0
+      "profit": 0.0,
+      "close_avg_price": null
     }
   ]
 }
