@@ -1944,7 +1944,8 @@
                                 <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">周期</th>
                                 <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">模式</th>
                                 <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">仓位</th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">均价</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">开仓均价</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">平仓均价</th>
                                 <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
                                 <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">平仓时间</th>
                                 <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">盈亏</th>
@@ -1952,7 +1953,7 @@
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200" id="top-tbody">
                             <tr>
-                                <td colspan="7" class="px-3 py-4 text-center text-gray-500">
+                                <td colspan="8" class="px-3 py-4 text-center text-gray-500">
                                     <i class="fa fa-info-circle text-lg mb-1"></i>
                                     <p>暂无交易记录</p>
                                 </td>
@@ -2017,7 +2018,8 @@
                                 <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">周期</th>
                                 <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">模式</th>
                                 <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">仓位</th>
-                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">均价</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">开仓均价</th>
+                                <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">平仓均价</th>
                                 <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
                                 <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">平仓时间</th>
                                 <th scope="col" class="px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">盈亏</th>
@@ -2025,7 +2027,7 @@
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200" id="bottom-tbody">
                             <tr>
-                                <td colspan="7" class="px-3 py-4 text-center text-gray-500">
+                                <td colspan="8" class="px-3 py-4 text-center text-gray-500">
                                     <i class="fa fa-info-circle text-lg mb-1"></i>
                                     <p>暂无交易记录</p>
                                 </td>
@@ -3355,12 +3357,12 @@
             renderTopBottomTable('bottom-tbody', records);
         }
 
-        // 通用渲染: 周期 | 模式 | 仓位 | 均价 | 状态 | 平仓时间 | 盈亏
+        // 通用渲染: 周期 | 模式 | 仓位 | 开仓均价 | 平仓均价 | 状态 | 平仓时间 | 盈亏
         function renderTopBottomTable(tbodyId, records) {
             const tbody = document.getElementById(tbodyId);
             if (!tbody) return;
             if (!records || records.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="px-3 py-4 text-center text-gray-500"><i class="fa fa-info-circle text-lg mb-1"></i><p>暂无交易记录</p></td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" class="px-3 py-4 text-center text-gray-500"><i class="fa fa-info-circle text-lg mb-1"></i><p>暂无交易记录</p></td></tr>';
                 return;
             }
             tbody.innerHTML = '';
@@ -3368,18 +3370,31 @@
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-gray-50';
                 const isShort = (trade.mode || '').includes('做空');
-                const isClosed = trade.is_closed;
+                const isClosed = !!trade.is_closed;
                 const statusClass = isClosed ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800';
                 const statusText = isClosed ? '已平仓' : '未平仓';
+                const quantity = parseFloat(trade.quantity) || 0;
+                const entryPrice = parseFloat(trade.avg_price ?? trade.entry_price ?? trade.open_price);
+                const rawExitPrice = trade.close_avg_price ?? trade.exit_price ?? trade.close_price;
+                const exitPrice = (rawExitPrice === undefined || rawExitPrice === null || rawExitPrice === '') ? NaN : parseFloat(rawExitPrice);
                 const profitVal = parseFloat(trade.profit) || 0;
                 const profitClass = profitVal >= 0 ? 'text-green-600' : 'text-red-600';
+                const entryText = Number.isFinite(entryPrice) ? formatMoney(entryPrice) : '-';
+                let exitText = Number.isFinite(exitPrice) ? formatMoney(exitPrice) : '-';
+                if (!Number.isFinite(exitPrice) && isClosed && Number.isFinite(entryPrice) && quantity > 0 && Number.isFinite(profitVal)) {
+                    const derivedExit = isShort ? entryPrice - profitVal / quantity : entryPrice + profitVal / quantity;
+                    if (Number.isFinite(derivedExit) && derivedExit > 0) {
+                        exitText = formatMoney(derivedExit);
+                    }
+                }
                 tr.innerHTML = `
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.duration || '-'}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm">
                         <span class="px-1.5 inline-flex text-xs leading-4 font-semibold rounded-full ${isShort ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">${trade.mode || '-'}</span>
                     </td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${formatQuantity(trade.quantity || 0)} BTC</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${formatMoney(parseFloat(trade.avg_price) || 0)}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${formatQuantity(quantity)} BTC</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${entryText}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${exitText}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm">
                         <span class="px-1.5 inline-flex text-xs leading-4 font-semibold rounded-full ${statusClass}">${statusText}</span>
                     </td>
