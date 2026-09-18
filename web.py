@@ -15,12 +15,14 @@ if not _disable_eventlet:
     except ImportError:
         pass
 
-from flask import Flask, render_template, jsonify, request, send_from_directory
+from flask import Flask, render_template, jsonify, request, send_from_directory, redirect, session, url_for
 import json
+import hashlib
+import secrets
 import requests
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from functools import wraps
 import threading
 import time
@@ -228,8 +230,27 @@ def _post_feed_payload(posts, limit=POST_FEED_PAGE_SIZE):
         'post_feed_has_more': len(posts) > len(page),
     }
 
+def _env_int(name, default):
+    """Read a positive integer environment variable with fallback."""
+    raw = os.getenv(name, '')
+    try:
+        value = int(raw)
+        if value > 0:
+            return value
+    except (TypeError, ValueError):
+        pass
+    return default
+
+
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'secret!'
+# 会话签名密钥: 优先 WEB_SESSION_SECRET; 未配置则每次启动随机生成(重启后会话失效)。
+_SESSION_SECRET_FROM_ENV = bool(str(os.getenv('WEB_SESSION_SECRET', '') or '').strip())
+app.config['SECRET_KEY'] = (
+    str(os.getenv('WEB_SESSION_SECRET', '') or '').strip() or secrets.token_hex(32)
+)
+# 会话有效期(小时), 默认 168 = 7 天
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=_env_int('WEB_SESSION_HOURS', 168))
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 # 添加 CORS 支持
 @app.after_request
 def after_request(response):
@@ -265,16 +286,179 @@ def require_api_token(view):
     return wrapper
 
 
-def _env_int(name, default):
-    """Read a positive integer environment variable with fallback."""
-    raw = os.getenv(name, '')
-    try:
-        value = int(raw)
-        if value > 0:
-            return value
-    except (TypeError, ValueError):
-        pass
-    return default
+# ---------------------------------------------------------------------------
+# 登录门禁: 配置 WEB_LOGIN_PASSWORD 或 WEB_LOGIN_PASSWORD_SHA256 后启用;
+# 未配置密码时保持旧行为(开放访问), 部署时必须配置。
+# 凭据与开关在每次请求时读取环境变量, 便于测试与无需改代码的热调整。
+# ---------------------------------------------------------------------------
+LOGIN_MAX_FAILURES = 5
+LOGIN_LOCK_SECONDS = 60
+_login_failures = {}
+_login_failures_lock = threading.Lock()
+
+
+def _valid_sha256(value):
+    return len(value) == 64 and all(ch in '0123456789abcdef' for ch in value)
+
+
+def _get_login_credentials():
+    """返回 (username, plain_password, sha256_hex)。SHA256 优先且需为合法十六进制。"""
+    username = str(os.getenv('WEB_LOGIN_USERNAME', '') or '').strip() or 'admin'
+    plain_password = str(os.getenv('WEB_LOGIN_PASSWORD', '') or '')
+    sha256_hex = str(os.getenv('WEB_LOGIN_PASSWORD_SHA256', '') or '').strip().lower()
+    if sha256_hex and not _valid_sha256(sha256_hex):
+        sha256_hex = ''
+    return username, plain_password, sha256_hex
+
+
+def _invalid_sha256_configured():
+    """WEB_LOGIN_PASSWORD_SHA256 已配置但不是 64 位十六进制。"""
+    raw = str(os.getenv('WEB_LOGIN_PASSWORD_SHA256', '') or '').strip().lower()
+    return bool(raw) and not _valid_sha256(raw)
+
+
+def _login_enabled():
+    _, plain_password, sha256_hex = _get_login_credentials()
+    return bool(plain_password or sha256_hex)
+
+
+def _check_login_credentials(username, password):
+    expected_username, plain_password, sha256_hex = _get_login_credentials()
+    username_ok = hmac.compare_digest(
+        str(username or '').encode('utf-8'), expected_username.encode('utf-8')
+    )
+    if sha256_hex:
+        password_digest = hashlib.sha256(str(password or '').encode('utf-8')).hexdigest()
+        password_ok = hmac.compare_digest(password_digest, sha256_hex)
+    else:
+        password_ok = hmac.compare_digest(
+            str(password or '').encode('utf-8'), plain_password.encode('utf-8')
+        )
+    return username_ok and password_ok
+
+
+def _safe_next_path(target):
+    """只允许站内相对路径作为登录后回跳地址, 防止开放重定向。"""
+    path = str(target or '').strip()
+    # 控制字符(含 \t \r \n \x00 与 DEL)可被响应头/浏览器规范化成外站目标, 一律拒绝
+    if any(ord(ch) < 0x20 or ord(ch) == 0x7f for ch in path):
+        return ''
+    if not path.startswith('/') or path.startswith('//') or path.startswith('/\\'):
+        return ''
+    if '\\' in path:
+        return ''
+    return path
+
+
+def _client_ip():
+    return str(request.remote_addr or 'unknown')
+
+
+def _login_lock_remaining(ip):
+    with _login_failures_lock:
+        entry = _login_failures.get(ip)
+        if not entry:
+            return 0.0
+        remaining = float(entry.get('locked_until', 0.0)) - time.time()
+        if remaining > 0:
+            return remaining
+        if int(entry.get('count', 0)) >= LOGIN_MAX_FAILURES:
+            _login_failures.pop(ip, None)
+        return 0.0
+
+
+def _record_login_failure(ip):
+    with _login_failures_lock:
+        now = time.time()
+        for stale_ip in [
+            key for key, value in _login_failures.items()
+            if key != ip and float(value.get('seen', now)) < now - 3600
+        ]:
+            _login_failures.pop(stale_ip, None)
+        entry = _login_failures.setdefault(ip, {'count': 0, 'locked_until': 0.0})
+        entry['count'] = int(entry.get('count', 0)) + 1
+        entry['seen'] = now
+        if entry['count'] >= LOGIN_MAX_FAILURES:
+            entry['locked_until'] = now + LOGIN_LOCK_SECONDS
+            return True
+        return False
+
+
+def _clear_login_failures(ip):
+    with _login_failures_lock:
+        _login_failures.pop(ip, None)
+
+
+@app.before_request
+def enforce_login_guard():
+    """登录门禁守卫: 放行白名单/写接口/已登录, 其余读接口 401、页面 302 到 /login。"""
+    if request.method == 'OPTIONS':
+        return None
+
+    path = request.path or '/'
+    if path in ('/login', '/logout', '/health') or path.startswith('/static/'):
+        return None
+    # 写接口保持各自 @require_api_token 原有鉴权, 不受登录门禁影响
+    if path.startswith('/api/update_'):
+        return None
+    if not _login_enabled():
+        return None
+    if session.get('auth') is True:
+        return None
+
+    if path.startswith('/api/'):
+        return jsonify({'status': 'error', 'message': 'login required'}), 401
+    if path == '/':
+        return redirect(url_for('login'))
+    next_path = path
+    if request.query_string:
+        next_path = f"{path}?{request.query_string.decode('utf-8', 'ignore')}"
+    return redirect(url_for('login', next=next_path))
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if not _login_enabled():
+        return redirect('/')
+
+    next_path = _safe_next_path(request.values.get('next'))
+    if request.method == 'GET':
+        if session.get('auth') is True:
+            return redirect(next_path or '/')
+        return render_template('login.html', error='', username='', next=next_path)
+
+    username = str(request.form.get('username') or '')
+    password = str(request.form.get('password') or '')
+    ip = _client_ip()
+
+    lock_seconds = _login_lock_remaining(ip)
+    if lock_seconds > 0:
+        return render_template(
+            'login.html',
+            error=f'尝试次数过多，请 {int(lock_seconds) + 1} 秒后再试',
+            username=username,
+            next=next_path,
+        ), 429
+
+    if _check_login_credentials(username, password):
+        _clear_login_failures(ip)
+        # 清空登录前会话, 防止 session fixation
+        session.clear()
+        session.permanent = True
+        session['auth'] = True
+        session['user'] = username
+        return redirect(next_path or '/')
+
+    _record_login_failure(ip)
+    return render_template(
+        'login.html', error='用户名或密码错误', username=username, next=next_path
+    ), 401
+
+
+@app.route('/logout', methods=['GET', 'POST'])
+def logout():
+    session.clear()
+    return redirect('/login')
 
 
 MAX_TRIANGLE_RECORDS = _env_int('WEB_MAX_TRIANGLE_RECORDS', 3000)
@@ -1848,6 +2032,9 @@ btc_price_thread.start()
 # WebSocket 事件处理
 @socketio.on('connect')
 def handle_connect():
+    # 登录门禁开启时拒绝未登录的 Socket.IO 连接, 避免绕过登录直接获取数据
+    if _login_enabled() and session.get('auth') is not True:
+        return False
     # print('Client connected')
     socketio.emit('all_data', data_storage.get_all_data())
 
@@ -2046,6 +2233,15 @@ if __name__ == '__main__':
         run_kwargs['allow_unsafe_werkzeug'] = True
     if not str(os.getenv('WEB_API_TOKEN', '') or '').strip():
         print('[Web] WARNING: 未设置 WEB_API_TOKEN, 写接口无鉴权 (建议仅内网暴露或尽快配置)')
+    if not _SESSION_SECRET_FROM_ENV:
+        print('[Web] WARNING: 未设置 WEB_SESSION_SECRET, 已生成临时会话密钥, 重启后会话失效')
+    if _invalid_sha256_configured():
+        print(
+            '[Web] WARNING: WEB_LOGIN_PASSWORD_SHA256 配置非法（非 64 位 hex），'
+            + ('登录未启用' if not _login_enabled() else '已忽略，回退使用 WEB_LOGIN_PASSWORD')
+        )
+    elif not _login_enabled():
+        print('[Web] WARNING: 登录未启用（未配置 WEB_LOGIN_PASSWORD），面板开放访问；部署时必须配置')
     print(f'[Web] 异步模式: {SOCKETIO_ASYNC_MODE} (WEB_DISABLE_EVENTLET={_disable_eventlet})')
     try:
         socketio.run(app, **run_kwargs)
