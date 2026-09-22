@@ -156,11 +156,30 @@
             text-shadow: none;
         }
         #market-cycle,
+        #alpha-ma-zone,
         #runtime {
             background: rgba(255, 255, 255, 0.82);
             color: var(--text-primary) !important;
             border: 1px solid rgba(17, 17, 17, 0.08);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+        }
+        #alpha-ma-zone.ma-bull {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(16, 185, 129, 0.26)) !important;
+            color: #166534 !important;
+            border-color: rgba(34, 197, 94, 0.38) !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 18px rgba(34, 197, 94, 0.12);
+        }
+        #alpha-ma-zone.ma-bear {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(220, 38, 38, 0.23)) !important;
+            color: #991b1b !important;
+            border-color: rgba(239, 68, 68, 0.38) !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 18px rgba(239, 68, 68, 0.12);
+        }
+        #alpha-ma-zone.ma-flat {
+            background: linear-gradient(135deg, rgba(100, 116, 139, 0.18), rgba(71, 85, 105, 0.24)) !important;
+            color: #334155 !important;
+            border-color: rgba(71, 85, 105, 0.38) !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 18px rgba(71, 85, 105, 0.12);
         }
         #market-cycle.bull {
             background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(16, 185, 129, 0.26)) !important;
@@ -651,6 +670,7 @@
             }
 
             #market-cycle,
+            #alpha-ma-zone,
             #runtime {
                 padding: 0.16rem 0.55rem !important;
                 font-size: 0.73rem !important;
@@ -1549,6 +1569,10 @@
                 <div class="flex items-center ml-4">
                     <span class="text-sm font-semibold text-gray-700 mr-2">α:</span>
                     <span class="text-sm font-bold text-dark" id="alpha-value">+0.00</span>
+                </div>
+                <div class="flex items-center ml-4">
+                    <span class="text-sm font-semibold text-gray-700 mr-2">K线趋势:</span>
+                    <span class="px-3 py-1 rounded-full text-sm font-semibold flex items-center ma-flat" id="alpha-ma-zone" title="AlphaEngine K线趋势 · 数据不可用">—</span>
                 </div>
             </div>
             <div class="flex items-center space-x-6">
@@ -3229,6 +3253,27 @@
                     alphaElement.textContent = `${sign}${alphaVal.toFixed(2)}`;
                     alphaElement.className = `text-sm font-bold ${alphaVal > 0 ? 'text-green-600' : alphaVal < 0 ? 'text-red-600' : 'text-gray-500'}`;
                 }
+            }
+
+            // 更新 AlphaEngine K线趋势 (均线区间)
+            const maElement = document.getElementById('alpha-ma-zone');
+            if (maElement) {
+                const maData = marketData.alpha_engine_ma;
+                const hasMa = !!(maData && typeof maData === 'object' && maData.available);
+                const maZone = hasMa ? String(maData.zone || '').trim() : '';
+                const maAsOf = hasMa ? String(maData.as_of || '').trim() : '';
+                maElement.classList.remove('ma-bull', 'ma-bear', 'ma-flat');
+                if (hasMa && maZone.includes('多头')) {
+                    maElement.classList.add('ma-bull');
+                } else if (hasMa && maZone.includes('空头')) {
+                    maElement.classList.add('ma-bear');
+                } else {
+                    maElement.classList.add('ma-flat');
+                }
+                maElement.textContent = hasMa && maZone ? maZone : '—';
+                maElement.title = maAsOf
+                    ? `AlphaEngine K线趋势 · 截至 ${maAsOf}`
+                    : 'AlphaEngine K线趋势 · 数据不可用';
             }
 
             // 轻量行情更新也要同步刷新两个策略的浮盈

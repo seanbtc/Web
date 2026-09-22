@@ -86,8 +86,62 @@ def load_alpha_engine_alpha():
         return 0.0
 
 
+def load_alpha_engine_ma():
+    """只读 AlphaEngine 状态文件中的 K 线趋势摘要 (state["ma"])。
+
+    容错: 文件缺失 / 无 ma / 字段类型异常 → None, 不抛错。
+    """
+    try:
+        with open(alpha_engine_state_file, 'r', encoding='utf-8') as state_file:
+            state_data = json.load(state_file)
+        ma_data = state_data.get('ma') if isinstance(state_data, dict) else None
+        if not isinstance(ma_data, dict):
+            return None
+        available = ma_data.get('available')
+        zone = ma_data.get('zone')
+        as_of = ma_data.get('as_of')
+        if available is not None and not isinstance(available, bool):
+            return None
+        if zone is not None and not isinstance(zone, str):
+            return None
+        if as_of is not None and not isinstance(as_of, str):
+            return None
+        return {
+            'available': bool(available),
+            'zone': zone or None,
+            'as_of': as_of or None,
+        }
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return None
+
+
 def alpha_engine_regime_label(regime):
     return ALPHA_ENGINE_REGIME_LABELS.get(regime, '未知')
+
+
+def alpha_engine_ma_signature(ma):
+    """K 线趋势变化指纹 (available/zone/as_of 任一变化即算变化); 非 dict → None。"""
+    if not isinstance(ma, dict):
+        return None
+    return (bool(ma.get('available')), ma.get('zone'), ma.get('as_of'))
+
+
+def alpha_engine_update_changed(market_data, new_regime, new_alpha, new_ma):
+    """regime / alpha / K 线趋势 任一变化 → 需要推送前端。"""
+    if not isinstance(market_data, dict):
+        return True
+    if market_data.get('alpha_engine_regime') != new_regime:
+        return True
+    if market_data.get('cycle') != alpha_engine_regime_label(new_regime):
+        return True
+    try:
+        old_alpha = float(market_data.get('alpha_engine_alpha', 0.0))
+    except (TypeError, ValueError):
+        old_alpha = 0.0
+    if abs(old_alpha - new_alpha) > 0.001:
+        return True
+    return (alpha_engine_ma_signature(market_data.get('alpha_engine_ma'))
+            != alpha_engine_ma_signature(new_ma))
 
 
 # Promo 发帖数据只通过 HTTP 推送进入 Web (POST /api/update_post_feed),
@@ -1178,16 +1232,17 @@ def check_file_updates():
                 if current_modified > last_modified_alpha_engine:
                     new_regime = load_alpha_engine_regime()
                     new_alpha = load_alpha_engine_alpha()
+                    new_ma = load_alpha_engine_ma()
                     if new_regime:
                         last_modified_alpha_engine = current_modified
                         new_cycle = alpha_engine_regime_label(new_regime)
-                        if (data_storage.market_data.get('alpha_engine_regime') != new_regime
-                                or data_storage.market_data.get('cycle') != new_cycle
-                                or abs(data_storage.market_data.get('alpha_engine_alpha', 0.0) - new_alpha) > 0.001):
+                        if alpha_engine_update_changed(data_storage.market_data,
+                                                       new_regime, new_alpha, new_ma):
                             data_storage.update_market_data({
                                 'cycle': new_cycle,
                                 'alpha_engine_regime': new_regime,
                                 'alpha_engine_alpha': new_alpha,
+                                'alpha_engine_ma': new_ma,
                             })
                             socketio.emit('market_update', {
                                 'market_data': data_storage.market_data,
@@ -1355,6 +1410,7 @@ triangle_summary = triangle_data.get('summary', {
 alpha_engine_regime = load_alpha_engine_regime()
 alpha_engine_cycle = alpha_engine_regime_label(alpha_engine_regime)
 alpha_engine_alpha = load_alpha_engine_alpha()
+alpha_engine_ma = load_alpha_engine_ma()
 
 # 定期获取 BTC 价格（DataFeed 优先 → Binance API → CoinGecko 回退）
 def fetch_btc_price():
@@ -1506,6 +1562,7 @@ global_data = {
         'cycle': alpha_engine_cycle,
         'alpha_engine_regime': alpha_engine_regime,
         'alpha_engine_alpha': alpha_engine_alpha,
+        'alpha_engine_ma': alpha_engine_ma,
         'btc_price': 58000.0
     },
     'post_feed': load_promo_posts()
@@ -1941,6 +1998,8 @@ class DataStorage:
             self.market_data['alpha_engine_regime'] = data['alpha_engine_regime']
         if 'alpha_engine_alpha' in data:
             self.market_data['alpha_engine_alpha'] = data['alpha_engine_alpha']
+        if 'alpha_engine_ma' in data:
+            self.market_data['alpha_engine_ma'] = data['alpha_engine_ma']
         if 'btc_price' in data:
             self.market_data['btc_price'] = data['btc_price']
         self.update_global_data()
