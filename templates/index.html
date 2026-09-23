@@ -2640,6 +2640,9 @@
 
             // 更新发帖动态
             updatePostFeed(data);
+
+            // 数据刷新后重新校准竖屏等高
+            schedulePerformanceViewerHeightSync(0);
         });
 
         // 发帖动态更新 — 新帖子到达时滚动刷新
@@ -3660,6 +3663,7 @@
                     updateProfitCurve(data);
                     updateYearlyProfitCurve(data);
                     updatePostFeed(data);
+                    syncPerformanceViewerHeight();
                 })
                 .catch(error => console.error('获取数据失败:', error));
         };
@@ -3688,6 +3692,7 @@
                 window.setTimeout(() => {
                     profitCurveChart?.resize();
                     yearlyProfitCurveChart?.resize();
+                    syncPerformanceViewerHeight();
                 }, 380);
             }
         }
@@ -3695,6 +3700,51 @@
         performanceViewButtons.forEach(button => {
             button.addEventListener('click', () => setPerformanceView(button.dataset.performanceView));
         });
+
+        // ===== 竖屏帖子/盈亏等高同步 =====
+        const portraitPerformanceQuery = window.matchMedia('(max-width: 1199px), (max-aspect-ratio: 5/4)');
+        let performanceHeightSyncTimer = null;
+
+        function syncPerformanceViewerHeight() {
+            const viewer = document.getElementById('performance-viewer');
+            const pnlView = document.getElementById('performance-pnl-view');
+            if (!viewer || !pnlView) return;
+
+            const previousHeight = viewer.style.height;
+            if (!portraitPerformanceQuery.matches) {
+                if (previousHeight) viewer.style.height = '';
+                return;
+            }
+
+            // 竖屏：以盈亏视图自然高度作为两个视图的统一高度，帖子列表在内部滚动
+            // 测量时 viewer 瞬时展开会钳制帖子列表滚动位置，测量前后保存/恢复
+            const feed = document.getElementById('post-feed-container');
+            const feedScrollTop = feed ? feed.scrollTop : 0;
+            viewer.style.height = 'auto';
+            const measured = pnlView.getBoundingClientRect().height;
+            if (!Number.isFinite(measured) || measured <= 0) {
+                viewer.style.height = previousHeight;
+                if (feed && feed.scrollTop !== feedScrollTop) feed.scrollTop = feedScrollTop;
+                return;
+            }
+            viewer.style.height = `${Math.ceil(measured)}px`;
+            if (feed && feed.scrollTop !== feedScrollTop) feed.scrollTop = feedScrollTop;
+        }
+
+        function schedulePerformanceViewerHeightSync(delay = 150) {
+            window.clearTimeout(performanceHeightSyncTimer);
+            performanceHeightSyncTimer = window.setTimeout(syncPerformanceViewerHeight, delay);
+        }
+
+        if (typeof portraitPerformanceQuery.addEventListener === 'function') {
+            portraitPerformanceQuery.addEventListener('change', syncPerformanceViewerHeight);
+        } else if (typeof portraitPerformanceQuery.addListener === 'function') {
+            portraitPerformanceQuery.addListener(syncPerformanceViewerHeight);
+        }
+        window.addEventListener('resize', () => schedulePerformanceViewerHeightSync(150));
+        window.addEventListener('orientationchange', () => schedulePerformanceViewerHeightSync(150));
+        syncPerformanceViewerHeight();
+        // ===== 竖屏帖子/盈亏等高同步 END =====
 
         // ===== 发帖动态模块 =====
         const POST_PAGE_SIZE = 20;
