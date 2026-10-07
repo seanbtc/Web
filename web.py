@@ -737,6 +737,59 @@ def _build_lead_record_key(trade_data):
     ])
 
 
+def _to_bool_flag(value):
+    if isinstance(value, bool):
+        return value
+    return str(value or '').strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def _format_signed_position_text(value):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return ''
+    if number > 0:
+        return f'多 {number:g}'
+    if number < 0:
+        return f'空 {abs(number):g}'
+    return '0'
+
+
+def _resolve_net_adjustment_display(trade_data, trade_type, reason_text):
+    """净头寸调整订单展示派生：按归因腿动作显示（开多仓/开空仓），历史记录按 reason 兜底。
+
+    返回 (net_adjustment, attribution, display_trade_type, display_direction, display_note)。
+    仅影响展示字段；trade_type 保持原值供开/平仓盈亏配对使用。
+    """
+    attribution_raw = trade_data.get('attribution')
+    attribution = attribution_raw if isinstance(attribution_raw, dict) else {}
+    net_adjustment = _to_bool_flag(trade_data.get('net_adjustment')) or ('净头寸调整' in reason_text)
+    if not net_adjustment:
+        return False, attribution, trade_type, '', ''
+
+    leg = str(attribution.get('leg') or '').strip().lower()
+    if leg not in ('long', 'short'):
+        leg = 'long' if str(trade_data.get('side') or '').strip().upper() == 'BUY' else 'short'
+    action = str(attribution.get('action') or 'open').strip().lower()
+    direction_text = '多头' if leg == 'long' else '空头'
+    action_text = '加' if action == 'add' else '开'
+    display_trade_type = f'{action_text}{direction_text[0]}仓'
+
+    note_parts = ['净头寸调整']
+    quantity = _to_float(attribution.get('quantity'), None)
+    if quantity is not None:
+        note_parts.append(f'{direction_text}{"加仓" if action == "add" else "开仓"} {quantity:g}')
+    net_before = _format_signed_position_text(attribution.get('net_position_before'))
+    net_after = _format_signed_position_text(attribution.get('net_position_after'))
+    if net_before or net_after:
+        note_parts.append(f'净头寸 {net_before}→{net_after}')
+    display_note = (
+        '：'.join([note_parts[0], '，'.join(note_parts[1:])])
+        if len(note_parts) > 1 else note_parts[0]
+    )
+    return True, attribution, display_trade_type, direction_text, display_note
+
+
 def _normalize_lead_trade_record(trade_data):
     timestamp = str(
         trade_data.get('timestamp')
@@ -745,6 +798,10 @@ def _normalize_lead_trade_record(trade_data):
         or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     ).strip()
     trade_type = str(trade_data.get('trade_type') or '未知').strip() or '未知'
+    reason_text = str(trade_data.get('reason') or trade_data.get('alert_message') or '').strip()
+    net_adjustment, attribution, display_trade_type, display_direction, display_note = (
+        _resolve_net_adjustment_display(trade_data, trade_type, reason_text)
+    )
     order_pnl = _extract_triangle_profit_delta(trade_data)
     realized_pnl = trade_data.get('realized_pnl')
 
@@ -758,7 +815,12 @@ def _normalize_lead_trade_record(trade_data):
         'quantity': round(_to_float(trade_data.get('quantity'), 0.0), 8),
         'price': _to_float(trade_data.get('price'), 0.0),
         'trade_type': trade_type,
-        'reason': str(trade_data.get('reason') or trade_data.get('alert_message') or '').strip(),
+        'net_adjustment': bool(net_adjustment),
+        'attribution': attribution,
+        'display_trade_type': display_trade_type,
+        'display_direction': display_direction,
+        'display_note': display_note,
+        'reason': reason_text,
         'timestamp': timestamp,
         'gross_pnl': trade_data.get('gross_pnl'),
         'realized_pnl': round(_to_float(realized_pnl, order_pnl), 4) if (realized_pnl is not None or order_pnl is not None) else None,

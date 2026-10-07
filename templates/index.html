@@ -2742,7 +2742,7 @@
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${formatQuantity(trade.quantity || 0)}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${priceText}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm font-medium ${pnlClass}">${pnl === null ? '-' : formatSignedMoney(pnl)}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.reason || '-'}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.display_note || trade.reason || '-'}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -2970,8 +2970,10 @@
                 tr.className = 'hover:bg-gray-50';
 
                 const side = trade.side || '未知';
-                const tradeType = trade.trade_type || '未知';
-                const orderPnl = trade.order_pnl ?? trade.realized_pnl ?? trade.net_profit;
+                const tradeType = trade.display_trade_type || trade.trade_type || '未知';
+                const isNetAdjustment = !!trade.net_adjustment;
+                // 净头寸调整订单：策略层是归因腿开仓（如多头腿），不展示执行层已实现盈亏
+                const orderPnl = isNetAdjustment ? null : (trade.order_pnl ?? trade.realized_pnl ?? trade.net_profit);
                 const pnl = orderPnl === undefined || orderPnl === null || orderPnl === '' ? null : Number(orderPnl);
                 const pnlClass = pnl === null
                     ? 'text-gray-500'
@@ -2988,7 +2990,11 @@
 
                 const tradeTypeClass = {
                     '开仓': 'bg-blue-100 text-blue-800',
+                    '开多仓': 'bg-blue-100 text-blue-800',
+                    '开空仓': 'bg-blue-100 text-blue-800',
                     '加仓': 'bg-cyan-100 text-cyan-800',
+                    '加多仓': 'bg-cyan-100 text-cyan-800',
+                    '加空仓': 'bg-cyan-100 text-cyan-800',
                     '止盈': 'bg-green-100 text-green-800',
                     '止损': 'bg-red-100 text-red-800',
                     '平仓': 'bg-yellow-100 text-yellow-800',
@@ -3015,7 +3021,7 @@
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${formatQuantity(trade.quantity || 0)}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${priceText}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm font-medium ${pnlClass}">${pnl === null ? '-' : formatSignedMoney(pnl)}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.reason || '-'}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.display_note || trade.reason || '-'}</td>
                 `;
                 tbody.appendChild(tr);
             });
