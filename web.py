@@ -891,11 +891,27 @@ def _resolve_execution_action(trade_data):
     return 'open'
 
 
-def _resolve_net_adjustment_display(trade_data, trade_type, reason_text):
-    """净头寸调整订单展示派生：徽章/方向优先决策腿（decision_leg_*），备注按决策腿语义呈现。
+DISPLAY_DIRECTION_TEXT = {'long': '多头', 'short': '空头'}
+DISPLAY_ACTION_TEXT = {'open': '开仓', 'add': '加仓', 'close': '平仓'}
 
-    展示优先级：decision_leg_*（决策腿）→ 现有 leg_*/执行语义（历史记录兜底）。
-    备注规则（BStrategy 新 payload 字段优先，历史旧字段兜底）：
+
+def _display_direction_from_side(side, action):
+    """普通订单展示方向：开/加 BUY→多头、SELL→空头；平 BUY→空头（平空）、SELL→多头（平多）。"""
+    side = str(side or '').strip().upper()
+    if side == 'BUY':
+        return 'short' if action == 'close' else 'long'
+    if side == 'SELL':
+        return 'long' if action == 'close' else 'short'
+    return ''
+
+
+def _resolve_net_adjustment_display(trade_data, trade_type, reason_text):
+    """订单展示派生（全部订单行）：方向在前统一文案 + 净头寸调整备注。
+
+    徽章/方向：decision_leg_*（决策腿）优先；缺失时按执行动作 + side 派生
+    （开/加：BUY→多头、SELL→空头；平：BUY→空头平仓、SELL→多头平仓）。
+    统一文案：多头开仓/空头开仓/多头平仓/空头平仓/多头加仓/空头加仓。
+    备注（仅净头寸调整记录）：
     - 决策腿为开/加（含机制=净头寸对齐）：备注含实际执行净额说明
       （如“净头寸调整（实际执行：减少空头 0.187）”），不呈现为新的信号开仓；
     - 平仓记录：该侧自身原因（leg_reason，如“信号平仓”）优先，机制作次要说明；
@@ -907,24 +923,27 @@ def _resolve_net_adjustment_display(trade_data, trade_type, reason_text):
     attribution_raw = trade_data.get('attribution')
     attribution = attribution_raw if isinstance(attribution_raw, dict) else {}
     net_adjustment = _is_net_adjustment_record(trade_data)
-    if not net_adjustment:
-        return False, attribution, trade_type, '', ''
-
     side = str(trade_data.get('side') or '').strip().upper()
     action = _resolve_execution_action(trade_data)
     decision_direction, decision_action = _resolve_decision_leg_fields(trade_data)
 
     if decision_direction and decision_action:
-        decision_direction_text = {'long': '多头', 'short': '空头'}[decision_direction]
-        display_trade_type = f'{"开" if decision_action == "open" else ("加" if decision_action == "add" else "平")}{decision_direction_text[0]}仓'
-        direction_text = decision_direction_text
-    elif action == 'close':
-        direction_text = '空头' if side == 'BUY' else ('多头' if side == 'SELL' else '')
-        display_trade_type = f'平{direction_text[0]}仓' if direction_text else '平仓'
+        effective_direction = decision_direction
+        effective_action = decision_action
     else:
-        direction_text = '多头' if side == 'BUY' else ('空头' if side == 'SELL' else '')
-        action_text = '加' if action == 'add' else '开'
-        display_trade_type = f'{action_text}{direction_text[0]}仓' if direction_text else trade_type
+        effective_direction = _display_direction_from_side(side, action)
+        effective_action = action
+
+    direction_text = DISPLAY_DIRECTION_TEXT.get(effective_direction, '')
+    action_text = DISPLAY_ACTION_TEXT.get(effective_action, '')
+    if direction_text and action_text:
+        display_trade_type = f'{direction_text}{action_text}'
+    else:
+        display_trade_type = trade_type
+        direction_text = ''
+
+    if not net_adjustment:
+        return False, attribution, display_trade_type, direction_text, ''
 
     leg_fields = _resolve_net_adjustment_leg_fields(trade_data)
     leg = leg_fields['leg_direction'] or str(attribution.get('leg') or '').strip().lower()
@@ -933,8 +952,6 @@ def _resolve_net_adjustment_display(trade_data, trade_type, reason_text):
     mechanism_label = leg_fields['mechanism_label']
     if not mechanism_label and leg_fields['mechanism'] == NET_ADJUSTMENT_MECHANISM:
         mechanism_label = NET_ADJUSTMENT_MECHANISM_LABEL
-
-    effective_action = decision_action or action
 
     if effective_action != 'close':
         if decision_direction and decision_action:
@@ -1068,6 +1085,88 @@ def _build_lead_summary(trade_records, initial_funds=0.0, archived_realized_pnl=
         'archived_realized_pnl': round(_to_float(archived_realized_pnl, 0.0), 4),
         'retained_record_count': len(trade_records) if isinstance(trade_records, list) else 0,
     }
+
+
+def _closed_position_side(record):
+    """执行平仓动作减少/平掉的持仓方向（BUY→空头，SELL→多头）；非平仓或方向未知返回空串。"""
+    if _resolve_execution_action(record) != 'close':
+        return ''
+    side = str(record.get('side') or '').strip().upper()
+    if side == 'BUY':
+        return 'short'
+    if side == 'SELL':
+        return 'long'
+    return ''
+
+
+def _displays_own_close(record, closed_side):
+    """行展示是否为被平侧自身的平仓行（如空头平仓行）。"""
+    display_trade_type = str(record.get('display_trade_type') or '')
+    if '平仓' not in display_trade_type:
+        return False
+    expected = DISPLAY_DIRECTION_TEXT.get(closed_side, '')
+    return bool(expected) and str(record.get('display_direction') or '') == expected
+
+
+def _display_pnl_source_date(record):
+    """结转来源日期短文本（MM-DD）。"""
+    raw = str(record.get('timestamp') or '').strip()
+    if len(raw) >= 10 and raw[4] == '-' and raw[7] == '-':
+        return f'{raw[5:7]}-{raw[8:10]}'
+    return raw or '未知'
+
+
+def _apply_display_pnl_attribution(trade_records):
+    """按方向归属派生 display_pnl：净额执行的已实现盈亏归属“被减仓/被平的那一侧”。
+
+    - 行展示为被平侧自身的平仓（如“空头平仓”）→ 显示本行盈亏 + 结转盈亏，
+      结转以 display_pnl_note 标注来源日期（如“含 10-06 结转”）；
+    - 行展示其它动作（如“多头开仓”行实际执行的是减少空头）→ 本行 display_pnl=None（"-"），
+      盈亏挂起到被平侧，累计到该侧下一行平仓；
+    - 无对应平仓行时挂起金额不再显示（仅展示层；摘要/总账仍按原始 order_pnl 计）。
+    幂等：每次调用先重置 display_pnl/display_pnl_note，再按时间顺序重算。
+    """
+    if not isinstance(trade_records, list):
+        return
+    ordered = sorted(
+        enumerate(trade_records),
+        key=lambda item: (
+            _parse_triangle_trade_timestamp(
+                item[1].get('timestamp') if isinstance(item[1], dict) else None
+            ) or datetime.min,
+            item[0],
+        ),
+    )
+    parked = {'long': [], 'short': []}
+    for _, record in ordered:
+        if not isinstance(record, dict):
+            continue
+        record['display_pnl'] = None
+        record.pop('display_pnl_note', None)
+        closed_side = _closed_position_side(record)
+        if not closed_side:
+            # 开/加执行：无被平侧，行内显式盈亏按旧口径展示
+            fallback_pnl = _extract_lead_realized_pnl(record)
+            if fallback_pnl is not None:
+                record['display_pnl'] = round(fallback_pnl, 4)
+            continue
+        if _displays_own_close(record, closed_side):
+            carry = parked[closed_side]
+            raw_pnl = _extract_lead_realized_pnl(record)
+            has_value = raw_pnl is not None or bool(carry)
+            record['display_pnl'] = (
+                round((raw_pnl or 0.0) + sum(amount for _, amount in carry), 4)
+                if has_value else None
+            )
+            if carry:
+                dates = sorted({date_text for date_text, _ in carry})
+                record['display_pnl_note'] = f'含 {"、".join(dates)} 结转'
+            parked[closed_side] = []
+        else:
+            raw_pnl = _extract_lead_realized_pnl(record)
+            if raw_pnl is not None:
+                parked[closed_side].append((_display_pnl_source_date(record), raw_pnl))
+            record['display_pnl'] = None
 
 
 def _normalize_triangle_trade_record(trade_data):
@@ -1257,6 +1356,12 @@ def _replay_trade_records_with_pnl(trade_records):
     return position_buckets
 
 
+def _finalize_lead_records(trade_records):
+    """带单记录统一收尾：账务回放 + 展示盈亏方向归属（加载/更新入口，幂等）。"""
+    _replay_trade_records_with_pnl(trade_records)
+    _apply_display_pnl_attribution(trade_records)
+
+
 def _normalize_triangle_summary(summary, round_records=None):
     normalized = dict(summary) if isinstance(summary, dict) else {}
     round_profit = _sum_triangle_round_profit(round_records)
@@ -1301,6 +1406,8 @@ def _sync_total_profit_from_lead(total_profit_data, lead_data, now=None):
     规则：
     - 基线 = 最新一个早于今日的曲线点；当日点 = 基线本金/总资金 + 窗口内
       lead 记录的已实现盈亏之和（口径与 lead summary 一致，含净头寸调整平仓）。
+    - 窗口盈亏按展示归属日计入：记录含 display_pnl 字段时取该值（结转盈亏落被平侧
+      平仓行）；无该字段（旧调用/旧 payload）时回退原始已实现盈亏。
     - 窗口起点按基线粒度：日粒度点（YYYY-MM-DD）为当日结算值，次日起算；年月粒度点
       （YYYY-MM）为月末结算值，次月 1 日起算（基线月内记录视为已包含在基线中）。
     - 基线格式无法判定时打印告警并跳过自动同步（不改动文件）。
@@ -1361,7 +1468,10 @@ def _sync_total_profit_from_lead(total_profit_data, lead_data, now=None):
             record_key = (record_time.year, record_time.month, record_time.day)
             if record_key < window_start_key or record_key > today_key:
                 continue
-            pnl = _extract_lead_realized_pnl(record)
+            if 'display_pnl' in record:
+                pnl = _to_float(record.get('display_pnl'), None)
+            else:
+                pnl = _extract_lead_realized_pnl(record)
             if pnl is not None:
                 window_pnl += pnl
     if abs(window_pnl) < 1e-9:
@@ -1409,7 +1519,7 @@ def load_lead_data(strict=False):
                         continue
                     seen_keys.add(record['order_key'])
                     normalized_records.append(record)
-                _replay_trade_records_with_pnl(normalized_records)
+                _finalize_lead_records(normalized_records)
                 archived_realized_pnl = _to_float(summary.get('archived_realized_pnl', 0.0), 0.0)
                 initial_funds = _to_float(summary.get('initial_funds', 0.0), 0.0)
                 return {
@@ -2231,7 +2341,7 @@ class DataStorage:
         initial_funds = _to_float(summary.get('initial_funds', data.get('initial_funds', 0.0) if isinstance(data, dict) else 0.0), 0.0)
         archived_realized_pnl = _to_float(summary.get('archived_realized_pnl', 0.0), 0.0)
 
-        _replay_trade_records_with_pnl(existing_records)
+        _finalize_lead_records(existing_records)
 
         if len(existing_records) > MAX_LEAD_RECORDS:
             dropped_records = existing_records[MAX_LEAD_RECORDS:]
@@ -2242,7 +2352,7 @@ class DataStorage:
             )
             del existing_records[MAX_LEAD_RECORDS:]
 
-        _replay_trade_records_with_pnl(existing_records)
+        _finalize_lead_records(existing_records)
 
         self.lead_data = {
             'summary': _build_lead_summary(

@@ -215,6 +215,128 @@ def _backfilled_1006_record(**overrides):
     return record
 
 
+def _live_0921_short_open():
+    """现网记录 1：2026-09-21 08:00:05 空头开仓 0.197@81143.9（订单 1141560706678）。"""
+    return {
+        'account_id': 'binance.lead',
+        'account_label': 'binance.lead',
+        'order_id': '1141560706678',
+        'symbol': 'BTCUSDT.P',
+        'side': 'SELL',
+        'quantity': 0.197,
+        'price': 81143.9,
+        'trade_type': '开仓',
+        'reason': '开仓',
+        'timestamp': '2026-09-21 08:00:05',
+    }
+
+
+def _live_1008_close_short(**overrides):
+    """现网记录 3：2026-10-08 08:00:05 平空 0.01@83281.9（空头腿自身离场）。"""
+    record = {
+        'account_id': 'binance.lead',
+        'account_label': 'binance.lead',
+        'order_id': '1144960000001',
+        'symbol': 'BTCUSDT.P',
+        'side': 'BUY',
+        'quantity': 0.01,
+        'price': 83281.9,
+        'trade_type': '开仓',
+        'execution_trade_type': '平仓',
+        'execution_action': 'close',
+        'net_adjustment': True,
+        'leg_direction': 'short',
+        'leg_action': 'close',
+        'leg_reason': '信号平仓',
+        'mechanism': 'net_position_alignment',
+        'mechanism_label': '净头寸调整执行',
+        'decision_leg_direction': 'short',
+        'decision_leg_action': 'close',
+        'reason': '双向信号净头寸调整',
+        'realized_pnl': -21.379,
+        'timestamp': '2026-10-08 08:00:05',
+    }
+    record.update(overrides)
+    return record
+
+
+def _live_1008_open_long(**overrides):
+    """现网记录 4：2026-10-08 08:00:06 多头腿开仓 0.173@83281.9（净调执行）。"""
+    record = {
+        'account_id': 'binance.lead',
+        'account_label': 'binance.lead',
+        'order_id': '1144960000002',
+        'symbol': 'BTCUSDT.P',
+        'side': 'BUY',
+        'quantity': 0.173,
+        'price': 83281.9,
+        'trade_type': '开仓',
+        'execution_trade_type': '开仓',
+        'execution_action': 'open',
+        'net_adjustment': True,
+        'leg_direction': 'long',
+        'leg_action': 'open',
+        'leg_reason': '信号开仓',
+        'mechanism': 'net_position_alignment',
+        'mechanism_label': '净头寸调整执行',
+        'decision_leg_direction': 'long',
+        'decision_leg_action': 'open',
+        'reason': '双向信号净头寸调整',
+        'timestamp': '2026-10-08 08:00:06',
+    }
+    record.update(overrides)
+    return record
+
+
+def _live_1008_add_long(**overrides):
+    """现网记录 5：2026-10-08 12:00:05 多头加仓（决策腿 long/add）。"""
+    record = {
+        'account_id': 'binance.lead',
+        'account_label': 'binance.lead',
+        'order_id': '1144960000003',
+        'symbol': 'BTCUSDT.P',
+        'side': 'BUY',
+        'quantity': 0.05,
+        'price': 84000.0,
+        'trade_type': '加仓',
+        'execution_trade_type': '加仓',
+        'execution_action': 'add',
+        'decision_leg_direction': 'long',
+        'decision_leg_action': 'add',
+        'timestamp': '2026-10-08 12:00:05',
+    }
+    record.update(overrides)
+    return record
+
+
+def _live_five_records():
+    """现网五条记录（09-21 空头开仓 / 10-06 决策腿多头开仓 / 10-08 平空 / 10-08 开多 / 12:00 加多）。"""
+    return [
+        _live_0921_short_open(),
+        _backfilled_1006_record(realized_pnl=-762.2868),
+        _live_1008_close_short(),
+        _live_1008_open_long(),
+        _live_1008_add_long(),
+    ]
+
+
+def _finalized(records):
+    normalized = [web._normalize_lead_trade_record(record) for record in records]
+    web._finalize_lead_records(normalized)
+    return normalized
+
+
+def _buy_close_with_decision(timestamp, realized_pnl, direction, action, order_id):
+    return _raw_close_record(
+        order_id=order_id,
+        timestamp=timestamp,
+        realized_pnl=realized_pnl,
+        gross_pnl=realized_pnl,
+        decision_leg_direction=direction,
+        decision_leg_action=action,
+    )
+
+
 # ---------------------------------------------------------------------------
 # display 派生矩阵（close/open/add、多/空、新单侧字段有无）
 # ---------------------------------------------------------------------------
@@ -225,7 +347,7 @@ def test_execution_close_buy_displays_ping_kong_with_pnl():
     assert record['trade_type'] == '开仓'
     assert record['net_adjustment'] is True
     assert record['execution_action'] == 'close'
-    assert record['display_trade_type'] == '平空仓'
+    assert record['display_trade_type'] == '空头平仓'
     assert record['display_direction'] == '空头'
     assert record['realized_pnl'] == pytest.approx(-21.9545)
     assert record['order_pnl'] == pytest.approx(-21.9545)
@@ -241,7 +363,7 @@ def test_execution_close_sell_displays_ping_duo():
         execution_action='close',
         execution_trade_type='平仓',
     ))
-    assert record['display_trade_type'] == '平多仓'
+    assert record['display_trade_type'] == '多头平仓'
     assert record['display_direction'] == '多头'
 
 
@@ -253,7 +375,7 @@ def test_execution_open_short_displays_kai_kong():
         execution_trade_type='开仓',
         trade_type='开仓',
     ))
-    assert record['display_trade_type'] == '开空仓'
+    assert record['display_trade_type'] == '空头开仓'
     assert record['display_direction'] == '空头'
 
 
@@ -265,13 +387,13 @@ def test_execution_add_long_displays_jia_duo():
         execution_trade_type='加仓',
         trade_type='加仓',
     ))
-    assert record['display_trade_type'] == '加多仓'
+    assert record['display_trade_type'] == '多头加仓'
     assert record['display_direction'] == '多头'
 
 
 def test_open_long_net_alignment_note_not_rendered_as_signal_open():
     record = web._normalize_lead_trade_record(_raw_open_long_record())
-    assert record['display_trade_type'] == '开多仓'
+    assert record['display_trade_type'] == '多头开仓'
     assert record['display_direction'] == '多头'
     # 净头寸对齐开仓不呈现为新信号开仓（即便 leg_reason 为“信号开仓”）
     assert record['display_note'] == '多头仓位对齐（净头寸调整执行）'
@@ -296,7 +418,7 @@ def test_legacy_close_falls_back_to_trade_type_not_side():
         'timestamp': '2026-10-06 00:00:03',
     })
     assert record['net_adjustment'] is True
-    assert record['display_trade_type'] == '平空仓'
+    assert record['display_trade_type'] == '空头平仓'
     assert record['display_direction'] == '空头'
 
 
@@ -313,7 +435,7 @@ def test_legacy_add_uses_trade_type_action():
         'attribution': {'leg': 'short', 'action': 'add', 'quantity': 0.05},
         'alert_message': '空头加仓（净头寸调整）',
     })
-    assert record['display_trade_type'] == '加空仓'
+    assert record['display_trade_type'] == '空头加仓'
     assert record['display_direction'] == '空头'
 
 
@@ -329,8 +451,8 @@ def test_plain_close_record_unchanged():
         'reason': '空头平仓 | 触发: 止损',
     })
     assert record['net_adjustment'] is False
-    assert record['display_trade_type'] == '平仓'
-    assert record['display_direction'] == ''
+    assert record['display_trade_type'] == '空头平仓'
+    assert record['display_direction'] == '空头'
     assert record['display_note'] == ''
 
 
@@ -340,7 +462,7 @@ def test_stale_display_fields_overwritten_before_after():
         '开多仓', '多头', '净头寸调整',
     )
     record = web._normalize_lead_trade_record(raw)
-    assert (record['display_trade_type'], record['display_direction']) == ('平空仓', '空头')
+    assert (record['display_trade_type'], record['display_direction']) == ('空头平仓', '空头')
     assert record['display_note'] == '信号平仓（净头寸调整执行）'
 
 
@@ -387,7 +509,7 @@ def test_other_mechanism_is_not_net_adjustment():
 def test_legacy_close_without_new_fields_keeps_execution_note():
     record = web._normalize_lead_trade_record(_without_leg_fields(_raw_close_record()))
     assert record['net_adjustment'] is True
-    assert record['display_trade_type'] == '平空仓'
+    assert record['display_trade_type'] == '空头平仓'
     assert record['display_note'] == '净头寸调整（原因：双向信号净头寸调整）'
     assert '归因' not in record['display_note']
 
@@ -401,14 +523,14 @@ def test_legacy_close_with_attribution_drops_attribution_narrative():
         'net_position_after': -0.010,
     }))
     record = web._normalize_lead_trade_record(legacy)
-    assert record['display_trade_type'] == '平空仓'
+    assert record['display_trade_type'] == '空头平仓'
     assert '归因' not in record['display_note']
     assert record['display_note'] == '净头寸调整（净头寸：空 0.197→空 0.01；原因：双向信号净头寸调整）'
 
 
 def test_legacy_open_with_attribution_uses_alignment_note():
     record = web._normalize_lead_trade_record(_without_leg_fields(_raw_open_long_record()))
-    assert record['display_trade_type'] == '开多仓'
+    assert record['display_trade_type'] == '多头开仓'
     assert record['display_direction'] == '多头'
     assert record['display_note'] == '多头仓位对齐（净头寸调整执行）'
     assert '归因' not in record['display_note']
@@ -478,7 +600,7 @@ def test_load_lead_data_recomputes_stale_display(tmp_path, monkeypatch):
     close_record = next(
         record for record in loaded['trade_records'] if record['order_id'] == 'today-a'
     )
-    assert close_record['display_trade_type'] == '平空仓'
+    assert close_record['display_trade_type'] == '空头平仓'
     assert close_record['display_direction'] == '空头'
     assert close_record['realized_pnl'] == pytest.approx(-21.9545)
 
@@ -492,7 +614,7 @@ def test_load_lead_data_recomputes_stale_display(tmp_path, monkeypatch):
 
 def test_legacy_1006_backfilled_displays_decision_leg_open_long():
     record = web._normalize_lead_trade_record(_backfilled_1006_record())
-    assert record['display_trade_type'] == '开多仓'
+    assert record['display_trade_type'] == '多头开仓'
     assert record['display_direction'] == '多头'
     assert '净头寸调整' in record['display_note']
     assert '实际执行' in record['display_note']
@@ -508,7 +630,7 @@ def test_1008_close_falls_back_to_ping_kong():
     record = web._normalize_lead_trade_record(_raw_close_record())
     assert record['decision_leg_direction'] == ''
     assert record['decision_leg_action'] == ''
-    assert record['display_trade_type'] == '平空仓'
+    assert record['display_trade_type'] == '空头平仓'
     assert record['display_direction'] == '空头'
     assert record['display_note'] == '信号平仓（净头寸调整执行）'
     assert record['order_pnl'] == pytest.approx(-21.9545)
@@ -520,7 +642,7 @@ def test_decision_leg_priority_over_leg_and_execution():
         decision_leg_direction='long',
         decision_leg_action='open',
     ))
-    assert record['display_trade_type'] == '开多仓'
+    assert record['display_trade_type'] == '多头开仓'
     assert record['display_direction'] == '多头'
     assert '实际执行' in record['display_note']
     assert '归因' not in record['display_note']
@@ -534,7 +656,7 @@ def test_decision_missing_falls_back_to_leg_fields():
     record = web._normalize_lead_trade_record(raw)
     assert record['decision_leg_direction'] == ''
     assert record['decision_leg_action'] == ''
-    assert record['display_trade_type'] == '开多仓'
+    assert record['display_trade_type'] == '多头开仓'
     assert record['display_direction'] == '多头'
     assert record['display_note'] == '多头仓位对齐（净头寸调整执行）'
 
@@ -564,19 +686,21 @@ def test_backfill_tool_backfills_and_is_idempotent(tmp_path, monkeypatch):
     assert result2['changed'] is False
     assert sorted(os.listdir(tmp_path)) == files_before
 
-    # 模拟重启：Web 归一化 → 开多仓；落盘后重载仍稳定（字段持久化）
+    # 模拟重启：Web 归一化 → 多头开仓；落盘后重载仍稳定（字段持久化）
     monkeypatch.setattr(web, 'data_dir', str(tmp_path))
     loaded = web.load_lead_data()
     reloaded_record = loaded['trade_records'][0]
-    assert reloaded_record['display_trade_type'] == '开多仓'
+    assert reloaded_record['display_trade_type'] == '多头开仓'
     assert reloaded_record['display_direction'] == '多头'
     assert reloaded_record['decision_leg_direction'] == 'long'
     assert reloaded_record['decision_leg_action'] == 'open'
     assert '实际执行' in reloaded_record['display_note']
     web.save_lead_data(loaded)
     loaded_again = web.load_lead_data()
-    assert loaded_again['trade_records'][0]['display_trade_type'] == '开多仓'
-    assert web._normalize_lead_trade_record(loaded_again['trade_records'][0]) == loaded_again['trade_records'][0]
+    assert loaded_again['trade_records'][0]['display_trade_type'] == '多头开仓'
+    renormalized = web._normalize_lead_trade_record(loaded_again['trade_records'][0])
+    web._finalize_lead_records([renormalized])
+    assert renormalized == loaded_again['trade_records'][0]
 
 
 def test_backfill_tool_dry_run_writes_nothing(tmp_path):
@@ -593,6 +717,163 @@ def test_backfill_tool_dry_run_writes_nothing(tmp_path):
     assert result['backup'] == ''
     assert data_path.read_text(encoding='utf-8') == before
     assert sorted(os.listdir(tmp_path)) == ['lead_trades.json']
+
+
+# ---------------------------------------------------------------------------
+# 现网五条记录：方向在前文案 + 盈亏方向归属（display_pnl 结转）
+# ---------------------------------------------------------------------------
+
+def test_live_five_records_direction_labels_and_pnl_attribution():
+    records = _finalized(_live_five_records())
+    by_id = {record['order_id']: record for record in records}
+
+    short_open = by_id['1141560706678']
+    assert short_open['display_trade_type'] == '空头开仓'
+    assert short_open['display_direction'] == '空头'
+    assert short_open['display_pnl'] is None
+
+    decision_open = by_id['1155109993906']
+    assert decision_open['display_trade_type'] == '多头开仓'
+    assert decision_open['display_direction'] == '多头'
+    assert decision_open['display_pnl'] is None  # 不显示在多头开仓行
+    assert decision_open['order_pnl'] == pytest.approx(-762.2868)  # 原始账务保留
+    assert '实际执行' in decision_open['display_note']
+    assert '归因' not in decision_open['display_note']
+
+    close_short = by_id['1144960000001']
+    assert close_short['display_trade_type'] == '空头平仓'
+    assert close_short['display_direction'] == '空头'
+    # -762.2868（10-06 结转）+ -21.379（本行）= -783.6658（前端 2 位显示 -783.67）
+    assert close_short['display_pnl'] == pytest.approx(-783.6658)
+    assert round(close_short['display_pnl'], 2) == pytest.approx(-783.67)
+    assert close_short['display_pnl_note'] == '含 10-06 结转'
+    assert close_short['display_note'] == '信号平仓（净头寸调整执行）'
+
+    open_long = by_id['1144960000002']
+    assert open_long['display_trade_type'] == '多头开仓'
+    assert open_long['display_direction'] == '多头'
+    assert open_long['display_pnl'] is None
+
+    add_long = by_id['1144960000003']
+    assert add_long['display_trade_type'] == '多头加仓'
+    assert add_long['display_direction'] == '多头'
+    assert add_long['display_pnl'] is None
+
+    # 总账不变：展示盈亏合计 == 原始已实现盈亏合计
+    display_total = sum(
+        record['display_pnl'] for record in records if record['display_pnl'] is not None
+    )
+    raw_total = sum(
+        value for value in (web._extract_lead_realized_pnl(record) for record in records)
+        if value is not None
+    )
+    assert display_total == pytest.approx(raw_total)
+
+
+def test_display_pnl_carry_accumulates_multiple_sources():
+    records = _finalized([
+        _buy_close_with_decision('2026-10-06 00:00:03', -100.0, 'long', 'open', 'carry-a'),
+        _buy_close_with_decision('2026-10-07 00:00:03', -50.0, 'long', 'open', 'carry-b'),
+        _buy_close_with_decision('2026-10-08 00:00:03', -20.0, 'short', 'close', 'carry-close'),
+    ])
+    assert records[0]['display_trade_type'] == '多头开仓'
+    assert records[0]['display_pnl'] is None
+    assert records[1]['display_pnl'] is None
+    assert records[2]['display_trade_type'] == '空头平仓'
+    assert records[2]['display_pnl'] == pytest.approx(-170.0)
+    assert records[2]['display_pnl_note'] == '含 10-06、10-07 结转'
+
+
+def test_display_pnl_without_later_close_row_stays_hidden():
+    records = _finalized([
+        _buy_close_with_decision('2026-10-05 00:00:03', -10.0, 'short', 'close', 'edge-close'),
+        _buy_close_with_decision('2026-10-06 00:00:03', -100.0, 'long', 'open', 'edge-park'),
+        _live_1008_open_long(order_id='edge-open'),
+    ])
+    assert records[0]['display_pnl'] == pytest.approx(-10.0)  # 更早的平仓行不受影响
+    assert records[1]['display_pnl'] is None  # 挂起
+    assert records[2]['display_pnl'] is None  # 非平仓行不承接
+    assert records[1].get('display_pnl_note') is None
+
+
+def test_display_pnl_idempotent_across_reload(tmp_path, monkeypatch):
+    monkeypatch.setattr(web, 'data_dir', str(tmp_path))
+    payload = {
+        'summary': {'initial_funds': 10000.0},
+        'trade_records': _live_five_records(),
+    }
+    (tmp_path / 'lead_trades.json').write_text(
+        json.dumps(payload, ensure_ascii=False), encoding='utf-8'
+    )
+
+    loaded = web.load_lead_data()
+    close_row = next(
+        record for record in loaded['trade_records'] if record['order_id'] == '1144960000001'
+    )
+    assert close_row['display_pnl'] == pytest.approx(-783.6658)
+    assert close_row['display_pnl_note'] == '含 10-06 结转'
+
+    web.save_lead_data(loaded)
+    reloaded = web.load_lead_data()
+    assert reloaded['trade_records'] == loaded['trade_records']
+
+    # 二次收尾重算幂等
+    web._finalize_lead_records(loaded['trade_records'])
+    assert loaded['trade_records'] == reloaded['trade_records']
+
+
+def test_legacy_record_without_display_pnl_field_falls_back():
+    # 旧记录（未经收尾/旧调用）：无 display_pnl 字段，normalize 仍给方向在前文案
+    record = web._normalize_lead_trade_record({
+        'account_id': 'binance.lead',
+        'order_id': 'legacy-fallback-1',
+        'symbol': 'BTCUSDT.P',
+        'side': 'SELL',
+        'quantity': 0.5,
+        'price': 90000.0,
+        'trade_type': '平仓',
+        'realized_pnl': 12.5,
+        'timestamp': '2026-09-15 12:00:00',
+    })
+    assert record['display_trade_type'] == '多头平仓'
+    assert record['display_direction'] == '多头'
+    assert 'display_pnl' not in record
+    # 收尾后（新管线）自平行显示原始盈亏
+    finalized = _finalized([record])
+    assert finalized[0]['display_pnl'] == pytest.approx(12.5)
+    assert finalized[0].get('display_pnl_note') is None
+
+
+def test_total_profit_sync_uses_display_pnl_attribution_date():
+    records = _finalized(_live_five_records())
+    total_profit = {
+        'trade_records': [],
+        'symbol_profit_tracker': {},
+        'profit_curve_data': {
+            'data_points': [
+                {'date': '2025-03', 'principal': 10000, 'total_funds': 10000},
+                {'date': '2026-10-05', 'principal': 12000, 'total_funds': 13000},
+            ]
+        },
+    }
+    # 10-06 当天：该笔亏损挂在多头开仓行（display_pnl=None）→ 不计入
+    assert web._sync_total_profit_from_lead(
+        total_profit, {'summary': {}, 'trade_records': records},
+        now=datetime(2026, 10, 6, 12, 0, 0),
+    ) is False
+    assert all(
+        point['date'] != '2026-10-06'
+        for point in total_profit['profit_curve_data']['data_points']
+    )
+
+    # 10-08：结转亏损随空头平仓行落 10-08
+    assert web._sync_total_profit_from_lead(
+        total_profit, {'summary': {}, 'trade_records': records},
+        now=datetime(2026, 10, 8, 12, 0, 0),
+    ) is True
+    point = total_profit['profit_curve_data']['data_points'][-1]
+    assert point['date'] == '2026-10-08'
+    assert point['total_funds'] == pytest.approx(13000.0 - 783.6658)
 
 
 # ---------------------------------------------------------------------------
@@ -882,7 +1163,7 @@ def test_update_lead_data_persists_corrections_and_total_profit(tmp_path, monkey
     close_record = next(
         record for record in saved_lead['trade_records'] if record['order_id'] == 'today-a'
     )
-    assert close_record['display_trade_type'] == '平空仓'
+    assert close_record['display_trade_type'] == '空头平仓'
     assert close_record['display_direction'] == '空头'
     assert close_record['display_note'] == '信号平仓（净头寸调整执行）'
     assert close_record['leg_reason'] == '信号平仓'
@@ -907,6 +1188,13 @@ def test_template_uses_display_fields():
         html = handle.read()
     assert 'trade.display_trade_type || trade.trade_type' in html
     assert 'isNetAdjustment ? null' not in html
+    # 盈亏列优先 display_pnl（字段存在时 null 表示 "-"），结转备注随行展示
+    assert "Object.prototype.hasOwnProperty.call(trade, 'display_pnl')" in html
+    assert 'trade.display_pnl_note' in html
+    assert 'formatSignedMoney(pnl, 2)' in html
     assert 'trade.order_pnl ?? trade.realized_pnl ?? trade.net_profit' in html
     assert 'trade.display_note || trade.reason' in html
-    assert "'平多仓', '平空仓'" in html
+    # 方向在前统一文案（新标签样式）
+    assert "'多头平仓'" in html and "'空头平仓'" in html
+    assert "'多头开仓'" in html and "'空头开仓'" in html
+    assert "'多头加仓'" in html and "'空头加仓'" in html

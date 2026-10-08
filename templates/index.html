@@ -2971,9 +2971,11 @@
 
                 const side = trade.side || '未知';
                 const tradeType = trade.display_trade_type || trade.trade_type || '未知';
-                // 净头寸调整按执行语义展示：盈亏仅有空值时显示 "-"
-                const orderPnl = trade.order_pnl ?? trade.realized_pnl ?? trade.net_profit;
+                // display_pnl：按方向归属后的展示盈亏（字段存在时 null 表示 "-"）；旧数据回退原始盈亏
+                const hasDisplayPnl = Object.prototype.hasOwnProperty.call(trade, 'display_pnl');
+                const orderPnl = hasDisplayPnl ? trade.display_pnl : (trade.order_pnl ?? trade.realized_pnl ?? trade.net_profit);
                 const pnl = orderPnl === undefined || orderPnl === null || orderPnl === '' ? null : Number(orderPnl);
+                const pnlNote = hasDisplayPnl && trade.display_pnl_note ? String(trade.display_pnl_note) : '';
                 const pnlClass = pnl === null
                     ? 'text-gray-500'
                     : pnl >= 0
@@ -2989,21 +2991,27 @@
 
                 const tradeTypeClass = {
                     '开仓': 'bg-blue-100 text-blue-800',
+                    '多头开仓': 'bg-blue-100 text-blue-800',
+                    '空头开仓': 'bg-blue-100 text-blue-800',
                     '开多仓': 'bg-blue-100 text-blue-800',
                     '开空仓': 'bg-blue-100 text-blue-800',
                     '加仓': 'bg-cyan-100 text-cyan-800',
+                    '多头加仓': 'bg-cyan-100 text-cyan-800',
+                    '空头加仓': 'bg-cyan-100 text-cyan-800',
                     '加多仓': 'bg-cyan-100 text-cyan-800',
                     '加空仓': 'bg-cyan-100 text-cyan-800',
                     '止盈': 'bg-green-100 text-green-800',
                     '止损': 'bg-red-100 text-red-800',
                     '平仓': 'bg-yellow-100 text-yellow-800',
+                    '多头平仓': 'bg-yellow-100 text-yellow-800',
+                    '空头平仓': 'bg-yellow-100 text-yellow-800',
                     '平多仓': 'bg-yellow-100 text-yellow-800',
                     '平空仓': 'bg-yellow-100 text-yellow-800',
                     '未知': 'bg-gray-100 text-gray-800'
                 }[tradeType] || 'bg-gray-100 text-gray-800';
 
                 let priceText = '-';
-                if (trade.entry_price !== undefined && trade.entry_price !== null && trade.exit_price !== undefined && trade.exit_price !== null && ['平仓', '止盈', '止损', '平多仓', '平空仓'].includes(tradeType)) {
+                if (trade.entry_price !== undefined && trade.entry_price !== null && trade.exit_price !== undefined && trade.exit_price !== null && ['平仓', '止盈', '止损', '平多仓', '平空仓', '多头平仓', '空头平仓'].includes(tradeType)) {
                     priceText = `${formatDecimal(trade.entry_price)} -> ${formatDecimal(trade.exit_price)}`;
                 } else if (trade.price !== undefined && trade.price !== null) {
                     priceText = formatDecimal(trade.price);
@@ -3021,7 +3029,7 @@
                     </td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${formatQuantity(trade.quantity || 0)}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${priceText}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium ${pnlClass}">${pnl === null ? '-' : formatSignedMoney(pnl)}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium ${pnlClass}">${pnl === null ? '-' : formatSignedMoney(pnl, 2)}${pnlNote ? `<span class="block text-xs font-normal text-gray-400">${pnlNote}</span>` : ''}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.display_note || trade.reason || '-'}</td>
                 `;
                 tbody.appendChild(tr);
