@@ -22,6 +22,7 @@ import secrets
 import requests
 import logging
 import sys
+import tempfile
 from datetime import datetime, timezone, timedelta
 from functools import wraps
 import threading
@@ -571,6 +572,34 @@ def _parse_profit_curve_date(value):
     return year, month, day
 
 
+def _profit_curve_window_start(value):
+    """返回曲线点结算值覆盖范围的窗口起点（record_key < 起点的记录视为已计入该点）。
+
+    - 年月粒度（如 `2026-08`，月末结算值）：起点 = 次月 1 日；
+    - 日粒度（如 `2026-08-23`，当日结算值）：起点 = 次日；
+    - 无法判定的格式返回 None（调用方告警并跳过自动同步）。
+    """
+    parts = str(value or '').strip().split('-')
+    if len(parts) == 2:
+        date_key = _parse_profit_curve_date(value)
+        if date_key is None:
+            return None
+        year, month = date_key[0], date_key[1]
+        if month == 12:
+            return year + 1, 1, 1
+        return year, month + 1, 1
+    if len(parts) == 3:
+        date_key = _parse_profit_curve_date(value)
+        if date_key is None:
+            return None
+        try:
+            next_day = datetime(date_key[0], date_key[1], date_key[2]) + timedelta(days=1)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        return next_day.year, next_day.month, next_day.day
+    return None
+
+
 def _build_total_profit_summary(total_profit_data):
     summary = {
         'total_net_profit': 0.0,
@@ -755,38 +784,184 @@ def _format_signed_position_text(value):
     return '0'
 
 
+NET_ADJUSTMENT_REASON_KEYWORD = '净头寸调整'
+NET_ADJUSTMENT_MECHANISM = 'net_position_alignment'
+NET_ADJUSTMENT_MECHANISM_LABEL = '净头寸调整执行'
+NET_ADJUSTMENT_NOTE_REASON_MAX_CHARS = 120
+
+
+def _is_net_adjustment_record(trade_data):
+    """净头寸调整判定：新 payload mechanism 优先，显式标记与 reason 关键字兜底。"""
+    mechanism = str(trade_data.get('mechanism') or '').strip().lower()
+    if mechanism:
+        return mechanism == NET_ADJUSTMENT_MECHANISM
+    if _to_bool_flag(trade_data.get('net_adjustment')):
+        return True
+    reason_text = str(trade_data.get('reason') or trade_data.get('alert_message') or '')
+    return NET_ADJUSTMENT_REASON_KEYWORD in reason_text
+
+
+def _resolve_net_adjustment_leg_fields(trade_data):
+    """读取 BStrategy 单侧载荷字段（leg_direction/leg_action/leg_reason/mechanism/mechanism_label）。
+
+    非法/缺失值归一为空串，由调用方按历史旧字段（attribution / 执行语义）兜底。
+    """
+    leg_direction = str(trade_data.get('leg_direction') or '').strip().lower()
+    if leg_direction not in ('long', 'short'):
+        leg_direction = ''
+    leg_action = str(trade_data.get('leg_action') or '').strip().lower()
+    if leg_action not in ('open', 'add', 'close'):
+        leg_action = ''
+    return {
+        'leg_direction': leg_direction,
+        'leg_action': leg_action,
+        'leg_reason': str(trade_data.get('leg_reason') or '').strip(),
+        'mechanism': str(trade_data.get('mechanism') or '').strip().lower(),
+        'mechanism_label': str(trade_data.get('mechanism_label') or '').strip(),
+    }
+
+
+def _resolve_decision_leg_fields(trade_data):
+    """决策腿字段（decision_leg_direction/decision_leg_action）：非法/缺失归一为空串。"""
+    direction = str(trade_data.get('decision_leg_direction') or '').strip().lower()
+    if direction not in ('long', 'short'):
+        direction = ''
+    action = str(trade_data.get('decision_leg_action') or '').strip().lower()
+    if action not in ('open', 'add', 'close'):
+        action = ''
+    return direction, action
+
+
+def _describe_net_adjustment_execution(trade_data, decision_direction):
+    """描述净头寸调整的“实际执行”摘要（信息可见即可，用于决策腿开/加备注）。
+
+    优先用 attribution 净头寸前后值判定增减；缺失时按决策腿语义（多腿开仓 → 减少空头）兜底。
+    """
+    attribution_raw = trade_data.get('attribution')
+    attribution = attribution_raw if isinstance(attribution_raw, dict) else {}
+    quantity = _to_float(trade_data.get('quantity'), None)
+    if quantity is None or quantity <= 0:
+        quantity = _to_float(attribution.get('quantity'), None)
+    quantity_text = f'{quantity:g}' if quantity is not None and quantity > 0 else ''
+
+    before = _to_float(attribution.get('net_position_before'), None)
+    after = _to_float(attribution.get('net_position_after'), None)
+    if before is not None and after is not None:
+        before_direction = '空头' if before < 0 else ('多头' if before > 0 else '')
+        after_direction = '空头' if after < 0 else ('多头' if after > 0 else '')
+        if before != 0 and after != 0 and (before > 0) != (after > 0):
+            text = f'转为{after_direction}'
+        elif before_direction:
+            if abs(after) < abs(before):
+                text = f'减少{before_direction}'
+            elif abs(after) > abs(before):
+                text = f'增加{before_direction}'
+            else:
+                text = f'维持{before_direction}'
+        else:
+            text = f'{after_direction}仓位' if after_direction else ''
+        if text:
+            return f'{text} {quantity_text}'.strip()
+
+    actual_direction = '空头' if decision_direction == 'long' else ('多头' if decision_direction == 'short' else '')
+    if actual_direction:
+        return f'减少{actual_direction} {quantity_text}'.strip()
+
+    side = str(trade_data.get('side') or '').strip().upper()
+    side_text = {'BUY': '买入', 'SELL': '卖出'}.get(side, '')
+    if side_text and quantity_text:
+        return f'{side_text} {quantity_text}'
+    return ''
+
+
+def _resolve_execution_action(trade_data):
+    """执行层动作 close/open/add：execution_action 优先，其次 execution_trade_type，最后回退 trade_type。"""
+    action = str(trade_data.get('execution_action') or '').strip().lower()
+    if action in ('close', 'open', 'add'):
+        return action
+
+    execution_trade_type = str(trade_data.get('execution_trade_type') or '').strip()
+    trade_type = str(trade_data.get('trade_type') or '').strip()
+    for candidate in (execution_trade_type, trade_type):
+        if not candidate:
+            continue
+        if '加仓' in candidate or '补仓' in candidate:
+            return 'add'
+        return 'close' if _trade_type_matches(candidate, TRIANGLE_CLOSE_TYPES) else 'open'
+    return 'open'
+
+
 def _resolve_net_adjustment_display(trade_data, trade_type, reason_text):
-    """净头寸调整订单展示派生：按归因腿动作显示（开多仓/开空仓），历史记录按 reason 兜底。
+    """净头寸调整订单展示派生：徽章/方向优先决策腿（decision_leg_*），备注按决策腿语义呈现。
+
+    展示优先级：decision_leg_*（决策腿）→ 现有 leg_*/执行语义（历史记录兜底）。
+    备注规则（BStrategy 新 payload 字段优先，历史旧字段兜底）：
+    - 决策腿为开/加（含机制=净头寸对齐）：备注含实际执行净额说明
+      （如“净头寸调整（实际执行：减少空头 0.187）”），不呈现为新的信号开仓；
+    - 平仓记录：该侧自身原因（leg_reason，如“信号平仓”）优先，机制作次要说明；
+    - 字段缺失：回退执行语义备注（原因/净头寸），不再输出“归因：…”叙事。
 
     返回 (net_adjustment, attribution, display_trade_type, display_direction, display_note)。
     仅影响展示字段；trade_type 保持原值供开/平仓盈亏配对使用。
     """
     attribution_raw = trade_data.get('attribution')
     attribution = attribution_raw if isinstance(attribution_raw, dict) else {}
-    net_adjustment = _to_bool_flag(trade_data.get('net_adjustment')) or ('净头寸调整' in reason_text)
+    net_adjustment = _is_net_adjustment_record(trade_data)
     if not net_adjustment:
         return False, attribution, trade_type, '', ''
 
-    leg = str(attribution.get('leg') or '').strip().lower()
-    if leg not in ('long', 'short'):
-        leg = 'long' if str(trade_data.get('side') or '').strip().upper() == 'BUY' else 'short'
-    action = str(attribution.get('action') or 'open').strip().lower()
-    direction_text = '多头' if leg == 'long' else '空头'
-    action_text = '加' if action == 'add' else '开'
-    display_trade_type = f'{action_text}{direction_text[0]}仓'
+    side = str(trade_data.get('side') or '').strip().upper()
+    action = _resolve_execution_action(trade_data)
+    decision_direction, decision_action = _resolve_decision_leg_fields(trade_data)
 
-    note_parts = ['净头寸调整']
-    quantity = _to_float(attribution.get('quantity'), None)
-    if quantity is not None:
-        note_parts.append(f'{direction_text}{"加仓" if action == "add" else "开仓"} {quantity:g}')
-    net_before = _format_signed_position_text(attribution.get('net_position_before'))
-    net_after = _format_signed_position_text(attribution.get('net_position_after'))
-    if net_before or net_after:
-        note_parts.append(f'净头寸 {net_before}→{net_after}')
-    display_note = (
-        '：'.join([note_parts[0], '，'.join(note_parts[1:])])
-        if len(note_parts) > 1 else note_parts[0]
-    )
+    if decision_direction and decision_action:
+        decision_direction_text = {'long': '多头', 'short': '空头'}[decision_direction]
+        display_trade_type = f'{"开" if decision_action == "open" else ("加" if decision_action == "add" else "平")}{decision_direction_text[0]}仓'
+        direction_text = decision_direction_text
+    elif action == 'close':
+        direction_text = '空头' if side == 'BUY' else ('多头' if side == 'SELL' else '')
+        display_trade_type = f'平{direction_text[0]}仓' if direction_text else '平仓'
+    else:
+        direction_text = '多头' if side == 'BUY' else ('空头' if side == 'SELL' else '')
+        action_text = '加' if action == 'add' else '开'
+        display_trade_type = f'{action_text}{direction_text[0]}仓' if direction_text else trade_type
+
+    leg_fields = _resolve_net_adjustment_leg_fields(trade_data)
+    leg = leg_fields['leg_direction'] or str(attribution.get('leg') or '').strip().lower()
+    leg_direction_text = {'long': '多头', 'short': '空头'}.get(leg, '')
+    leg_reason = leg_fields['leg_reason']
+    mechanism_label = leg_fields['mechanism_label']
+    if not mechanism_label and leg_fields['mechanism'] == NET_ADJUSTMENT_MECHANISM:
+        mechanism_label = NET_ADJUSTMENT_MECHANISM_LABEL
+
+    effective_action = decision_action or action
+
+    if effective_action != 'close':
+        if decision_direction and decision_action:
+            execution_text = _describe_net_adjustment_execution(trade_data, decision_direction)
+            display_note = (
+                f'净头寸调整（实际执行：{execution_text}）'
+                if execution_text
+                else f'净头寸调整（{mechanism_label or NET_ADJUSTMENT_MECHANISM_LABEL}）'
+            )
+        else:
+            aligned_direction = leg_direction_text or direction_text
+            alignment_primary = f'{aligned_direction}仓位对齐' if aligned_direction else '仓位对齐'
+            display_note = f'{alignment_primary}（{mechanism_label or NET_ADJUSTMENT_MECHANISM_LABEL}）'
+    elif leg_reason:
+        display_note = f'{leg_reason}（{mechanism_label}）' if mechanism_label else leg_reason
+    elif mechanism_label:
+        display_note = mechanism_label
+    else:
+        note_parts = []
+        net_before = _format_signed_position_text(attribution.get('net_position_before'))
+        net_after = _format_signed_position_text(attribution.get('net_position_after'))
+        if net_before or net_after:
+            note_parts.append(f'净头寸：{net_before}→{net_after}')
+        if reason_text:
+            note_parts.append(f'原因：{reason_text[:NET_ADJUSTMENT_NOTE_REASON_MAX_CHARS]}')
+        display_note = '净头寸调整' + (f'（{"；".join(note_parts)}）' if note_parts else '')
+
     return True, attribution, display_trade_type, direction_text, display_note
 
 
@@ -802,6 +977,8 @@ def _normalize_lead_trade_record(trade_data):
     net_adjustment, attribution, display_trade_type, display_direction, display_note = (
         _resolve_net_adjustment_display(trade_data, trade_type, reason_text)
     )
+    leg_fields = _resolve_net_adjustment_leg_fields(trade_data)
+    decision_leg_direction, decision_leg_action = _resolve_decision_leg_fields(trade_data)
     order_pnl = _extract_triangle_profit_delta(trade_data)
     realized_pnl = trade_data.get('realized_pnl')
 
@@ -815,8 +992,17 @@ def _normalize_lead_trade_record(trade_data):
         'quantity': round(_to_float(trade_data.get('quantity'), 0.0), 8),
         'price': _to_float(trade_data.get('price'), 0.0),
         'trade_type': trade_type,
+        'execution_trade_type': str(trade_data.get('execution_trade_type') or '').strip(),
+        'execution_action': _resolve_execution_action(trade_data),
         'net_adjustment': bool(net_adjustment),
         'attribution': attribution,
+        'leg_direction': leg_fields['leg_direction'],
+        'leg_action': leg_fields['leg_action'],
+        'leg_reason': leg_fields['leg_reason'],
+        'mechanism': leg_fields['mechanism'],
+        'mechanism_label': leg_fields['mechanism_label'],
+        'decision_leg_direction': decision_leg_direction,
+        'decision_leg_action': decision_leg_action,
         'display_trade_type': display_trade_type,
         'display_direction': display_direction,
         'display_note': display_note,
@@ -834,6 +1020,18 @@ def _normalize_lead_trade_record(trade_data):
     return normalized
 
 
+def _extract_lead_realized_pnl(record):
+    """记录计入累计已实现盈亏的数值；不计入返回 None（与 _build_lead_summary 口径一致）。"""
+    if not isinstance(record, dict):
+        return None
+    profit_value = record.get('order_pnl')
+    if profit_value is None:
+        profit_value = _extract_triangle_profit_delta(record)
+    if profit_value is None and not _trade_type_matches(record.get('trade_type'), TRIANGLE_CLOSE_TYPES):
+        return None
+    return _to_float(profit_value, 0.0)
+
+
 def _build_lead_summary(trade_records, initial_funds=0.0, archived_realized_pnl=0.0):
     total_realized_pnl = _to_float(archived_realized_pnl, 0.0)
     close_trade_count = 0
@@ -844,13 +1042,10 @@ def _build_lead_summary(trade_records, initial_funds=0.0, archived_realized_pnl=
         for record in trade_records:
             if not isinstance(record, dict):
                 continue
-            profit_value = record.get('order_pnl')
-            if profit_value is None:
-                profit_value = _extract_triangle_profit_delta(record)
-            if profit_value is None and not _trade_type_matches(record.get('trade_type'), TRIANGLE_CLOSE_TYPES):
+            profit = _extract_lead_realized_pnl(record)
+            if profit is None:
                 continue
 
-            profit = _to_float(profit_value, 0.0)
             total_realized_pnl += profit
             close_trade_count += 1
             if profit > 0:
@@ -938,7 +1133,7 @@ def _triangle_apply_open_trade(position_buckets, trade_data):
     return None
 
 
-def _triangle_apply_close_trade(position_buckets, trade_data, update_record=True):
+def _triangle_apply_close_trade(position_buckets, trade_data, update_record=True, preserve_explicit_pnl=False):
     side = str(trade_data.get('side') or '').strip().upper()
     if side not in {'BUY', 'SELL'}:
         return None
@@ -970,11 +1165,24 @@ def _triangle_apply_close_trade(position_buckets, trade_data, update_record=True
         trade_data['exit_price'] = round(exit_price, 4)
         trade_data['open_price'] = round(entry_price, 4)
         trade_data['close_price'] = round(exit_price, 4)
-        trade_data['gross_pnl'] = round(gross_pnl, 4)
-        trade_data['realized_pnl'] = order_pnl
-        trade_data['order_pnl'] = order_pnl
-        trade_data['open_fee'] = round(open_fee, 4) if open_fee else 0.0
-        trade_data['close_fee'] = round(close_fee, 4) if close_fee else 0.0
+        has_explicit_pnl = (
+            trade_data.get('realized_pnl') is not None
+            or trade_data.get('order_pnl') is not None
+        )
+        if preserve_explicit_pnl and has_explicit_pnl:
+            # 净头寸调整平仓：保留策略/交易所给出的已实现盈亏，仅补缺字段
+            if trade_data.get('gross_pnl') is None:
+                trade_data['gross_pnl'] = round(gross_pnl, 4)
+            if trade_data.get('open_fee') is None:
+                trade_data['open_fee'] = round(open_fee, 4) if open_fee else 0.0
+            if trade_data.get('close_fee') is None:
+                trade_data['close_fee'] = round(close_fee, 4) if close_fee else 0.0
+        else:
+            trade_data['gross_pnl'] = round(gross_pnl, 4)
+            trade_data['realized_pnl'] = order_pnl
+            trade_data['order_pnl'] = order_pnl
+            trade_data['open_fee'] = round(open_fee, 4) if open_fee else 0.0
+            trade_data['close_fee'] = round(close_fee, 4) if close_fee else 0.0
 
     remaining_quantity = round(available_quantity - matched_quantity, 8)
     if remaining_quantity <= 0:
@@ -1006,10 +1214,10 @@ def _rebuild_triangle_open_positions(trade_records):
     for _, record in ordered_records:
         if not isinstance(record, dict):
             continue
-        trade_type = str(record.get('trade_type') or '').strip()
-        if trade_type in TRIANGLE_OPEN_TYPES:
+        action = _resolve_execution_action(record)
+        if action in ('open', 'add'):
             _triangle_apply_open_trade(position_buckets, record)
-        elif _trade_type_matches(trade_type, TRIANGLE_CLOSE_TYPES):
+        elif action == 'close':
             _triangle_apply_close_trade(position_buckets, record, update_record=False)
 
     return position_buckets
@@ -1035,11 +1243,16 @@ def _replay_trade_records_with_pnl(trade_records):
     for _, record in ordered_records:
         if not isinstance(record, dict):
             continue
-        trade_type = str(record.get('trade_type') or '').strip()
-        if trade_type in TRIANGLE_OPEN_TYPES:
+        action = _resolve_execution_action(record)
+        if action in ('open', 'add'):
             _triangle_apply_open_trade(position_buckets, record)
-        elif _trade_type_matches(trade_type, TRIANGLE_CLOSE_TYPES):
-            _triangle_apply_close_trade(position_buckets, record, update_record=True)
+        elif action == 'close':
+            _triangle_apply_close_trade(
+                position_buckets,
+                record,
+                update_record=True,
+                preserve_explicit_pnl=_is_net_adjustment_record(record),
+            )
 
     return position_buckets
 
@@ -1082,7 +1295,103 @@ def _build_triangle_summary(trade_records, initial_funds=0.0, archived_realized_
     return summary
 
 
-def load_lead_data():
+def _sync_total_profit_from_lead(total_profit_data, lead_data, now=None):
+    """按 lead_trades 已实现盈亏增量维护 total_profit 当日曲线点（幂等、确定性）。
+
+    规则：
+    - 基线 = 最新一个早于今日的曲线点；当日点 = 基线本金/总资金 + 窗口内
+      lead 记录的已实现盈亏之和（口径与 lead summary 一致，含净头寸调整平仓）。
+    - 窗口起点按基线粒度：日粒度点（YYYY-MM-DD）为当日结算值，次日起算；年月粒度点
+      （YYYY-MM）为月末结算值，次月 1 日起算（基线月内记录视为已包含在基线中）。
+    - 基线格式无法判定时打印告警并跳过自动同步（不改动文件）。
+    - 窗口不覆盖基线之前及 archived 记录（视为已包含在基线中），避免重复累计。
+    - 窗口盈亏为 0（|window_pnl| < 1e-9）且不存在当日点 → 不改动；重复调用结果一致。
+    返回 True 表示 total_profit_data 有变化。
+    """
+    if not isinstance(total_profit_data, dict) or not isinstance(lead_data, dict):
+        return False
+    curve_data = total_profit_data.get('profit_curve_data')
+    if not isinstance(curve_data, dict):
+        return False
+    points = curve_data.get('data_points')
+    if not isinstance(points, list):
+        return False
+
+    now = now or datetime.now()
+    today_key = (now.year, now.month, now.day)
+    today_label = f'{now.year:04d}-{now.month:02d}-{now.day:02d}'
+
+    parsed_points = []
+    for index, point in enumerate(points):
+        if not isinstance(point, dict):
+            continue
+        date_key = _parse_profit_curve_date(point.get('date'))
+        if not date_key:
+            continue
+        parsed_points.append((date_key, index, point))
+    if not parsed_points:
+        return False
+    parsed_points.sort(key=lambda item: (item[0], item[1]))
+
+    baseline = None
+    existing_today_index = None
+    for date_key, index, point in parsed_points:
+        if date_key < today_key:
+            baseline = (date_key, point)
+        elif date_key == today_key:
+            existing_today_index = index
+    if baseline is None:
+        return False
+
+    _, baseline_point = baseline
+    window_start_key = _profit_curve_window_start(baseline_point.get('date'))
+    if window_start_key is None:
+        print(f"总盈亏自动同步跳过：无法判定基线点日期格式 {baseline_point.get('date')!r}")
+        return False
+
+    window_pnl = 0.0
+    records = lead_data.get('trade_records')
+    if isinstance(records, list):
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            record_time = _parse_triangle_trade_timestamp(record.get('timestamp'))
+            if record_time is None:
+                continue
+            record_key = (record_time.year, record_time.month, record_time.day)
+            if record_key < window_start_key or record_key > today_key:
+                continue
+            pnl = _extract_lead_realized_pnl(record)
+            if pnl is not None:
+                window_pnl += pnl
+    if abs(window_pnl) < 1e-9:
+        return False
+
+    new_point = {
+        'date': today_label,
+        'principal': round(_to_float(baseline_point.get('principal'), 0.0), 4),
+        'total_funds': round(_to_float(baseline_point.get('total_funds'), 0.0) + window_pnl, 4),
+    }
+    if existing_today_index is not None:
+        existing_point = points[existing_today_index]
+        existing_principal = _to_float(existing_point.get('principal'), None)
+        existing_total_funds = _to_float(existing_point.get('total_funds'), None)
+        if (
+            existing_principal is not None
+            and existing_total_funds is not None
+            and abs(existing_principal - new_point['principal']) < 1e-9
+            and abs(existing_total_funds - new_point['total_funds']) < 1e-9
+        ):
+            return False
+        points[existing_today_index] = new_point
+        return True
+
+    points.append(new_point)
+    return True
+
+
+def load_lead_data(strict=False):
+    """读取带单数据；strict=True 时解析失败返回 None（热加载用，保留现有内存）。"""
     file_path = os.path.join(data_dir, 'lead_trades.json')
     if os.path.exists(file_path):
         try:
@@ -1109,6 +1418,8 @@ def load_lead_data():
                 }
         except Exception as e:
             print(f"读取带单策略数据失败: {e}")
+            if strict:
+                return None
     return {
         'summary': _build_lead_summary([], initial_funds=0.0, archived_realized_pnl=0.0),
         'trade_records': [],
@@ -1116,6 +1427,7 @@ def load_lead_data():
 
 
 def _save_json_if_changed(file_path, data, label):
+    """内容变化时原子写盘（tempfile + os.replace），避免半截文件被热加载读到。"""
     try:
         new_content = json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True)
         old_content = ''
@@ -1124,8 +1436,23 @@ def _save_json_if_changed(file_path, data, label):
                 old_content = f.read()
         if new_content == old_content:
             return
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(new_content)
+        directory = os.path.dirname(os.path.abspath(file_path)) or '.'
+        handle, temp_path = tempfile.mkstemp(
+            prefix=os.path.basename(file_path) + '.', suffix='.tmp', dir=directory
+        )
+        try:
+            with os.fdopen(handle, 'w', encoding='utf-8') as f:
+                f.write(new_content)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temp_path, file_path)
+        except Exception:
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except OSError:
+                pass
+            raise
         print(f"{label}已保存")
     except Exception as e:
         print(f"保存{label}失败: {e}")
@@ -1136,7 +1463,8 @@ def save_lead_data(data):
 
 
 # 从本地文件读取总盈亏数据
-def load_total_profit_data():
+def load_total_profit_data(strict=False):
+    """读取总盈亏数据；strict=True 时解析失败返回 None（热加载用，保留现有内存）。"""
     file_path = os.path.join(data_dir, 'total_profit.json')
     if os.path.exists(file_path):
         try:
@@ -1146,6 +1474,8 @@ def load_total_profit_data():
                 return data
         except Exception as e:
             print(f"读取总盈亏数据失败: {e}")
+            if strict:
+                return None
     return {
         'profit_summary': {
             'total_net_profit': 0.0,
@@ -1162,7 +1492,8 @@ def load_total_profit_data():
 # 套利策略数据不再从本地文件加载，完全依赖在线数据
 
 # 从本地文件读取三角策略数据
-def load_triangle_data():
+def load_triangle_data(strict=False):
+    """读取三角策略数据；strict=True 时解析失败返回 None（热加载用，保留现有内存）。"""
     triangle_file_path = os.path.join(data_dir, 'triangle_trades.json')
     legacy_triangle_file_path = os.path.join(data_dir, 'triangle_trades.json')
     source_file_path = triangle_file_path if os.path.exists(triangle_file_path) else legacy_triangle_file_path
@@ -1196,6 +1527,8 @@ def load_triangle_data():
             }
         except Exception as e:
             print(f"读取三角策略数据失败: {e}")
+            if strict:
+                return None
 
     return {
         'trade_records': [],
@@ -1208,7 +1541,8 @@ def save_triangle_data(data):
     _save_json_if_changed(os.path.join(data_dir, 'triangle_trades.json'), data, '三角策略数据')
 
 # 从本地文件读取套利策略数据
-def load_arbitrage_data():
+def load_arbitrage_data(strict=False):
+    """读取套利策略数据；strict=True 时解析失败返回 None（热加载用，保留现有内存）。"""
     file_path = os.path.join(data_dir, 'arbitrage_trades.json')
     if os.path.exists(file_path):
         try:
@@ -1217,6 +1551,8 @@ def load_arbitrage_data():
                 return data
         except Exception as e:
             print(f"读取套利策略数据失败: {e}")
+            if strict:
+                return None
     return {
         'profit_summary': {
             'total_net_profit': 0.0,
@@ -1233,7 +1569,8 @@ def load_arbitrage_data():
 def save_arbitrage_data(data):
     _save_json_if_changed(os.path.join(data_dir, 'arbitrage_trades.json'), data, '套利策略数据')
 
-def load_top_data():
+def load_top_data(strict=False):
+    """读取摸顶策略数据；strict=True 时解析失败返回 None（热加载用，保留现有内存）。"""
     file_path = os.path.join(data_dir, 'top_trades.json')
     if os.path.exists(file_path):
         try:
@@ -1241,6 +1578,8 @@ def load_top_data():
                 return json.load(f)
         except Exception as e:
             print(f"读取摸顶策略数据失败: {e}")
+            if strict:
+                return None
     return {'position_status': '摸顶做空', 'position_quantity': 0.0, 'position_avg_price': 0.0, 'position_symbol': 'BTCUSDT', 'trade_records': []}
 
 
@@ -1248,7 +1587,8 @@ def save_top_data(data):
     _save_json_if_changed(os.path.join(data_dir, 'top_trades.json'), data, '摸顶策略数据')
 
 
-def load_bottom_data():
+def load_bottom_data(strict=False):
+    """读取抄底策略数据；strict=True 时解析失败返回 None（热加载用，保留现有内存）。"""
     file_path = os.path.join(data_dir, 'bottom_trades.json')
     if os.path.exists(file_path):
         try:
@@ -1256,11 +1596,22 @@ def load_bottom_data():
                 return json.load(f)
         except Exception as e:
             print(f"读取抄底策略数据失败: {e}")
+            if strict:
+                return None
     return {'position_status': '抄底做多', 'position_quantity': 0.0, 'position_avg_price': 0.0, 'position_symbol': 'BTCUSDT', 'trade_records': []}
 
 
 def save_bottom_data(data):
     _save_json_if_changed(os.path.join(data_dir, 'bottom_trades.json'), data, '抄底策略数据')
+
+def _hot_reload_json(loader, label):
+    """热加载专用：读取/解析失败（loader(strict=True) 返回 None）时告警并返回 None，
+    由调用方保留现有内存数据，防止半截文件把面板数据清空。"""
+    data = loader(strict=True)
+    if data is None:
+        print(f"{label}热加载失败，保留现有内存数据")
+    return data
+
 
 # 定期检查文件更新的函数
 def check_file_updates():
@@ -1317,41 +1668,44 @@ def check_file_updates():
                 current_modified = os.path.getmtime(total_profit_file_path)
                 if current_modified > last_modified_total_profit:
                     last_modified_total_profit = current_modified
-                    new_data = load_total_profit_data()
-                    old_snapshot = json.dumps(data_storage.total_profit_data, ensure_ascii=False, sort_keys=True)
-                    data_storage.total_profit_data = new_data
-                    data_storage.update_global_data()
-                    new_snapshot = json.dumps(data_storage.total_profit_data, ensure_ascii=False, sort_keys=True)
-                    if old_snapshot != new_snapshot:
-                        print("总盈利数据已更新")
+                    new_data = _hot_reload_json(load_total_profit_data, '总盈利数据')
+                    if new_data is not None:
+                        old_snapshot = json.dumps(data_storage.total_profit_data, ensure_ascii=False, sort_keys=True)
+                        data_storage.total_profit_data = new_data
+                        data_storage.update_global_data()
+                        new_snapshot = json.dumps(data_storage.total_profit_data, ensure_ascii=False, sort_keys=True)
+                        if old_snapshot != new_snapshot:
+                            print("总盈利数据已更新")
             
             # 检查摸顶策略文件
             if os.path.exists(top_file_path):
                 current_modified = os.path.getmtime(top_file_path)
                 if current_modified > last_modified_top:
                     last_modified_top = current_modified
-                    new_data = load_top_data()
-                    old_snapshot = json.dumps(data_storage.top_data, ensure_ascii=False, sort_keys=True)
-                    data_storage.top_data.update(new_data)
-                    data_storage.strategy_status['top'] = data_storage.top_data.get('status', '持仓')
-                    data_storage.update_global_data()
-                    new_snapshot = json.dumps(data_storage.top_data, ensure_ascii=False, sort_keys=True)
-                    if old_snapshot != new_snapshot:
-                        print("摸顶策略数据已更新")
+                    new_data = _hot_reload_json(load_top_data, '摸顶策略数据')
+                    if new_data is not None:
+                        old_snapshot = json.dumps(data_storage.top_data, ensure_ascii=False, sort_keys=True)
+                        data_storage.top_data.update(new_data)
+                        data_storage.strategy_status['top'] = data_storage.top_data.get('status', '持仓')
+                        data_storage.update_global_data()
+                        new_snapshot = json.dumps(data_storage.top_data, ensure_ascii=False, sort_keys=True)
+                        if old_snapshot != new_snapshot:
+                            print("摸顶策略数据已更新")
 
             # 检查抄底策略文件
             if os.path.exists(bottom_file_path):
                 current_modified = os.path.getmtime(bottom_file_path)
                 if current_modified > last_modified_bottom:
                     last_modified_bottom = current_modified
-                    new_data = load_bottom_data()
-                    old_snapshot = json.dumps(data_storage.bottom_data, ensure_ascii=False, sort_keys=True)
-                    data_storage.bottom_data.update(new_data)
-                    data_storage.strategy_status['bottom'] = data_storage.bottom_data.get('status', '清仓')
-                    data_storage.update_global_data()
-                    new_snapshot = json.dumps(data_storage.bottom_data, ensure_ascii=False, sort_keys=True)
-                    if old_snapshot != new_snapshot:
-                        print("抄底策略数据已更新")
+                    new_data = _hot_reload_json(load_bottom_data, '抄底策略数据')
+                    if new_data is not None:
+                        old_snapshot = json.dumps(data_storage.bottom_data, ensure_ascii=False, sort_keys=True)
+                        data_storage.bottom_data.update(new_data)
+                        data_storage.strategy_status['bottom'] = data_storage.bottom_data.get('status', '清仓')
+                        data_storage.update_global_data()
+                        new_snapshot = json.dumps(data_storage.bottom_data, ensure_ascii=False, sort_keys=True)
+                        if old_snapshot != new_snapshot:
+                            print("抄底策略数据已更新")
 
             
             # 检查三角策略数据文件
@@ -1367,57 +1721,60 @@ def check_file_updates():
                         last_modified_triangle_legacy = current_modified
 
                     # 重新加载数据
-                    new_data = load_triangle_data()
-                    old_records = json.dumps(data_storage.triangle_data, ensure_ascii=False, sort_keys=True)
-                    old_summary = json.dumps(data_storage.triangle_summary, ensure_ascii=False, sort_keys=True)
-                    data_storage.triangle_data = new_data.get('trade_records', [])
-                    data_storage.triangle_rounds = new_data.get('round_records', [])
-                    data_storage.triangle_summary = new_data.get('summary', {
-                        'initial_funds': 0.0,
-                        'total_realized_pnl': 0.0,
-                        'current_funds': 0.0,
-                        'total_return_rate': 0.0,
-                        'close_trade_count': 0,
-                        'win_trades': 0,
-                        'lose_trades': 0,
-                        'archived_realized_pnl': 0.0,
-                        'retained_record_count': 0,
-                    })
-                    data_storage._triangle_open_positions = _rebuild_triangle_open_positions(data_storage.triangle_data)
-                    data_storage.strategy_status['triangle'] = '运行'
+                    new_data = _hot_reload_json(load_triangle_data, '三角策略数据')
+                    if new_data is not None:
+                        old_records = json.dumps(data_storage.triangle_data, ensure_ascii=False, sort_keys=True)
+                        old_summary = json.dumps(data_storage.triangle_summary, ensure_ascii=False, sort_keys=True)
+                        data_storage.triangle_data = new_data.get('trade_records', [])
+                        data_storage.triangle_rounds = new_data.get('round_records', [])
+                        data_storage.triangle_summary = new_data.get('summary', {
+                            'initial_funds': 0.0,
+                            'total_realized_pnl': 0.0,
+                            'current_funds': 0.0,
+                            'total_return_rate': 0.0,
+                            'close_trade_count': 0,
+                            'win_trades': 0,
+                            'lose_trades': 0,
+                            'archived_realized_pnl': 0.0,
+                            'retained_record_count': 0,
+                        })
+                        data_storage._triangle_open_positions = _rebuild_triangle_open_positions(data_storage.triangle_data)
+                        data_storage.strategy_status['triangle'] = '运行'
 
-                    data_storage.update_global_data()
-                    new_records = json.dumps(data_storage.triangle_data, ensure_ascii=False, sort_keys=True)
-                    new_summary = json.dumps(data_storage.triangle_summary, ensure_ascii=False, sort_keys=True)
-                    if old_records != new_records or old_summary != new_summary:
-                        print("三角策略数据已更新")
+                        data_storage.update_global_data()
+                        new_records = json.dumps(data_storage.triangle_data, ensure_ascii=False, sort_keys=True)
+                        new_summary = json.dumps(data_storage.triangle_summary, ensure_ascii=False, sort_keys=True)
+                        if old_records != new_records or old_summary != new_summary:
+                            print("三角策略数据已更新")
 
             # 检查带单策略数据文件
             if os.path.exists(lead_file_path):
                 current_modified = os.path.getmtime(lead_file_path)
                 if current_modified > last_modified_lead:
                     last_modified_lead = current_modified
-                    new_data = load_lead_data()
-                    old_snapshot = json.dumps(data_storage.lead_data, ensure_ascii=False, sort_keys=True)
-                    data_storage.lead_data = new_data
-                    data_storage.strategy_status['lead'] = '运行'
-                    data_storage.update_global_data()
-                    new_snapshot = json.dumps(data_storage.lead_data, ensure_ascii=False, sort_keys=True)
-                    if old_snapshot != new_snapshot:
-                        print("带单策略数据已更新")
+                    new_data = _hot_reload_json(load_lead_data, '带单策略数据')
+                    if new_data is not None:
+                        old_snapshot = json.dumps(data_storage.lead_data, ensure_ascii=False, sort_keys=True)
+                        data_storage.lead_data = new_data
+                        data_storage.strategy_status['lead'] = '运行'
+                        data_storage.update_global_data()
+                        new_snapshot = json.dumps(data_storage.lead_data, ensure_ascii=False, sort_keys=True)
+                        if old_snapshot != new_snapshot:
+                            print("带单策略数据已更新")
             
             # 检查套利策略数据文件
             if os.path.exists(arbitrage_file_path):
                 current_modified = os.path.getmtime(arbitrage_file_path)
                 if current_modified > last_modified_arbitrage:
                     last_modified_arbitrage = current_modified
-                    new_data = load_arbitrage_data()
-                    old_snapshot = json.dumps(data_storage.arbitrage_data, ensure_ascii=False, sort_keys=True)
-                    data_storage.arbitrage_data = new_data
-                    data_storage.update_global_data()
-                    new_snapshot = json.dumps(data_storage.arbitrage_data, ensure_ascii=False, sort_keys=True)
-                    if old_snapshot != new_snapshot:
-                        print("套利策略数据已更新")
+                    new_data = _hot_reload_json(load_arbitrage_data, '套利策略数据')
+                    if new_data is not None:
+                        old_snapshot = json.dumps(data_storage.arbitrage_data, ensure_ascii=False, sort_keys=True)
+                        data_storage.arbitrage_data = new_data
+                        data_storage.update_global_data()
+                        new_snapshot = json.dumps(data_storage.arbitrage_data, ensure_ascii=False, sort_keys=True)
+                        if old_snapshot != new_snapshot:
+                            print("套利策略数据已更新")
 
             # 检查本地发帖数据文件 (用户手动编辑 post_feed.json 时刷新)
             try:
@@ -1909,7 +2266,21 @@ class DataStorage:
 
         self.update_global_data()
         save_lead_data(self.lead_data)
-    
+        if _sync_total_profit_from_lead(self.total_profit_data, self.lead_data):
+            self._save_total_profit_data()
+            self.update_global_data()
+
+    def _save_total_profit_data(self):
+        """保存 total_profit.json（剔除运行时派生的 profit_summary 字段）。"""
+        if not isinstance(self.total_profit_data, dict):
+            return
+        payload = {
+            key: value
+            for key, value in self.total_profit_data.items()
+            if key != 'profit_summary'
+        }
+        _save_json_if_changed(os.path.join(data_dir, 'total_profit.json'), payload, '总盈利数据')
+
     def update_arbitrage_data(self, data):
         """更新套利数据：仅以单笔订单的 net_profit 作为总额计算来源。"""
         arbitrage_data_file = os.path.join(data_dir, 'arbitrage_trades.json')

@@ -2971,9 +2971,8 @@
 
                 const side = trade.side || '未知';
                 const tradeType = trade.display_trade_type || trade.trade_type || '未知';
-                const isNetAdjustment = !!trade.net_adjustment;
-                // 净头寸调整订单：策略层是归因腿开仓（如多头腿），不展示执行层已实现盈亏
-                const orderPnl = isNetAdjustment ? null : (trade.order_pnl ?? trade.realized_pnl ?? trade.net_profit);
+                // 净头寸调整按执行语义展示：盈亏仅有空值时显示 "-"
+                const orderPnl = trade.order_pnl ?? trade.realized_pnl ?? trade.net_profit;
                 const pnl = orderPnl === undefined || orderPnl === null || orderPnl === '' ? null : Number(orderPnl);
                 const pnlClass = pnl === null
                     ? 'text-gray-500'
@@ -2998,11 +2997,13 @@
                     '止盈': 'bg-green-100 text-green-800',
                     '止损': 'bg-red-100 text-red-800',
                     '平仓': 'bg-yellow-100 text-yellow-800',
+                    '平多仓': 'bg-yellow-100 text-yellow-800',
+                    '平空仓': 'bg-yellow-100 text-yellow-800',
                     '未知': 'bg-gray-100 text-gray-800'
                 }[tradeType] || 'bg-gray-100 text-gray-800';
 
                 let priceText = '-';
-                if (trade.entry_price !== undefined && trade.entry_price !== null && trade.exit_price !== undefined && trade.exit_price !== null && ['平仓', '止盈', '止损'].includes(tradeType)) {
+                if (trade.entry_price !== undefined && trade.entry_price !== null && trade.exit_price !== undefined && trade.exit_price !== null && ['平仓', '止盈', '止损', '平多仓', '平空仓'].includes(tradeType)) {
                     priceText = `${formatDecimal(trade.entry_price)} -> ${formatDecimal(trade.exit_price)}`;
                 } else if (trade.price !== undefined && trade.price !== null) {
                     priceText = formatDecimal(trade.price);
