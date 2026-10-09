@@ -1,0 +1,272 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统功能骨架 · BStrategy之家</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%233b82f6' d='M16 2L2 8v16l14 6 14-6V8L16 2zm0 22l-8-3v-10l8-4 8 4v10l-8 3z'/%3E%3C/svg%3E" type="image/svg+xml">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { primary: '#3b82f6', secondary: '#10b981', accent: '#f59e0b', danger: '#ef4444', dark: '#1e293b', light: '#f8fafc' }
+                }
+            }
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        if (window.mermaid) {
+            mermaid.initialize({
+                startOnLoad: true,
+                securityLevel: 'loose',
+                theme: 'neutral',
+                themeVariables: { fontSize: '18px' },
+                flowchart: { htmlLabels: true, useMaxWidth: false, padding: 8 }
+            });
+        }
+    </script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; }
+        .sk-chip { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+        .sk-card { border-radius: 12px; background: #fff; border: 1px solid #e5e7eb; padding: 14px 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04); height: 100%; }
+        .sk-card.sk-live { border-left: 4px solid #10b981; }
+        .sk-card.sk-research { border-left: 4px solid #3b82f6; }
+        .sk-card.sk-idle { border-left: 4px solid #9ca3af; }
+        .sk-card.sk-paused { border-left: 4px solid #f59e0b; }
+        .sk-card.sk-planned { border-left: 4px solid #a855f7; border-style: dashed; }
+        .sk-card.sk-retired { border-left: 4px solid #475569; opacity: .72; }
+        .sk-cap { display: inline-block; background: #f1f5f9; color: #475569; border-radius: 6px; padding: 1px 7px; font-size: 11px; margin: 2px 4px 0 0; }
+        .sk-flow { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px 16px; }
+        .sk-flow-arrow { color: #94a3b8; margin: 0 6px; }
+        .sk-flow-node { display: inline-block; background: #eff6ff; color: #1d4ed8; border-radius: 9999px; padding: 2px 10px; font-size: 12px; font-weight: 600; margin: 2px 0; }
+        .sk-tab { padding: 4px 14px; border-radius: 9999px; font-size: 13px; font-weight: 600; border: 1px solid #e5e7eb; background: #fff; color: #475569; cursor: pointer; }
+        .sk-tab.is-active { background: #1e293b; color: #fff; border-color: #1e293b; }
+        #flow-scroll { position: relative; cursor: grab; }
+        #flow-scroll.sk-panning { cursor: grabbing; user-select: none; }
+        #flow-scroll .mermaid { width: max-content; min-width: 100%; margin: 0 auto; text-align: left; }
+        #flow-scroll .mermaid svg { display: block; }
+        @media print { header { position: static !important; } .no-print { display: none !important; } }
+    </style>
+</head>
+<body class="bg-light min-h-screen">
+    {% set chip = {
+        'live': 'bg-green-100 text-green-800',
+        'research': 'bg-blue-100 text-blue-800',
+        'idle': 'bg-gray-200 text-gray-700',
+        'paused': 'bg-amber-100 text-amber-800',
+        'planned': 'bg-purple-100 text-purple-800',
+        'retired': 'bg-slate-700 text-white'
+    } %}
+    {% set chip_label = system_map.status_labels %}
+
+    <header class="bg-white shadow-md sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-3 flex flex-col md:flex-row items-start md:items-center justify-between">
+            <div class="flex items-center mb-2 md:mb-0">
+                <h1 class="text-lg font-bold text-dark mr-3"><i class="fa fa-sitemap text-primary mr-2"></i>系统功能骨架</h1>
+                <span class="text-xs text-gray-500 mr-3">更新: {{ system_map.updated_at }} · 节点 {{ system_map.total_nodes }}</span>
+                <span class="text-xs text-gray-400 mr-2">状态:</span>
+                {% for item in system_map.counts %}
+                <span class="sk-chip {{ chip.get(item.key, 'bg-gray-100 text-gray-700') }} mr-1">{{ item.label }} {{ item.count }}</span>
+                {% endfor %}
+            </div>
+            <div class="flex items-center space-x-5 no-print">
+                <a href="/" class="text-sm font-semibold text-gray-600 hover:text-primary transition-colors"><i class="fa fa-arrow-left mr-1"></i>返回面板</a>
+                <a href="/logout" class="text-sm font-semibold text-gray-500 hover:text-red-500 transition-colors">退出登录</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-6">
+        <p class="text-sm text-gray-500 mb-6">
+            手工维护的系统能力地图（<code class="bg-gray-100 px-1 rounded">Web/system_map.py</code>）：按<b>交互 → 后台 → 计算 → 执行 → 认知 → 数据 → 安全</b>七面展示功能支持状态；
+            状态口径：<b>已上线</b>=生产运行、<b>研究可用</b>=本地研究链路已跑通、<b>有意停用</b>=主动停、<b>暂缓</b>=用户决定后置、<b>规划中</b>=已立项未实现、<b>已退役</b>=历史归档。
+        </p>
+
+        <div class="flex items-center gap-2 mb-4 no-print">
+            <button id="view-btn-flow" type="button" class="sk-tab is-active" onclick="skSwitchView('flow')"><i class="fa fa-sitemap mr-1"></i>流程图</button>
+            <button id="view-btn-card" type="button" class="sk-tab" onclick="skSwitchView('card')"><i class="fa fa-th-large mr-1"></i>卡片视图</button>
+        </div>
+
+        <section id="flow-view" class="mb-8">
+            <div class="flex flex-wrap items-center gap-2 mb-2 no-print">
+                <button type="button" class="sk-tab" onclick="skZoom(-0.1)" title="缩小">A−</button>
+                <span id="sk-zoom-label" class="text-sm font-semibold text-gray-600" style="min-width:52px;text-align:center;">100%</span>
+                <button type="button" class="sk-tab" onclick="skZoom(0.1)" title="放大">A+</button>
+                <button type="button" class="sk-tab" onclick="skZoomFit()" title="按容器宽度缩放">适应宽度</button>
+                <button type="button" class="sk-tab" onclick="skZoomReset()" title="回到 100%">100%</button>
+                <span class="text-xs text-gray-400">按住图可拖动平移（鼠标/触摸）；也可横向/纵向滚动；窄屏默认自动适应宽度</span>
+            </div>
+            <div id="flow-scroll" class="bg-white border border-gray-200 rounded-xl p-3 overflow-auto" style="max-height:78vh;">
+                <div class="mermaid">{{ system_map.mermaid }}</div>
+            </div>
+            <p class="text-xs text-gray-400 mt-2">
+                状态配色：绿=已上线 · 蓝=研究可用 · 灰=停用 · 黄=暂缓 · 紫（虚线框）=规划中 · 深灰=已退役；虚线箭头=周批/评审/停用等特殊路径。
+                图层内方块=功能节点（鼠标悬停看节点名），跨层箭头=主要数据/执行流。
+            </p>
+        </section>
+
+        <div id="card-view" class="hidden">
+        {% for layer in system_map.layers %}
+        <section class="mb-8">
+            <div class="flex items-baseline mb-3">
+                <h2 class="text-base font-bold text-dark mr-3">{{ layer.title }}</h2>
+                <span class="text-xs text-gray-400">{{ layer.subtitle }}</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {% for node in layer.nodes %}
+                <article class="sk-card sk-{{ node.status }}">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="font-semibold text-dark text-sm">{{ node.name }}</span>
+                        <span class="sk-chip {{ chip.get(node.status, 'bg-gray-100 text-gray-700') }}">{{ chip_label.get(node.status, node.status) }}</span>
+                    </div>
+                    <p class="text-xs text-gray-500 leading-relaxed mb-1">{{ node.desc }}</p>
+                    {% if node.caps %}
+                    <div>{% for cap in node.caps %}<span class="sk-cap">{{ cap }}</span>{% endfor %}</div>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+        {% endfor %}
+
+        <section class="mb-8">
+            <div class="flex items-baseline mb-3">
+                <h2 class="text-base font-bold text-dark mr-3">⑧ 主要链路</h2>
+                <span class="text-xs text-gray-400">跨模块的数据流与执行流（现状）</span>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {% for flow in system_map.flows %}
+                <div class="sk-flow">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="font-semibold text-dark text-sm">{{ flow.name }}</span>
+                        <span class="sk-chip {{ chip.get(flow.status, 'bg-gray-100 text-gray-700') }}">{{ chip_label.get(flow.status, flow.status) }}</span>
+                    </div>
+                    <div class="text-sm leading-relaxed">
+                        {% for step in flow.path %}<span class="sk-flow-node">{{ step }}</span>{% if not loop.last %}<span class="sk-flow-arrow">→</span>{% endif %}{% endfor %}
+                    </div>
+                    {% if flow.note %}<div class="text-xs text-gray-400 mt-1">{{ flow.note }}</div>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        </div>
+
+        <footer class="text-xs text-gray-400 border-t pt-3 pb-8">
+            数据源：<code>Web/system_map.py</code>（{{ system_map.updated_at }}，schema v{{ system_map.schema_version }}）——功能上线/退役/暂缓时同步更新本文件即可。
+        </footer>
+    </main>
+    <script>
+        function skSwitchView(view) {
+            var isFlow = view !== 'card';
+            document.getElementById('flow-view').classList.toggle('hidden', !isFlow);
+            document.getElementById('card-view').classList.toggle('hidden', isFlow);
+            document.getElementById('view-btn-flow').classList.toggle('is-active', isFlow);
+            document.getElementById('view-btn-card').classList.toggle('is-active', !isFlow);
+            if (isFlow) { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+        }
+
+        // ---- 流程图缩放（放大字号：保持自然尺寸 + 可滚动；窄屏自动适应宽度）----
+        var skZoomState = { scale: 1, natW: 0, natH: 0, userZoomed: false };
+
+        function skSvg() {
+            return document.querySelector('#flow-view .mermaid svg');
+        }
+
+        function skZoomApply() {
+            var svg = skSvg();
+            if (!svg) { return false; }
+            if (!skZoomState.natW) {
+                var vb = svg.viewBox && svg.viewBox.baseVal;
+                if (vb && vb.width) {
+                    skZoomState.natW = vb.width;
+                    skZoomState.natH = vb.height;
+                }
+            }
+            svg.style.maxWidth = 'none';
+            svg.style.width = (skZoomState.natW * skZoomState.scale) + 'px';
+            svg.style.height = (skZoomState.natH * skZoomState.scale) + 'px';
+            var label = document.getElementById('sk-zoom-label');
+            if (label) { label.textContent = Math.round(skZoomState.scale * 100) + '%'; }
+            return true;
+        }
+
+        function skZoom(delta) {
+            skZoomState.userZoomed = true;
+            skZoomState.scale = Math.max(0.4, Math.min(3, skZoomState.scale + delta));
+            skZoomApply();
+        }
+
+        function skZoomReset() {
+            skZoomState.userZoomed = true;
+            skZoomState.scale = 1;
+            skZoomApply();
+        }
+
+        function skZoomFit() {
+            var box = document.getElementById('flow-scroll');
+            if (!box) { return; }
+            if (!skZoomState.natW) { skZoomApply(); }
+            if (skZoomState.natW) {
+                skZoomState.userZoomed = true;
+                skZoomState.scale = Math.max(0.4, Math.min(3, (box.clientWidth - 32) / skZoomState.natW));
+                skZoomApply();
+            }
+        }
+
+        function skInitZoom(attempt) {
+            if (!skZoomApply()) {
+                if ((attempt || 0) < 40) { window.setTimeout(function () { skInitZoom((attempt || 0) + 1); }, 250); }
+                return;
+            }
+            if (!skZoomState.userZoomed && window.innerWidth < 900) { skZoomFit(); }
+        }
+
+        // ---- 拖动平移（鼠标 + 触摸）：放大后可直接拖动画布看被遮挡区域 ----
+        function skInitPan() {
+            var box = document.getElementById('flow-scroll');
+            if (!box) { return; }
+            var dragging = false, startX = 0, startY = 0, startL = 0, startT = 0;
+            box.addEventListener('mousedown', function (e) {
+                if (e.button !== 0) { return; }
+                dragging = true;
+                startX = e.clientX; startY = e.clientY;
+                startL = box.scrollLeft; startT = box.scrollTop;
+                box.classList.add('sk-panning');
+                e.preventDefault();
+            });
+            window.addEventListener('mousemove', function (e) {
+                if (!dragging) { return; }
+                box.scrollLeft = startL - (e.clientX - startX);
+                box.scrollTop = startT - (e.clientY - startY);
+            });
+            window.addEventListener('mouseup', function () {
+                dragging = false;
+                box.classList.remove('sk-panning');
+            });
+            var touching = false, tX = 0, tY = 0, tL = 0, tT = 0;
+            box.addEventListener('touchstart', function (e) {
+                if (e.touches.length !== 1) { return; }
+                touching = true;
+                tX = e.touches[0].clientX; tY = e.touches[0].clientY;
+                tL = box.scrollLeft; tT = box.scrollTop;
+            }, { passive: true });
+            box.addEventListener('touchmove', function (e) {
+                if (!touching || e.touches.length !== 1) { return; }
+                box.scrollLeft = tL - (e.touches[0].clientX - tX);
+                box.scrollTop = tT - (e.touches[0].clientY - tY);
+                e.preventDefault();
+            }, { passive: false });
+            box.addEventListener('touchend', function () { touching = false; }, { passive: true });
+        }
+
+        window.addEventListener('load', function () {
+            skInitPan();
+            window.setTimeout(function () { skInitZoom(0); }, 150);
+        });
+    </script>
+</body>
+</html>

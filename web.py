@@ -2780,6 +2780,13 @@ def update_bottom_data():
 def index():
     return render_template('index.html')
 
+
+@app.route('/skeleton')
+def skeleton():
+    """系统功能骨架页（登录门禁自动保护）：功能/支持状态地图。"""
+    from system_map import view_model
+    return render_template('skeleton.html', system_map=view_model())
+
 # 上下文处理器
 @app.context_processor
 def inject_datetime():
