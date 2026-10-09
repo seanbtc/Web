@@ -1745,10 +1745,10 @@
                                 <div class="table-container overflow-x-auto compact-table-container">
                                     <table class="asset-table min-w-full">
                                         <thead>
-                                            <tr><th>期限</th><th>数量</th><th>均价</th><th>状态</th><th>平仓均价</th><th>盈亏</th></tr>
+                                            <tr><th>数量</th><th>均价</th><th>状态</th><th>平仓均价</th><th>盈亏</th></tr>
                                         </thead>
                                         <tbody id="asset-spot-records">
-                                            <tr><td colspan="6" class="text-gray-400 text-center py-3">暂无记录</td></tr>
+                                            <tr><td colspan="5" class="text-gray-400 text-center py-3">暂无记录</td></tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -1787,10 +1787,10 @@
                                 <div class="table-container overflow-x-auto compact-table-container">
                                     <table class="asset-table min-w-full">
                                         <thead>
-                                            <tr><th>期限</th><th>数量</th><th>均价</th><th>状态</th><th>平仓均价</th><th>盈亏</th></tr>
+                                            <tr><th>数量</th><th>均价</th><th>状态</th><th>平仓均价</th><th>盈亏</th></tr>
                                         </thead>
                                         <tbody id="asset-top-records">
-                                            <tr><td colspan="6" class="text-gray-400 text-center py-3">暂无记录</td></tr>
+                                            <tr><td colspan="5" class="text-gray-400 text-center py-3">暂无记录</td></tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -3507,7 +3507,7 @@
             const tbody = document.getElementById(tbodyId);
             if (!tbody) return;
             if (!records.length) {
-                tbody.innerHTML = '<tr><td colspan="6" class="text-gray-400 text-center py-3">暂无记录</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="text-gray-400 text-center py-3">暂无记录</td></tr>';
                 return;
             }
             tbody.innerHTML = records.map(record => {
@@ -3516,7 +3516,6 @@
                 const profitText = closed ? formatSignedMoney(profit, 2) : '-';
                 const profitClass = closed ? (profit >= 0 ? 'text-green-600' : 'text-red-600') : '';
                 return '<tr>'
-                    + `<td>${record.duration || '-'}</td>`
                     + `<td>${Number.isFinite(Number(record.quantity)) ? formatQuantity(record.quantity) : '-'}</td>`
                     + `<td>${Number.isFinite(Number(record.avg_price)) ? formatMoney(record.avg_price, 1) : '-'}</td>`
                     + `<td>${closed ? '已了结' : '持有中'}</td>`
