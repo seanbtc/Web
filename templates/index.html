@@ -1252,18 +1252,22 @@
 
         .performance-view-track {
             display: flex;
-            width: 200%;
+            width: 300%;
             height: 100%;
             transition: transform 360ms cubic-bezier(0.22, 0.61, 0.36, 1);
             will-change: transform;
         }
 
         .performance-view-track.is-pnl {
-            transform: translateX(-50%);
+            transform: translateX(-33.3333%);
+        }
+
+        .performance-view-track.is-assets {
+            transform: translateX(-66.6667%);
         }
 
         .performance-view {
-            flex: 0 0 50%;
+            flex: 0 0 33.3333%;
             min-width: 0;
             height: 100%;
             min-height: 0;
@@ -1275,6 +1279,33 @@
             grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
             gap: 0.72rem;
         }
+
+        .performance-assets-view {
+            display: block;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .asset-card {
+            background: #fff;
+            border-radius: 0.85rem;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+            padding: 1rem 1.1rem;
+            margin-bottom: 0.72rem;
+        }
+
+        .asset-stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.5rem;
+        }
+
+        .asset-stat { background: #f8fafc; border-radius: 0.5rem; padding: 0.5rem 0.65rem; min-width: 0; }
+        .asset-stat .asset-label { font-size: 0.72rem; color: #64748b; margin-bottom: 2px; }
+        .asset-stat .asset-value { font-size: 1.02rem; font-weight: 700; color: #1e293b; word-break: break-all; }
+        .asset-table { width: 100%; font-size: 0.78rem; }
+        .asset-table th { text-align: left; color: #64748b; font-weight: 600; padding: 2px 6px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+        .asset-table td { padding: 2px 6px; border-bottom: 1px solid #f1f5f9; color: #334155; white-space: nowrap; }
 
         .performance-pnl-view > .panel-section {
             min-height: 0;
@@ -1602,6 +1633,9 @@
                         <button type="button" class="performance-view-button" data-performance-view="pnl" role="tab" aria-selected="false">
                             <i class="fa fa-line-chart mr-1"></i>盈亏
                         </button>
+                        <button type="button" class="performance-view-button" data-performance-view="assets" role="tab" aria-selected="false">
+                            <i class="fa fa-briefcase mr-1"></i>资产
+                        </button>
                     </div>
                 </div>
 
@@ -1674,6 +1708,94 @@
             </div>
         </section>
 
+                        </div>
+
+                        <div id="performance-assets-view" class="performance-view performance-assets-view" role="tabpanel" aria-hidden="true">
+                            <section class="asset-card" id="asset-composition-card">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h3 class="text-base font-semibold text-dark"><i class="fa fa-pie-chart text-primary mr-2"></i>资产构成</h3>
+                                    <span class="text-xs text-gray-400">抄底现货（市值）· 带单模块（资金快照）· 摸顶策略（均价×数量+累计盈亏）</span>
+                                </div>
+                                <div class="flex flex-col md:flex-row items-center gap-5">
+                                    <div class="relative" style="width:220px;height:220px;flex:0 0 auto;">
+                                        <canvas id="assetCompositionChart"></canvas>
+                                        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                            <div class="text-xs text-gray-400">总资产</div>
+                                            <div class="text-base font-bold text-dark" id="asset-total-value">-</div>
+                                        </div>
+                                        <div id="asset-composition-empty" class="hidden absolute inset-0 flex items-center justify-center text-sm text-gray-400">暂无可视化资产</div>
+                                    </div>
+                                    <div class="flex-1 min-w-0 w-full" id="asset-composition-legend"></div>
+                                </div>
+                            </section>
+
+                            <section class="asset-card" id="asset-spot-card">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h3 class="text-base font-semibold text-dark"><i class="fa fa-diamond text-primary mr-2"></i>抄底现货资产</h3>
+                                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600" id="asset-spot-status">-</span>
+                                </div>
+                                <div class="asset-stat-grid mb-3">
+                                    <div class="asset-stat"><div class="asset-label">持仓数量</div><div class="asset-value" id="asset-spot-qty">-</div></div>
+                                    <div class="asset-stat"><div class="asset-label">持仓均价</div><div class="asset-value" id="asset-spot-avg">-</div></div>
+                                    <div class="asset-stat"><div class="asset-label">当前价</div><div class="asset-value" id="asset-spot-price">-</div></div>
+                                    <div class="asset-stat"><div class="asset-label">持仓市值</div><div class="asset-value" id="asset-spot-value">-</div></div>
+                                    <div class="asset-stat"><div class="asset-label">浮动盈亏</div><div class="asset-value" id="asset-spot-float">-</div></div>
+                                    <div class="asset-stat"><div class="asset-label">已了结盈亏</div><div class="asset-value" id="asset-spot-realized">-</div></div>
+                                </div>
+                                <div class="table-container overflow-x-auto compact-table-container">
+                                    <table class="asset-table min-w-full">
+                                        <thead>
+                                            <tr><th>期限</th><th>数量</th><th>均价</th><th>状态</th><th>平仓均价</th><th>盈亏</th></tr>
+                                        </thead>
+                                        <tbody id="asset-spot-records">
+                                            <tr><td colspan="6" class="text-gray-400 text-center py-3">暂无记录</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+
+                            <section class="asset-card" id="asset-lead-card">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h3 class="text-base font-semibold text-dark"><i class="fa fa-signal text-secondary mr-2"></i>带单模块资产</h3>
+                                    <span class="text-xs text-gray-400" id="asset-lead-note">账户快照（lead_trades.json）</span>
+                                </div>
+                                <div class="asset-stat-grid mb-3">
+                                    <div class="asset-stat"><div class="asset-label">初始资金</div><div class="asset-value" id="asset-lead-initial">-</div></div>
+                                    <div class="asset-stat"><div class="asset-label">当前资金</div><div class="asset-value" id="asset-lead-current">-</div></div>
+                                    <div class="asset-stat"><div class="asset-label">累计已实现盈亏</div><div class="asset-value" id="asset-lead-realized">-</div></div>
+                                    <div class="asset-stat"><div class="asset-label">总收益率</div><div class="asset-value" id="asset-lead-return">-</div></div>
+                                    <div class="asset-stat"><div class="asset-label">平仓笔数</div><div class="asset-value" id="asset-lead-trades">-</div></div>
+                                    <div class="asset-stat"><div class="asset-label">胜 / 负</div><div class="asset-value" id="asset-lead-wl">-</div></div>
+                                </div>
+                                <div class="text-xs text-gray-500" id="asset-lead-extra"></div>
+                            </section>
+
+                            <section class="asset-card" id="asset-top-card">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h3 class="text-base font-semibold text-dark"><i class="fa fa-flag-checkered text-accent mr-2"></i>摸顶策略资产</h3>
+                                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600" id="asset-top-status">-</span>
+                                </div>
+                                <div class="asset-stat-grid mb-3">
+                                    <div class="asset-stat"><div class="asset-label">持仓数量</div><div class="asset-value" id="asset-top-qty">-</div></div>
+                                    <div class="asset-stat"><div class="asset-label">持仓均价</div><div class="asset-value" id="asset-top-avg">-</div></div>
+                                    <div class="asset-stat"><div class="asset-label">当前价</div><div class="asset-value" id="asset-top-price">-</div></div>
+                                    <div class="asset-stat"><div class="asset-label">仓位成本</div><div class="asset-value" id="asset-top-cost">-</div></div>
+                                    <div class="asset-stat"><div class="asset-label">浮动盈亏</div><div class="asset-value" id="asset-top-float">-</div></div>
+                                    <div class="asset-stat"><div class="asset-label">累计盈亏</div><div class="asset-value" id="asset-top-realized">-</div></div>
+                                    <div class="asset-stat"><div class="asset-label">策略资产</div><div class="asset-value" id="asset-top-asset">-</div></div>
+                                </div>
+                                <div class="table-container overflow-x-auto compact-table-container">
+                                    <table class="asset-table min-w-full">
+                                        <thead>
+                                            <tr><th>期限</th><th>数量</th><th>均价</th><th>状态</th><th>平仓均价</th><th>盈亏</th></tr>
+                                        </thead>
+                                        <tbody id="asset-top-records">
+                                            <tr><td colspan="6" class="text-gray-400 text-center py-3">暂无记录</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-2" id="asset-top-note">资产 = 持仓均价 × 数量 + 累计盈亏；无仓位则不显示</div>
+                            </section>
                         </div>
                     </div>
                 </div>
@@ -2628,7 +2750,8 @@
             // 更新摸顶抄底策略数据
             updateTopData(data);
             updateBottomData(data);
-            
+            updateAssetsView(data);
+
             // 更新策略状态
             updateStrategyStatus(data);
             
@@ -3346,6 +3469,224 @@
         function refreshTopBottomFloatingProfits() {
             updateFloatingProfit('top-float-profit', latestTopPositionData, 'short');
             updateFloatingProfit('bottom-float-profit', latestBottomPositionData, 'long');
+            updateSpotAssetCard();
+            updateTopAssetCard();
+            updateAssetCompositionChart();
+        }
+
+        function setAssetText(elementId, text, signValue = null) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            el.textContent = text;
+            const numeric = Number(signValue);
+            if (signValue === null || signValue === undefined || !Number.isFinite(numeric)) {
+                el.classList.remove('text-green-600', 'text-red-600');
+                return;
+            }
+            el.classList.toggle('text-green-600', numeric >= 0);
+            el.classList.toggle('text-red-600', numeric < 0);
+        }
+
+        function updateSpotAssetCard() {
+            const bottomData = latestBottomPositionData || {};
+            const quantity = Number(bottomData.position_quantity) || 0;
+            const averagePrice = Number(bottomData.position_avg_price) || 0;
+            const currentPrice = getCurrentBtcPrice();
+            const statusEl = document.getElementById('asset-spot-status');
+            if (statusEl) updateStatusBadge(statusEl, bottomData.status || '清仓');
+            setAssetText('asset-spot-qty', quantity > 0 ? `${formatQuantity(quantity)} BTC` : '-');
+            setAssetText('asset-spot-avg', averagePrice > 0 ? formatMoney(averagePrice, 1) : '-');
+            setAssetText('asset-spot-price', currentPrice ? formatMoney(currentPrice, 1) : '-');
+            const marketValue = (currentPrice && quantity > 0) ? (quantity * currentPrice) : null;
+            setAssetText('asset-spot-value', marketValue !== null ? formatMoney(marketValue, 2) : '-');
+            const floating = calculateFloatingProfit(bottomData, 'long');
+            setAssetText('asset-spot-float', floating !== null ? formatSignedMoney(floating, 2) : '-', floating);
+        }
+
+        function renderAssetRecords(tbodyId, records) {
+            const tbody = document.getElementById(tbodyId);
+            if (!tbody) return;
+            if (!records.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-gray-400 text-center py-3">暂无记录</td></tr>';
+                return;
+            }
+            tbody.innerHTML = records.map(record => {
+                const closed = Boolean(record.is_closed);
+                const profit = Number(record.profit) || 0;
+                const profitText = closed ? formatSignedMoney(profit, 2) : '-';
+                const profitClass = closed ? (profit >= 0 ? 'text-green-600' : 'text-red-600') : '';
+                return '<tr>'
+                    + `<td>${record.duration || '-'}</td>`
+                    + `<td>${Number.isFinite(Number(record.quantity)) ? formatQuantity(record.quantity) : '-'}</td>`
+                    + `<td>${Number.isFinite(Number(record.avg_price)) ? formatMoney(record.avg_price, 1) : '-'}</td>`
+                    + `<td>${closed ? '已了结' : '持有中'}</td>`
+                    + `<td>${Number.isFinite(Number(record.close_avg_price)) ? formatMoney(record.close_avg_price, 1) : '-'}</td>`
+                    + `<td class="${profitClass}">${profitText}</td>`
+                    + '</tr>';
+            }).join('');
+        }
+
+        function updateTopAssetCard() {
+            const topData = latestTopPositionData || {};
+            const quantity = Math.abs(Number(topData.position_quantity) || 0);
+            const averagePrice = Number(topData.position_avg_price) || 0;
+            const currentPrice = getCurrentBtcPrice();
+            const records = (topData.trade_records || []).filter(record => record && typeof record === 'object');
+            const cumulativePnl = records.reduce((total, record) => total + (Number(record.profit) || 0), 0);
+            const statusEl = document.getElementById('asset-top-status');
+            if (statusEl) updateStatusBadge(statusEl, topData.status || '清仓');
+
+            const hasPosition = quantity > 0 && averagePrice > 0;
+            setAssetText('asset-top-qty', hasPosition ? `${formatQuantity(quantity)} BTC` : '-');
+            setAssetText('asset-top-avg', hasPosition ? formatMoney(averagePrice, 1) : '-');
+            setAssetText('asset-top-price', currentPrice ? formatMoney(currentPrice, 1) : '-');
+            const cost = hasPosition ? averagePrice * quantity : null;
+            setAssetText('asset-top-cost', cost !== null ? formatMoney(cost, 2) : '-');
+            const floating = calculateFloatingProfit(topData, 'short');
+            setAssetText('asset-top-float', floating !== null ? formatSignedMoney(floating, 2) : '-', floating);
+            setAssetText('asset-top-realized', formatSignedMoney(cumulativePnl, 2), cumulativePnl);
+            // 摸顶资产 = 当前仓位均价 × 数量 + 累计盈亏；无仓位不显示资产
+            const assetValue = hasPosition ? (cost + cumulativePnl) : null;
+            setAssetText('asset-top-asset', assetValue !== null ? formatMoney(assetValue, 2) : '—', assetValue);
+            const noteEl = document.getElementById('asset-top-note');
+            if (noteEl) {
+                noteEl.textContent = hasPosition
+                    ? '资产 = 持仓均价 × 数量 + 累计盈亏（已了结）'
+                    : '当前无持仓，不显示策略资产';
+            }
+        }
+
+        let assetCompositionChart = null;
+
+        function computeAssetSlices() {
+            const slices = [];
+            const bottomData = latestBottomPositionData || {};
+            const spotQuantity = Number(bottomData.position_quantity) || 0;
+            const spotPrice = getCurrentBtcPrice();
+            if (spotQuantity > 0 && spotPrice) {
+                slices.push({ label: '抄底现货', value: spotQuantity * spotPrice, color: '#3b82f6' });
+            }
+            const topData = latestTopPositionData || {};
+            const topQuantity = Math.abs(Number(topData.position_quantity) || 0);
+            const topAverage = Number(topData.position_avg_price) || 0;
+            const topPnl = (topData.trade_records || [])
+                .reduce((sum, record) => sum + (Number(record && record.profit) || 0), 0);
+            if (topQuantity > 0 && topAverage > 0) {
+                const value = topAverage * topQuantity + topPnl;
+                if (value > 0) {
+                    slices.push({ label: '摸顶策略', value: value, color: '#f59e0b' });
+                }
+            }
+            const leadSummary = (((window.latestDashboardData || {}).lead) || {}).summary || {};
+            const leadFunds = Number(leadSummary.current_funds);
+            if (Number.isFinite(leadFunds) && leadFunds > 0) {
+                slices.push({ label: '带单模块', value: leadFunds, color: '#10b981' });
+            }
+            return slices;
+        }
+
+        function updateAssetCompositionChart() {
+            const canvas = document.getElementById('assetCompositionChart');
+            if (!canvas) return;
+            const emptyEl = document.getElementById('asset-composition-empty');
+            const totalEl = document.getElementById('asset-total-value');
+            const legendEl = document.getElementById('asset-composition-legend');
+            const slices = computeAssetSlices();
+            const total = slices.reduce((sum, item) => sum + item.value, 0);
+            if (totalEl) totalEl.textContent = total > 0 ? formatMoney(total, 2) : '-';
+            if (legendEl) {
+                legendEl.innerHTML = slices.length ? slices.map(item => {
+                    const percent = total > 0 ? (item.value / total * 100) : 0;
+                    return '<div class="flex items-center justify-between text-sm py-1 border-b border-gray-100 last:border-0">'
+                        + '<span class="flex items-center min-w-0">'
+                        + `<span style="display:inline-block;width:10px;height:10px;border-radius:9999px;background:${item.color};margin-right:8px;flex:0 0 auto;"></span>`
+                        + `<span class="truncate">${item.label}</span></span>`
+                        + `<span class="font-semibold text-dark ml-3">${formatMoney(item.value, 2)} · ${percent.toFixed(1)}%</span>`
+                        + '</div>';
+                }).join('') : '<div class="text-sm text-gray-400">暂无可视化资产</div>';
+            }
+            if (emptyEl) emptyEl.classList.toggle('hidden', slices.length > 0);
+            canvas.style.display = slices.length > 0 ? '' : 'none';
+            if (!slices.length) return;
+
+            if (!assetCompositionChart) {
+                assetCompositionChart = new Chart(canvas.getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: slices.map(item => item.label),
+                        datasets: [{
+                            data: slices.map(item => item.value),
+                            backgroundColor: slices.map(item => item.color),
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '62%',
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: context => `${context.label}: ${formatMoney(context.parsed, 2)}`
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                assetCompositionChart.data.labels = slices.map(item => item.label);
+                assetCompositionChart.data.datasets[0].data = slices.map(item => item.value);
+                assetCompositionChart.data.datasets[0].backgroundColor = slices.map(item => item.color);
+                assetCompositionChart.update();
+            }
+        }
+
+        function updateAssetsView(data) {
+            window.latestDashboardData = data || window.latestDashboardData || {};
+            const bottomData = (data && data.bottom) || latestBottomPositionData || {};
+            updateSpotAssetCard();
+
+            const records = (bottomData.trade_records || []).filter(record => record && typeof record === 'object');
+            const closedRecords = records.filter(record => record.is_closed);
+            const realized = closedRecords.reduce((total, record) => total + (Number(record.profit) || 0), 0);
+            setAssetText('asset-spot-realized', closedRecords.length ? formatSignedMoney(realized, 2) : '$0.00',
+                         closedRecords.length ? realized : 0);
+            renderAssetRecords('asset-spot-records', records);
+
+            const topData = (data && data.top) || latestTopPositionData || {};
+            updateTopAssetCard();
+            renderAssetRecords('asset-top-records',
+                (topData.trade_records || []).filter(record => record && typeof record === 'object'));
+
+            const leadSummary = (((data && data.lead) || {}).summary) || {};
+            const initialFunds = Number(leadSummary.initial_funds);
+            const currentFunds = Number(leadSummary.current_funds);
+            const realizedPnl = Number(leadSummary.total_realized_pnl);
+            const returnRate = Number(leadSummary.total_return_rate);
+            const trades = Number(leadSummary.close_trade_count);
+            const wins = Number(leadSummary.win_trades);
+            const loses = Number(leadSummary.lose_trades);
+            const hasFunds = Number.isFinite(initialFunds) && Number.isFinite(currentFunds);
+            setAssetText('asset-lead-initial', hasFunds ? formatMoney(initialFunds, 2) : '-');
+            setAssetText('asset-lead-current', hasFunds ? formatMoney(currentFunds, 2) : '-');
+            setAssetText('asset-lead-realized', Number.isFinite(realizedPnl) ? formatSignedMoney(realizedPnl, 2) : '-',
+                         Number.isFinite(realizedPnl) ? realizedPnl : null);
+            setAssetText('asset-lead-return', Number.isFinite(returnRate) ? formatSignedPercent(returnRate, 2) : '-',
+                         Number.isFinite(returnRate) ? returnRate : null);
+            setAssetText('asset-lead-trades', Number.isFinite(trades) ? String(trades) : '-');
+            setAssetText('asset-lead-wl', (Number.isFinite(wins) && Number.isFinite(loses)) ? `${wins} / ${loses}` : '-');
+            const extraEl = document.getElementById('asset-lead-extra');
+            if (extraEl) {
+                const archived = Number(leadSummary.archived_realized_pnl);
+                const parts = [];
+                if (Number.isFinite(archived) && archived !== 0) parts.push(`归档盈亏：${formatSignedMoney(archived, 2)}`);
+                parts.push('当前资金为账户快照；盈亏为账务口径（与 lead_trades.json 同步）');
+                extraEl.textContent = parts.join(' · ');
+            }
+
+            updateAssetCompositionChart();
         }
         
 
@@ -3676,6 +4017,7 @@
                     updateMarketData(data);
                     updateTopData(data);
                     updateBottomData(data);
+                    updateAssetsView(data);
                     updateProfitCurve(data);
                     updateYearlyProfitCurve(data);
                     updatePostFeed(data);
@@ -3691,8 +4033,10 @@
 
         function setPerformanceView(view) {
             const isPnlView = view === 'pnl';
+            const isAssetsView = view === 'assets';
             if (performanceViewTrack) {
                 performanceViewTrack.classList.toggle('is-pnl', isPnlView);
+                performanceViewTrack.classList.toggle('is-assets', isAssetsView);
             }
             performanceViewButtons.forEach(button => {
                 const active = button.dataset.performanceView === view;
@@ -3700,15 +4044,22 @@
                 button.setAttribute('aria-selected', String(active));
             });
             if (performanceViewTitle) {
-                performanceViewTitle.textContent = isPnlView ? '交易系统盈亏' : '策略发帖动态';
+                performanceViewTitle.textContent = isAssetsView ? '资产总览' : (isPnlView ? '交易系统盈亏' : '策略发帖动态');
             }
-            document.getElementById('performance-post-view')?.setAttribute('aria-hidden', String(isPnlView));
+            document.getElementById('performance-post-view')?.setAttribute('aria-hidden', String(isPnlView || isAssetsView));
             document.getElementById('performance-pnl-view')?.setAttribute('aria-hidden', String(!isPnlView));
+            document.getElementById('performance-assets-view')?.setAttribute('aria-hidden', String(!isAssetsView));
             if (isPnlView) {
                 window.setTimeout(() => {
                     profitCurveChart?.resize();
                     yearlyProfitCurveChart?.resize();
                     syncPerformanceViewerHeight();
+                }, 380);
+            } else if (isAssetsView) {
+                updateAssetsView(window.latestDashboardData || {});
+                window.setTimeout(() => {
+                    assetCompositionChart?.resize();
+                    schedulePerformanceViewerHeightSync(80);
                 }, 380);
             }
         }
@@ -3737,7 +4088,10 @@
             const feed = document.getElementById('post-feed-container');
             const feedScrollTop = feed ? feed.scrollTop : 0;
             viewer.style.height = 'auto';
-            const measured = pnlView.getBoundingClientRect().height;
+            const assetsView = document.getElementById('performance-assets-view');
+            const measuredPnl = pnlView.getBoundingClientRect().height;
+            const measuredAssets = assetsView ? assetsView.getBoundingClientRect().height : 0;
+            const measured = Math.max(measuredPnl || 0, measuredAssets || 0);
             if (!Number.isFinite(measured) || measured <= 0) {
                 viewer.style.height = previousHeight;
                 if (feed && feed.scrollTop !== feedScrollTop) feed.scrollTop = feedScrollTop;
