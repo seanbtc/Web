@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections import Counter
 
 SCHEMA_VERSION = 1
-UPDATED_AT = '2026-10-09'
+UPDATED_AT = '2026-10-10'
 
 STATUS_LABELS = {
     'live': '已上线',
@@ -52,6 +52,10 @@ LAYERS = [
              'desc': '周日 04:00 参数研究周批（research runner）', 'caps': ['失败重试', '钉钉告警']},
             {'id': 'ops_health', 'name': 'health_watch', 'status': 'live', 'launchd': 'com.bot.health',
              'desc': '每 5 分钟 Mac 进程/磁盘/内存看护', 'caps': ['状态去抖']},
+            {'id': 'ops_briefing', 'name': 'briefing', 'status': 'live', 'launchd': 'com.bot.briefing',
+             'desc': '每日 08:30 本地模型汇总系统状态 → 钉钉', 'caps': ['qwen3:8b / Bonsai 27B', '全本地生成']},
+            {'id': 'ops_xdigest', 'name': 'xdigest', 'status': 'live', 'launchd': 'com.bot.xdigest',
+             'desc': '每日 09:00/21:00 X 关注情报筛选 → 钉钉', 'caps': ['9 账号观察', '本地模型筛选']},
             {'id': 'm09', 'name': 'M-09 常驻自愈', 'status': 'planned',
              'desc': '断电自启 / 崩溃自恢复的完整演练', 'caps': ['UPS（建议）']},
         ],
