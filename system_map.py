@@ -56,6 +56,9 @@ LAYERS = [
              'desc': '每日 08:30 本地模型汇总系统状态 → 钉钉', 'caps': ['qwen3:8b / Bonsai 27B', '全本地生成']},
             {'id': 'ops_xdigest', 'name': 'xdigest', 'status': 'live', 'launchd': 'com.bot.xdigest',
              'desc': '每日 09:00/21:00 X 关注情报筛选 → 钉钉', 'caps': ['9 账号观察', '本地模型筛选']},
+            {'id': 'ops_research_batch', 'name': 'research-batch', 'status': 'live', 'launchd': 'com.bot.research-batch',
+             'module': 'research/batch.py',
+             'desc': '按批次计划（research/plans/*.json）串行深度研究队列；每日 01:00 触发', 'caps': ['单实例锁', '断点续跑', '钉钉回执']},
             {'id': 'm09', 'name': 'M-09 常驻自愈', 'status': 'planned',
              'desc': '断电自启 / 崩溃自恢复的完整演练', 'caps': ['UPS（建议）']},
         ],
@@ -199,6 +202,7 @@ EDGES = [
     {'from': 'sentinel', 'to': 'dingtalk', 'label': '告警'},
     {'from': 'ops_kb', 'to': 'kb'},
     {'from': 'ops_research', 'to': 'ledger', 'label': '周批'},
+    {'from': 'ops_research_batch', 'to': 'pipeline', 'label': '批次队列'},
     {'from': 'ops_health', 'to': 'dingtalk'},
 ]
 
