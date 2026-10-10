@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections import Counter
 
 SCHEMA_VERSION = 1
-UPDATED_AT = '2026-10-10'
+UPDATED_AT = '2026-10-11'
 
 STATUS_LABELS = {
     'live': '已上线',
@@ -55,7 +55,11 @@ LAYERS = [
             {'id': 'ops_briefing', 'name': 'briefing', 'status': 'live', 'launchd': 'com.bot.briefing',
              'desc': '每日 08:30 本地模型汇总系统状态 → 钉钉', 'caps': ['qwen3:8b / Bonsai 27B', '全本地生成']},
             {'id': 'ops_xdigest', 'name': 'xdigest', 'status': 'live', 'launchd': 'com.bot.xdigest',
-             'desc': '每日 09:00/21:00 X 关注情报筛选 → 钉钉', 'caps': ['9 账号观察', '本地模型筛选']},
+             'desc': '每日 21:00 X 前沿情报精选（数据/技术/可学习）→ 钉钉',
+             'caps': ['17 账号池（试用制）', 'AI 精选（API+本地降级）']},
+            {'id': 'ops_aiservice', 'name': 'aiservice (Mac)', 'status': 'live', 'launchd': 'com.bot.aiservice',
+             'desc': 'Mac 本机 AI 网关（DeepSeek；xdigest 等本机消费者）',
+             'caps': ['Key 集中', 'JSON 修复', '用量日志']},
             {'id': 'ops_research_batch', 'name': 'research-batch', 'status': 'live', 'launchd': 'com.bot.research-batch',
              'module': 'research/batch.py',
              'desc': '按批次计划（research/plans/*.json）串行深度研究队列；每日 01:00 触发', 'caps': ['单实例锁', '断点续跑', '钉钉回执']},
@@ -204,6 +208,8 @@ EDGES = [
     {'from': 'ops_research', 'to': 'ledger', 'label': '周批'},
     {'from': 'ops_research_batch', 'to': 'pipeline', 'label': '批次队列'},
     {'from': 'ops_health', 'to': 'dingtalk'},
+    {'from': 'ops_xdigest', 'to': 'ops_aiservice', 'label': 'AI 精选', 'style': 'dashed'},
+    {'from': 'ops_aiservice', 'to': 'ext_deepseek'},
 ]
 
 
