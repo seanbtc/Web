@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections import Counter
 
 SCHEMA_VERSION = 1
-UPDATED_AT = '2026-10-11'
+UPDATED_AT = '2026-10-14'
 
 STATUS_LABELS = {
     'live': '已上线',
@@ -46,12 +46,12 @@ LAYERS = [
         'title': '② 后台面 · Mac ops/launchd',
         'subtitle': '无人值守：定时 + 看护 + 通知',
         'nodes': [
-            {'id': 'ops_kb', 'name': 'kb-index', 'status': 'live', 'launchd': 'com.bot.kb-index',
-             'desc': '每日 03:30 重建 KnowledgeBase 索引', 'caps': ['launchd']},
-            {'id': 'ops_research', 'name': 'research-weekly', 'status': 'live', 'launchd': 'com.bot.research-weekly',
-             'desc': '周日 04:00 参数研究周批（research runner）', 'caps': ['失败重试', '钉钉告警']},
-            {'id': 'ops_health', 'name': 'health_watch', 'status': 'live', 'launchd': 'com.bot.health',
-             'desc': '每 5 分钟 Mac 进程/磁盘/内存看护', 'caps': ['状态去抖']},
+            {'id': 'ops_kb', 'name': 'kb-index', 'status': 'retired',
+             'desc': '原每日 03:30 重建 KnowledgeBase 索引；2026-10-12 移除（用户决定：索引随入库重建，无需定时）', 'caps': ['已移除']},
+            {'id': 'ops_research', 'name': 'research-weekly', 'status': 'retired',
+             'desc': '原周日 04:00 参数研究周批（research runner）；2026-10-12 移除（用户决定：研究重心转 AI 版）', 'caps': ['已移除']},
+            {'id': 'ops_health', 'name': 'health_watch', 'status': 'retired',
+             'desc': '原每 5 分钟 Mac 进程/磁盘看护；2026-10-12 移除（用户决定）', 'caps': ['已移除']},
             {'id': 'ops_briefing', 'name': 'briefing', 'status': 'live', 'launchd': 'com.bot.briefing',
              'desc': '每日 08:30 本地模型汇总系统状态 → 钉钉', 'caps': ['qwen3:8b / Bonsai 27B', '全本地生成']},
             {'id': 'ops_xdigest', 'name': 'xdigest', 'status': 'live', 'launchd': 'com.bot.xdigest',
@@ -93,6 +93,9 @@ LAYERS = [
             {'id': 'm07b', 'name': 'M-07b walk-forward', 'status': 'research', 'module': 'research/walkforward.py',
              'desc': '折内重拟合 + 折外拼接 + 参数漂移 + lockbox 一次性揭盲',
              'caps': ['1w 需 train≥30 月', 'WF- 产物不自动清理']},
+            {'id': 'multistart', 'name': '多起点重放', 'status': 'research', 'module': 'research/multistart.py',
+             'desc': '固定参数 × 月度起点 → 分布（上线时点敏感性）；候选应用前必要流程',
+             'caps': ['判据：多数为正 / 浮亏≤35% / 收敛']},
         ],
     },
     {
