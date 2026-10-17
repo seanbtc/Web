@@ -43,8 +43,8 @@ def test_index_has_assets_view_markup(client):
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
     for marker in ('data-performance-view="assets"', 'performance-assets-view',
-                   'asset-spot-value', 'asset-lead-current', 'asset-spot-records',
-                   '抄底现货资产', '带单模块资产',
+                   'asset-spot-value', 'asset-lead-fee', 'asset-lead-realized', 'asset-spot-records',
+                   '抄底现货资产', '策略模块资产',
                    'asset-top-asset', 'asset-top-records', '摸顶策略资产',
                    'updateTopAssetCard', 'renderAssetRecords',
                    'assetCompositionChart', 'asset-composition-legend',

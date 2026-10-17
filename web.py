@@ -1032,6 +1032,18 @@ def _normalize_lead_trade_record(trade_data):
         'close_fee': round(_to_float(trade_data.get('close_fee'), 0.0), 4) if trade_data.get('close_fee') is not None else 0.0,
         'entry_price': _to_float(trade_data.get('entry_price'), None),
         'exit_price': _to_float(trade_data.get('exit_price'), None),
+        # ---- 交易所实际账务（2026-10-18；由 TradeSync 拉 userTrades 后回填）----
+        'actual_net_pnl': _to_float(trade_data.get('actual_net_pnl'), None),
+        'actual_realized_pnl': _to_float(trade_data.get('actual_realized_pnl'), None),
+        'actual_commission': _to_float(trade_data.get('actual_commission'), None),
+        'actual_commission_asset': str(trade_data.get('actual_commission_asset') or '').strip(),
+        'actual_commission_other': trade_data.get('actual_commission_other')
+                                  if isinstance(trade_data.get('actual_commission_other'), dict) else {},
+        'actual_filled_qty': _to_float(trade_data.get('actual_filled_qty'), None),
+        'actual_avg_price': _to_float(trade_data.get('actual_avg_price'), None),
+        'actual_fills': int(_to_float(trade_data.get('actual_fills'), 0.0) or 0) or None,
+        'actual_source': str(trade_data.get('actual_source') or '').strip(),
+        'actual_updated_at': str(trade_data.get('actual_updated_at') or '').strip(),
     }
     normalized['order_key'] = _build_lead_record_key(normalized)
     return normalized
@@ -1049,27 +1061,57 @@ def _extract_lead_realized_pnl(record):
     return _to_float(profit_value, 0.0)
 
 
-def _build_lead_summary(trade_records, initial_funds=0.0, archived_realized_pnl=0.0):
-    total_realized_pnl = _to_float(archived_realized_pnl, 0.0)
+def _lead_effective_pnl(record):
+    """展示/汇总口径：交易所实际净盈亏（userTrades realized − commission）优先，否则回退模型 order_pnl。
+
+    注意：开仓记录的实际净盈亏 = −开仓手续费（交易所逐笔口径），计入后可覆盖开仓成本；
+    模型回退仍只计平仓（order_pnl 已含模型分摊费用）。
+    """
+    if not isinstance(record, dict):
+        return None
+    actual = record.get('actual_net_pnl')
+    if actual is not None:
+        return _to_float(actual, None)
+    return _extract_lead_realized_pnl(record)
+
+
+def _build_lead_summary(trade_records, initial_funds=0.0, archived_realized_pnl=0.0, pnl_offset=0.0):
+    """汇总（2026-10-18：实际优先 + 基线偏移）。
+
+    - 金额口径 = Σ 有效盈亏（实际优先，缺失回退模型）+ 归档 + pnl_offset（"盈亏归 0"基线）；
+    - 胜/负/平仓笔数仍按模型平仓口径（`_extract_lead_realized_pnl`）统计，避免开仓手续费行混入胜负；
+    - `raw_total_realized_pnl` = 未加偏移的真实累计（对账用）；`actual_coverage` = 带实际值的记录占比。
+    """
+    raw_total = _to_float(archived_realized_pnl, 0.0)
     close_trade_count = 0
     win_trades = 0
     lose_trades = 0
+    actual_count = 0
+    actual_commission_total = 0.0
+    record_count = 0
 
     if isinstance(trade_records, list):
         for record in trade_records:
             if not isinstance(record, dict):
                 continue
-            profit = _extract_lead_realized_pnl(record)
-            if profit is None:
+            record_count += 1
+            profit = _lead_effective_pnl(record)
+            if profit is not None:
+                raw_total += profit
+            if record.get('actual_net_pnl') is not None:
+                actual_count += 1
+                actual_commission_total += _to_float(record.get('actual_commission'), 0.0)
+            model_profit = _extract_lead_realized_pnl(record)
+            if model_profit is None:
                 continue
-
-            total_realized_pnl += profit
             close_trade_count += 1
-            if profit > 0:
+            if model_profit > 0:
                 win_trades += 1
-            elif profit < 0:
+            elif model_profit < 0:
                 lose_trades += 1
 
+    offset = _to_float(pnl_offset, 0.0)
+    total_realized_pnl = raw_total + offset
     initial_funds_value = _to_float(initial_funds, 0.0)
     current_funds = initial_funds_value + total_realized_pnl
     total_return_rate = (total_realized_pnl / initial_funds_value * 100) if initial_funds_value > 0 else 0.0
@@ -1077,6 +1119,8 @@ def _build_lead_summary(trade_records, initial_funds=0.0, archived_realized_pnl=
     return {
         'initial_funds': round(initial_funds_value, 4),
         'total_realized_pnl': round(total_realized_pnl, 4),
+        'raw_total_realized_pnl': round(raw_total, 4),
+        'pnl_offset': round(offset, 4),
         'current_funds': round(current_funds, 4),
         'total_return_rate': round(total_return_rate, 6),
         'close_trade_count': close_trade_count,
@@ -1084,6 +1128,9 @@ def _build_lead_summary(trade_records, initial_funds=0.0, archived_realized_pnl=
         'lose_trades': lose_trades,
         'archived_realized_pnl': round(_to_float(archived_realized_pnl, 0.0), 4),
         'retained_record_count': len(trade_records) if isinstance(trade_records, list) else 0,
+        'actual_commission_total': round(actual_commission_total, 4),
+        'actual_coverage': round(actual_count / record_count, 4) if record_count else 0.0,
+        'funding_included': False,
     }
 
 
@@ -1522,8 +1569,11 @@ def load_lead_data(strict=False):
                 _finalize_lead_records(normalized_records)
                 archived_realized_pnl = _to_float(summary.get('archived_realized_pnl', 0.0), 0.0)
                 initial_funds = _to_float(summary.get('initial_funds', 0.0), 0.0)
+                pnl_offset = _to_float(summary.get('pnl_offset', 0.0), 0.0)
                 return {
-                    'summary': _build_lead_summary(normalized_records, initial_funds=initial_funds, archived_realized_pnl=archived_realized_pnl),
+                    'summary': _build_lead_summary(normalized_records, initial_funds=initial_funds,
+                                                   archived_realized_pnl=archived_realized_pnl,
+                                                   pnl_offset=pnl_offset),
                     'trade_records': normalized_records,
                 }
         except Exception as e:
@@ -2168,6 +2218,7 @@ class DataStorage:
                 lead_records,
                 initial_funds=lead_summary.get('initial_funds', 0.0),
                 archived_realized_pnl=archived_realized_pnl,
+                pnl_offset=_to_float(lead_summary.get('pnl_offset', 0.0), 0.0),
             )
 
         _trim_profit_curve_points(self.total_profit_data)
@@ -2340,6 +2391,7 @@ class DataStorage:
         summary = self.lead_data.get('summary', {}) if isinstance(self.lead_data.get('summary'), dict) else {}
         initial_funds = _to_float(summary.get('initial_funds', data.get('initial_funds', 0.0) if isinstance(data, dict) else 0.0), 0.0)
         archived_realized_pnl = _to_float(summary.get('archived_realized_pnl', 0.0), 0.0)
+        pnl_offset = _to_float(summary.get('pnl_offset', 0.0), 0.0)
 
         _finalize_lead_records(existing_records)
 
@@ -2359,6 +2411,7 @@ class DataStorage:
                 existing_records,
                 initial_funds=initial_funds,
                 archived_realized_pnl=archived_realized_pnl,
+                pnl_offset=pnl_offset,
             ),
             'trade_records': existing_records,
         }
@@ -2379,6 +2432,60 @@ class DataStorage:
         if _sync_total_profit_from_lead(self.total_profit_data, self.lead_data):
             self._save_total_profit_data()
             self.update_global_data()
+
+    def apply_lead_actuals(self, payload):
+        """交易所实际成交回填（2026-10-18）：按 order_id(+account_id) 匹配记录并写入 actual_*。
+
+        数据源 = TradeSync 拉取的 Binance userTrades（实际手续费/实际已实现/分腿）。
+        返回命中记录数（0 = 尚未有该订单记录或已回填过）。"""
+        if not isinstance(self.lead_data, dict):
+            self.lead_data = load_lead_data()
+        order_id = str((payload or {}).get('order_id') or '').strip()
+        if not order_id:
+            return 0
+        account_id = str((payload or {}).get('account_id') or '').strip()
+        records = self.lead_data.get('trade_records')
+        if not isinstance(records, list):
+            return 0
+        matched = 0
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            if str(record.get('order_id') or '') != order_id:
+                continue
+            if account_id and str(record.get('account_id') or '') != account_id:
+                continue
+            record['actual_net_pnl'] = _to_float(payload.get('actual_net_pnl'), None)
+            record['actual_realized_pnl'] = _to_float(payload.get('realized_pnl'), None)
+            record['actual_commission'] = _to_float(payload.get('commission_quote'), None)
+            record['actual_commission_asset'] = 'USDT'
+            other = payload.get('commission_other_asset')
+            record['actual_commission_other'] = other if isinstance(other, dict) else {}
+            record['actual_filled_qty'] = _to_float(payload.get('filled_qty'), None)
+            record['actual_avg_price'] = _to_float(payload.get('avg_price'), None)
+            record['actual_fills'] = int(_to_float(payload.get('fills'), 0.0) or 0) or None
+            record['actual_source'] = str(payload.get('source') or 'exchange')
+            record['actual_updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            matched += 1
+        if not matched:
+            return 0
+        summary = self.lead_data.get('summary', {}) if isinstance(self.lead_data.get('summary'), dict) else {}
+        _finalize_lead_records(records)
+        self.lead_data = {
+            'summary': _build_lead_summary(
+                records,
+                initial_funds=_to_float(summary.get('initial_funds', 0.0), 0.0),
+                archived_realized_pnl=_to_float(summary.get('archived_realized_pnl', 0.0), 0.0),
+                pnl_offset=_to_float(summary.get('pnl_offset', 0.0), 0.0),
+            ),
+            'trade_records': records,
+        }
+        self.update_global_data()
+        save_lead_data(self.lead_data)
+        if _sync_total_profit_from_lead(self.total_profit_data, self.lead_data):
+            self._save_total_profit_data()
+            self.update_global_data()
+        return matched
 
     def _save_total_profit_data(self):
         """保存 total_profit.json（剔除运行时派生的 profit_summary 字段）。"""
@@ -2664,6 +2771,17 @@ def update_lead_data():
         socketio.emit('all_data', data_storage.get_all_data())
         return jsonify({'status': 'success'})
     return jsonify({'status': 'error'}), 400
+
+@app.route('/api/update_lead_actuals', methods=['POST'])
+@require_api_token
+def update_lead_actuals():
+    """TradeSync 回填交易所实际成交（userTrades）：实际手续费/实际已实现/分腿。"""
+    payload = request.json or {}
+    matched = data_storage.apply_lead_actuals(payload)
+    if matched:
+        socketio.emit('all_data', data_storage.get_all_data())
+    return jsonify({'status': 'success', 'matched': matched})
+
 
 @app.route('/api/update_arbitrage', methods=['POST'])
 @require_api_token

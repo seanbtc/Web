@@ -104,7 +104,7 @@ LAYERS = [
         'subtitle': '下单 / 路由 / 展示 / 发帖',
         'nodes': [
             {'id': 'bstrategy', 'name': 'BStrategy', 'status': 'live', 'service': 'bstrategy',
-             'desc': '4H 多策略带单（实盘）', 'caps': ['止损闭环', '仓位对齐']},
+             'desc': '4H 多策略（策略模块 · 实盘）', 'caps': ['止损闭环', '仓位对齐']},
             {'id': 'tradesync', 'name': 'TradeSync', 'status': 'live', 'service': 'tradesync',
              'desc': '下单网关 / 账号路由', 'caps': ['Binance/Bybit/OKX/Bitget']},
             {'id': 'autodca', 'name': 'AutoDCA', 'status': 'idle', 'service': 'autodca',

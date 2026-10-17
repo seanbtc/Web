@@ -1714,7 +1714,7 @@
                             <section class="asset-card" id="asset-composition-card">
                                 <div class="flex items-center justify-between mb-2">
                                     <h3 class="text-base font-semibold text-dark"><i class="fa fa-pie-chart text-primary mr-2"></i>资产构成</h3>
-                                    <span class="text-xs text-gray-400">抄底现货（市值）· 带单模块（资金快照）· 摸顶策略（均价×数量+累计盈亏）</span>
+                                    <span class="text-xs text-gray-400">抄底现货（市值）· 策略模块（累计盈亏）· 摸顶策略（均价×数量+累计盈亏）</span>
                                 </div>
                                 <div class="flex flex-col md:flex-row items-center gap-5">
                                     <div class="relative" style="width:220px;height:220px;flex:0 0 auto;">
@@ -1756,14 +1756,12 @@
 
                             <section class="asset-card" id="asset-lead-card">
                                 <div class="flex items-center justify-between mb-2">
-                                    <h3 class="text-base font-semibold text-dark"><i class="fa fa-signal text-secondary mr-2"></i>带单模块资产</h3>
-                                    <span class="text-xs text-gray-400" id="asset-lead-note">账户快照（lead_trades.json）</span>
+                                    <h3 class="text-base font-semibold text-dark"><i class="fa fa-signal text-secondary mr-2"></i>策略模块资产</h3>
+                                    <span class="text-xs text-gray-400" id="asset-lead-note">交易所实际（userTrades 回填 · 不含资金费）</span>
                                 </div>
                                 <div class="asset-stat-grid mb-3">
-                                    <div class="asset-stat"><div class="asset-label">初始资金</div><div class="asset-value" id="asset-lead-initial">-</div></div>
-                                    <div class="asset-stat"><div class="asset-label">当前资金</div><div class="asset-value" id="asset-lead-current">-</div></div>
-                                    <div class="asset-stat"><div class="asset-label">累计已实现盈亏</div><div class="asset-value" id="asset-lead-realized">-</div></div>
-                                    <div class="asset-stat"><div class="asset-label">总收益率</div><div class="asset-value" id="asset-lead-return">-</div></div>
+                                    <div class="asset-stat"><div class="asset-label">累计盈亏</div><div class="asset-value" id="asset-lead-realized">-</div></div>
+                                    <div class="asset-stat"><div class="asset-label">实际手续费</div><div class="asset-value" id="asset-lead-fee">-</div></div>
                                     <div class="asset-stat"><div class="asset-label">平仓笔数</div><div class="asset-value" id="asset-lead-trades">-</div></div>
                                     <div class="asset-stat"><div class="asset-label">胜 / 负</div><div class="asset-value" id="asset-lead-wl">-</div></div>
                                 </div>
@@ -1802,14 +1800,14 @@
             </div>
         </section>
 
-        <!-- 带单策略模块 -->
+        <!-- 策略模块（原带单）-->
         <section id="lead-section" class="mb-12 bg-gray-100 rounded-xl p-6 panel-section">
             <div class="mb-6">
                 <div class="flex items-center mb-3">
                     <div class="w-10 h-10 bg-cyan-100 rounded-full flex items-center justify-center mr-3">
                         <i class="fa fa-users text-cyan-600 text-xl"></i>
                     </div>
-                    <h3 class="text-lg font-semibold text-dark">带单模块</h3>
+                    <h3 class="text-lg font-semibold text-dark">策略模块</h3>
                 </div>
                 <div class="flex items-center mb-4">
                     <span class="text-xs font-medium text-gray-500 mr-2">状态:</span>
@@ -1821,16 +1819,16 @@
                 <h4 class="text-lg font-semibold text-dark mb-4">本轮盈亏</h4>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div class="bg-gray-50 rounded-lg p-3 dashboard-stat-card">
-                        <div class="text-xs text-gray-500 mb-1 dashboard-metric-label">本金</div>
-                        <div class="text-lg font-bold text-dark dashboard-metric-value" id="lead-initial-funds">$0.00</div>
-                    </div>
-                    <div class="bg-gray-50 rounded-lg p-3 dashboard-stat-card">
-                        <div class="text-xs text-gray-500 mb-1 dashboard-metric-label">累计净收益</div>
+                        <div class="text-xs text-gray-500 mb-1 dashboard-metric-label">累计盈亏</div>
                         <div class="text-lg font-bold text-green-600 dashboard-metric-value" id="lead-total-net-profit">$0.00</div>
                     </div>
                     <div class="bg-gray-50 rounded-lg p-3 dashboard-stat-card">
-                        <div class="text-xs text-gray-500 mb-1 dashboard-metric-label">累计收益率</div>
-                        <div class="text-lg font-bold text-green-600 dashboard-metric-value" id="lead-total-return-rate">0.00%</div>
+                        <div class="text-xs text-gray-500 mb-1 dashboard-metric-label">实际手续费</div>
+                        <div class="text-lg font-bold text-dark dashboard-metric-value" id="lead-actual-fee">$0.00</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3 dashboard-stat-card">
+                        <div class="text-xs text-gray-500 mb-1 dashboard-metric-label">平仓笔数</div>
+                        <div class="text-lg font-bold text-dark dashboard-metric-value" id="lead-close-count">0</div>
                     </div>
                 </div>
             </div>
@@ -1856,7 +1854,7 @@
                             <tr>
                                 <td colspan="9" class="px-3 py-4 text-center text-gray-500">
                                     <i class="fa fa-info-circle text-lg mb-1"></i>
-                                    <p>暂无带单订单</p>
+                                    <p>暂无订单</p>
                                 </td>
                             </tr>
                         </tbody>
@@ -2717,7 +2715,7 @@
             // 更新顶部策略盈亏摘要
             updateTopSummary(data);
 
-            // 更新带单策略数据
+            // 更新策略模块数据
             if (data.lead) {
                 updateLeadSummary(data.lead);
                 updateLeadTable(data.lead);
@@ -3043,23 +3041,24 @@
 
         function updateLeadSummary(data) {
             const summary = data.summary || data || {};
-            const initialFunds = Number(summary.initial_funds || 0);
             const totalProfit = Number(summary.total_realized_pnl || 0);
-            const totalReturnRate = Number(summary.total_return_rate || 0);
+            const actualFee = Number(summary.actual_commission_total || 0);
+            const closeCount = Number(summary.close_trade_count || 0);
 
-            const initialFundsEl = document.getElementById('lead-initial-funds');
             const totalProfitEl = document.getElementById('lead-total-net-profit');
-            const totalReturnRateEl = document.getElementById('lead-total-return-rate');
+            const actualFeeEl = document.getElementById('lead-actual-fee');
+            const closeCountEl = document.getElementById('lead-close-count');
 
-            if (!initialFundsEl || !totalProfitEl || !totalReturnRateEl) {
-                return;
+            if (totalProfitEl) {
+                totalProfitEl.textContent = formatSignedMoney(totalProfit);
+                totalProfitEl.className = 'text-lg font-bold ' + (totalProfit >= 0 ? 'text-green-600' : 'text-red-600');
             }
-
-            initialFundsEl.textContent = formatMoney(initialFunds);
-            totalProfitEl.textContent = formatSignedMoney(totalProfit);
-            totalProfitEl.className = 'text-lg font-bold ' + (totalProfit >= 0 ? 'text-green-600' : 'text-red-600');
-            totalReturnRateEl.textContent = formatSignedPercent(totalReturnRate);
-            totalReturnRateEl.className = 'text-lg font-bold ' + (totalReturnRate >= 0 ? 'text-green-600' : 'text-red-600');
+            if (actualFeeEl) {
+                actualFeeEl.textContent = formatMoney(actualFee);
+            }
+            if (closeCountEl) {
+                closeCountEl.textContent = String(closeCount);
+            }
         }
 
         function updateLeadTable(data) {
@@ -3074,7 +3073,7 @@
                     <tr>
                         <td colspan="9" class="px-6 py-8 text-center text-gray-500">
                             <i class="fa fa-info-circle text-2xl mb-2"></i>
-                            <p>暂无带单订单</p>
+                            <p>暂无订单</p>
                         </td>
                     </tr>
                 `;
@@ -3095,11 +3094,14 @@
 
                 const side = trade.side || '未知';
                 const tradeType = trade.display_trade_type || trade.trade_type || '未知';
-                // display_pnl：按方向归属后的展示盈亏（字段存在时 null 表示 "-"）；旧数据回退原始盈亏
+                // 实际优先（userTrades 回填）；否则 display_pnl（按方向归属）；旧数据回退原始盈亏
+                const hasActual = trade.actual_net_pnl !== undefined && trade.actual_net_pnl !== null && trade.actual_net_pnl !== '';
                 const hasDisplayPnl = Object.prototype.hasOwnProperty.call(trade, 'display_pnl');
-                const orderPnl = hasDisplayPnl ? trade.display_pnl : (trade.order_pnl ?? trade.realized_pnl ?? trade.net_profit);
+                const orderPnl = hasActual
+                    ? trade.actual_net_pnl
+                    : (hasDisplayPnl ? trade.display_pnl : (trade.order_pnl ?? trade.realized_pnl ?? trade.net_profit));
                 const pnl = orderPnl === undefined || orderPnl === null || orderPnl === '' ? null : Number(orderPnl);
-                const pnlNote = hasDisplayPnl && trade.display_pnl_note ? String(trade.display_pnl_note) : '';
+                const pnlNote = hasActual ? '实际' : (hasDisplayPnl && trade.display_pnl_note ? String(trade.display_pnl_note) : '');
                 const pnlClass = pnl === null
                     ? 'text-gray-500'
                     : pnl >= 0
@@ -3577,9 +3579,9 @@
                 }
             }
             const leadSummary = (((window.latestDashboardData || {}).lead) || {}).summary || {};
-            const leadFunds = Number(leadSummary.current_funds);
-            if (Number.isFinite(leadFunds) && leadFunds > 0) {
-                slices.push({ label: '带单模块', value: leadFunds, color: '#10b981' });
+            const modulePnl = Number(leadSummary.total_realized_pnl);
+            if (Number.isFinite(modulePnl) && modulePnl > 0) {
+                slices.push({ label: '策略模块', value: modulePnl, color: '#10b981' });
             }
             return slices;
         }
@@ -3660,28 +3662,24 @@
                 (topData.trade_records || []).filter(record => record && typeof record === 'object'));
 
             const leadSummary = (((data && data.lead) || {}).summary) || {};
-            const initialFunds = Number(leadSummary.initial_funds);
-            const currentFunds = Number(leadSummary.current_funds);
             const realizedPnl = Number(leadSummary.total_realized_pnl);
-            const returnRate = Number(leadSummary.total_return_rate);
+            const actualFee = Number(leadSummary.actual_commission_total);
             const trades = Number(leadSummary.close_trade_count);
             const wins = Number(leadSummary.win_trades);
             const loses = Number(leadSummary.lose_trades);
-            const hasFunds = Number.isFinite(initialFunds) && Number.isFinite(currentFunds);
-            setAssetText('asset-lead-initial', hasFunds ? formatMoney(initialFunds, 2) : '-');
-            setAssetText('asset-lead-current', hasFunds ? formatMoney(currentFunds, 2) : '-');
             setAssetText('asset-lead-realized', Number.isFinite(realizedPnl) ? formatSignedMoney(realizedPnl, 2) : '-',
                          Number.isFinite(realizedPnl) ? realizedPnl : null);
-            setAssetText('asset-lead-return', Number.isFinite(returnRate) ? formatSignedPercent(returnRate, 2) : '-',
-                         Number.isFinite(returnRate) ? returnRate : null);
+            setAssetText('asset-lead-fee', Number.isFinite(actualFee) ? formatMoney(actualFee, 2) : '-');
             setAssetText('asset-lead-trades', Number.isFinite(trades) ? String(trades) : '-');
             setAssetText('asset-lead-wl', (Number.isFinite(wins) && Number.isFinite(loses)) ? `${wins} / ${loses}` : '-');
             const extraEl = document.getElementById('asset-lead-extra');
             if (extraEl) {
-                const archived = Number(leadSummary.archived_realized_pnl);
+                const coverage = Number(leadSummary.actual_coverage);
                 const parts = [];
-                if (Number.isFinite(archived) && archived !== 0) parts.push(`归档盈亏：${formatSignedMoney(archived, 2)}`);
-                parts.push('当前资金为账户快照；盈亏为账务口径（与 lead_trades.json 同步）');
+                if (Number.isFinite(coverage)) {
+                    parts.push(`实际数据覆盖：${(coverage * 100).toFixed(1)}%（userTrades 回填）`);
+                }
+                parts.push('口径：实际已实现 − 实际手续费（不含资金费）');
                 extraEl.textContent = parts.join(' · ');
             }
 
