@@ -53,7 +53,7 @@ LAYERS = [
             {'id': 'ops_health', 'name': 'health_watch', 'status': 'retired',
              'desc': '原每 5 分钟 Mac 进程/磁盘看护；2026-10-12 移除（用户决定）', 'caps': ['已移除']},
             {'id': 'ops_briefing', 'name': 'briefing', 'status': 'live', 'launchd': 'com.bot.briefing',
-             'desc': '每日 08:30 本地模型汇总系统状态 → 钉钉', 'caps': ['qwen3:8b / Bonsai 27B', '全本地生成']},
+             'desc': '每日 08:30 本地模型汇总系统状态 → 钉钉', 'caps': ['Bonsai 27B（闲置自动休眠）', '全本地生成']},
             {'id': 'ops_xdigest', 'name': 'xdigest', 'status': 'live', 'launchd': 'com.bot.xdigest',
              'desc': '每日 21:00 X 前沿情报精选（数据/技术/可学习）→ 钉钉',
              'caps': ['17 账号池（试用制）', 'AI 精选（API+本地降级）']},
