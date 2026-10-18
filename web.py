@@ -1130,7 +1130,6 @@ def _build_lead_summary(trade_records, initial_funds=0.0, archived_realized_pnl=
         'retained_record_count': len(trade_records) if isinstance(trade_records, list) else 0,
         'actual_commission_total': round(actual_commission_total, 4),
         'actual_coverage': round(actual_count / record_count, 4) if record_count else 0.0,
-        'funding_included': False,
     }
 
 

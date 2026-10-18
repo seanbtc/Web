@@ -76,7 +76,6 @@ def test_summary_prefers_actual_and_applies_offset():
     assert summary['total_realized_pnl'] == pytest.approx(7.0)
     assert summary['actual_commission_total'] == pytest.approx(0.6)
     assert summary['actual_coverage'] == pytest.approx(0.5)
-    assert summary['funding_included'] is False
 
     offset_summary = web._build_lead_summary(records, pnl_offset=-7.0)
     assert offset_summary['total_realized_pnl'] == pytest.approx(0.0)          # 盈亏归零
