@@ -6,3 +6,7 @@ logcat.log
 .env
 .venv/
 venv/
+
+# 运行态数据不入库（2026-10-18 R3）：由运行进程维护；部署 pull 后需从备份恢复
+# （清单与流程见工作区 ops/RUNTIME-FILES.md）
+data/*.json

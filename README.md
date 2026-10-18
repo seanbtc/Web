@@ -14,6 +14,14 @@
 
 配置键说明见 [`.env.example`](.env.example) 或工作区根 `.env.example`。测试：`.venv\Scripts\python.exe -m pytest tests\ -q`。
 
+## 运行态数据（data/*.json）不入库（2026-10-18）
+
+- `data/*.json`（lead_trades / total_profit / post_feed / top_trades / bottom_trades / triangle_trades / arbitrage_trades）
+  由运行进程自动维护，已从 git 退跟踪并加入 `.gitignore`；
+- 全新克隆（无数据文件）时各加载器按默认空态启动（`web.py` 自动创建 `data/`），回归测试见 `tests/test_missing_data_files.py`；
+- 部署注意：包含本批的 `git pull` 会删除服务器上的旧跟踪文件 → 先备份 `data/`、pull 后恢复
+  （清单与流程见工作区 `ops/RUNTIME-FILES.md`）。
+
 ## 总盈亏曲线（total_profit.json）自动更新
 
 - 历史写入方：仓库内无任何代码写 `data/total_profit.json`（仅读取 + mtime 热加载），此前为人工维护；现由 Web 在收到 `/api/update_lead` 并落盘 `lead_trades.json` 后自动更新。
