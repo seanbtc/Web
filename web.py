@@ -2942,6 +2942,149 @@ def _portfolio_view_model(portfolio):
         'gross_ratio': '—' if gross_ratio is None else _num(gross_ratio, '{:.2f}×'),
         'mark_price': _num(portfolio.get('mark_price'), '{:,.2f}'),
         'reasons': portfolio.get('reasons') or [],
+        'status_label': _health_status_label(portfolio.get('status') or 'observe'),
+    }
+
+
+_HEALTH_STATUS_LABELS = {
+    'ok': '正常',
+    'observe': '观察',
+    'yellow': '预警',
+    'red': '异常',
+    'disabled': '停用',
+}
+
+_HEALTH_GATE_LABELS = {
+    'g0_order_diff': '订单对账',
+    'g1_single_leg': '单腿收益',
+    'g2_streak_and_gap': '连亏/空窗',
+    'g3_cumulative_band': '收益带',
+    'g4_float_and_drawdown': '浮亏/回撤',
+    'g5_params_guard': '参数一致性',
+    'g6_alignment': '开仓对齐',
+    'g7_distribution': '分布健康',
+}
+
+
+def _health_status_label(status):
+    status = str(status or 'observe')
+    return _HEALTH_STATUS_LABELS.get(status, status)
+
+
+def _format_snapshot_time(value):
+    """快照时间 -> 'MM-DD HH:MM'（北京时间）；空/解析失败原样返回。"""
+    text = str(value or '').strip()
+    if not text:
+        return ''
+    try:
+        stamp = datetime.fromisoformat(text.replace('Z', '+00:00'))
+    except ValueError:
+        return text
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    return stamp.astimezone(timezone(timedelta(hours=8))).strftime('%m-%d %H:%M')
+
+
+def _health_guard_display(guard):
+    """M1 参数一致性 -> 状态 + 一行详情（避免原始 checks 噪音）。"""
+    guard = guard if isinstance(guard, dict) else {}
+    status = str(guard.get('status') or 'observe')
+    if status == 'ok':
+        detail = '锚与生效参数一致'
+    elif status == 'disabled':
+        detail = '监控未启用'
+    else:
+        bad = [item for item in (guard.get('checks') or [])
+               if isinstance(item, dict) and not item.get('ok')]
+        detail = '；'.join(str(item.get('detail') or '') for item in bad[:2] if item.get('detail')) or '待复核'
+    return {'status': status, 'label': _health_status_label(status), 'detail': detail}
+
+
+def _health_align_display(gate):
+    """M2 开仓对齐 -> 无配对样本时只报'暂无配对样本'，有样本才展示关键数字。"""
+    gate = gate if isinstance(gate, dict) else {}
+    metrics = gate.get('metrics') if isinstance(gate.get('metrics'), dict) else {}
+    status = str(gate.get('status') or 'observe')
+
+    def _num(value):
+        return None if value is None else float(value)
+
+    pairs_n = int(metrics.get('pairs_n') or 0)
+    p90 = _num(metrics.get('latency_p90_seconds'))
+    p95 = _num(metrics.get('price_bps_p95'))
+    return {
+        'status': status, 'label': _health_status_label(status),
+        'has_pairs': pairs_n > 0, 'pairs_n': pairs_n,
+        'missing': int(metrics.get('replay_missing_n') or 0),
+        'extra': int(metrics.get('live_extra_n') or 0),
+        'p90': '—' if p90 is None else f'{p90:.0f}s',
+        'p95': '—' if p95 is None else f'{abs(p95):.1f}bps',
+    }
+
+
+def _health_dist_display(dist):
+    """M3 分布健康 -> 样本进度（图形化）+ 达标后的关键指标。"""
+    dist = dist if isinstance(dist, dict) else {}
+    sample = dist.get('sample') if isinstance(dist.get('sample'), dict) else {}
+    metrics = dist.get('metrics') if isinstance(dist.get('metrics'), dict) else {}
+    status = str(dist.get('status') or 'observe')
+    n_legs = int(sample.get('n_legs') or 0)
+    min_legs = int(sample.get('min_legs') or 10) or 10
+    months = float(sample.get('months') or 0.0)
+    min_months = float(sample.get('min_months') or 1.0) or 1.0
+    adequate = bool(sample.get('adequate'))
+    progress = 100.0 if adequate else round(
+        min(max(n_legs / min_legs, months / min_months), 1.0) * 100.0, 1)
+
+    def _fmt(value, pattern):
+        return None if value is None else pattern.format(float(value))
+
+    items = []
+    if adequate:
+        for label, value in (
+            ('胜率', _fmt(metrics.get('win_rate_pct'), '{:.1f}%')),
+            ('盈亏因子', _fmt(metrics.get('profit_factor'), '{:.2f}')),
+            ('腿/年', _fmt(metrics.get('legs_per_year'), '{:.1f}')),
+            ('最长连亏', None if metrics.get('max_losing_streak') is None
+             else str(int(metrics.get('max_losing_streak')))),
+            ('持仓中位', _fmt(metrics.get('median_holding_days'), '{:.1f} 天')),
+        ):
+            if value is not None:
+                items.append({'label': label, 'value': value})
+    return {
+        'status': status, 'label': _health_status_label(status),
+        'adequate': adequate, 'progress': progress,
+        'sample_text': f'{n_legs}/{min_legs} 腿 · {months:.2f}/{min_months:g} 月',
+        'metrics': items,
+    }
+
+
+def _health_direction_display(name, branch):
+    """单方向：三个模块（M1/M2/M3）+ 其余闸门汇总 + 黄/红证据。"""
+    branch = branch if isinstance(branch, dict) else {}
+    gates = branch.get('gates') if isinstance(branch.get('gates'), dict) else {}
+    problems, evidence, ok_n = [], [], 0
+    for key, gate in gates.items():
+        gate = gate if isinstance(gate, dict) else {}
+        status = str(gate.get('status') or 'observe')
+        if key not in ('g5_params_guard', 'g6_alignment', 'g7_distribution'):
+            if status == 'ok':
+                ok_n += 1
+            else:
+                problems.append({'label': _HEALTH_GATE_LABELS.get(key, key),
+                                 'status': status, 'status_label': _health_status_label(status)})
+        if status in ('yellow', 'red'):
+            for line in (gate.get('evidence') or [])[:2]:
+                evidence.append({'gate': _HEALTH_GATE_LABELS.get(key, key),
+                                 'status': status, 'line': str(line)})
+    return {
+        'name': name,
+        'guard': _health_guard_display(branch.get('params_guard')),
+        'align': _health_align_display(branch.get('alignment_gate')),
+        'dist': _health_dist_display(branch.get('distribution_health')),
+        'other_ok_n': ok_n,
+        'other_problems': problems,
+        'evidence': evidence,
     }
 
 
@@ -2956,27 +3099,19 @@ def load_strategy_health():
             continue
         if not isinstance(snapshot, dict):
             continue
-        directions = []
-        for name, branch in (snapshot.get('directions') or {}).items():
-            if not isinstance(branch, dict):
-                continue
-            directions.append({
-                'name': name,
-                'overall_status': branch.get('overall_status'),
-                'gates': [{'name': key, 'status': (value or {}).get('status'),
-                           'evidence': ((value or {}).get('evidence') or [])[:2]}
-                          for key, value in (branch.get('gates') or {}).items()],
-                'distribution': branch.get('distribution_health') or {},
-                'params_guard': branch.get('params_guard') or {},
-                'alignment': branch.get('alignment') or {},
-            })
+        directions = [_health_direction_display(name, branch)
+                      for name, branch in (snapshot.get('directions') or {}).items()
+                      if isinstance(branch, dict)]
         portfolio = snapshot.get('portfolio')
         portfolio_model = _portfolio_view_model(portfolio)
+        health_model = dict(snapshot.get('health') or {})
+        health_model['status_label'] = _health_status_label(health_model.get('status') or 'observe')
         entries.append({
             'pair': snapshot.get('pair'),
             'mode': snapshot.get('mode'),
-            'generated_at': snapshot.get('generated_at') or (snapshot.get('heartbeat') or {}).get('ts'),
-            'health': snapshot.get('health') or {},
+            'generated_at': _format_snapshot_time(
+                snapshot.get('generated_at') or (snapshot.get('heartbeat') or {}).get('ts')),
+            'health': health_model,
             'directions': directions,
             'portfolio': portfolio_model,
         })
