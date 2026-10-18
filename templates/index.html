@@ -1298,13 +1298,8 @@
             padding-right: 4px;
         }
 
-        /* 策略健康（「策略模块」区块内切换）：状态徽章（与独立页 /strategy_health 同一套类名） */
-        .status-ok { background:#d1fae5; color:#065f46; }
-        .status-observe { background:#e5e7eb; color:#374151; }
-        .status-yellow { background:#fef3c7; color:#92400e; }
-        .status-red { background:#fee2e2; color:#991b1b; }
-        .status-disabled { background:#f3f4f6; color:#6b7280; }
-        .gate-chip { display:inline-block; padding:2px 8px; border-radius:9999px; font-size:12px; margin:2px 4px 2px 0; }
+        /* 策略健康视图组件（共享样式，见 templates/_strategy_health_style.html） */
+{% include '_strategy_health_style.html' %}
 
         .asset-card {
             background: #fff;

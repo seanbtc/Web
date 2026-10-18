@@ -1,0 +1,29 @@
+        /* 策略健康视图组件（看板「策略模块」区与独立页 /strategy_health 共享） */
+        .status-ok { background:#d1fae5; color:#065f46; }
+        .status-observe { background:#e5e7eb; color:#374151; }
+        .status-yellow { background:#fef3c7; color:#92400e; }
+        .status-red { background:#fee2e2; color:#991b1b; }
+        .status-disabled { background:#f3f4f6; color:#6b7280; }
+        .gate-chip { display:inline-block; padding:2px 8px; border-radius:9999px; font-size:12px; margin:2px 4px 2px 0; }
+
+        /* 结论横幅（按总体状态着色） */
+        .health-banner { border:1px solid transparent; border-radius:0.6rem; padding:0.5rem 0.75rem; margin-bottom:0.6rem; font-size:0.8rem; line-height:1.25rem; }
+        .status-bg-ok { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
+        .status-bg-observe { background:#f3f4f6; border-color:#e5e7eb; color:#374151; }
+        .status-bg-yellow { background:#fffbeb; border-color:#fde68a; color:#92400e; }
+        .status-bg-red { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
+
+        /* 三模块磁贴（参数一致性 / 开仓对齐 / 分布健康） */
+        .health-modules { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:0.55rem; }
+        .health-tile { background:#f9fafb; border:1px solid #eef0f3; border-radius:0.6rem; padding:0.5rem 0.65rem; min-width:0; }
+        .health-tile-head { display:flex; flex-wrap:wrap; align-items:center; gap:0.35rem; margin-bottom:0.3rem; }
+        .health-tile-name { font-size:0.72rem; font-weight:600; color:#374151; }
+        .health-tile-detail { font-size:0.68rem; color:#6b7280; line-height:1.15rem; word-break:break-word; overflow-wrap:anywhere; }
+
+        /* 样本进度条（分布健康） */
+        .health-meter { height:6px; border-radius:9999px; background:#e5e7eb; overflow:hidden; margin:0.25rem 0; }
+        .health-meter-fill { display:block; height:100%; border-radius:9999px; background:#93c5fd; }
+        .health-meter-fill.status-fill-ok { background:#10b981; }
+        .health-meter-fill.status-fill-yellow { background:#f59e0b; }
+        .health-meter-fill.status-fill-red { background:#ef4444; }
+        .health-meter-fill.status-fill-observe { background:#93c5fd; }

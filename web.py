@@ -2996,7 +2996,12 @@ def _health_guard_display(guard):
     else:
         bad = [item for item in (guard.get('checks') or [])
                if isinstance(item, dict) and not item.get('ok')]
-        detail = '；'.join(str(item.get('detail') or '') for item in bad[:2] if item.get('detail')) or '待复核'
+        lines = []
+        for item in bad[:2]:
+            name = str(item.get('name') or '').strip()
+            text = str(item.get('detail') or '').strip()
+            lines.append(f'{name}: {text}' if name else text)
+        detail = '；'.join([line for line in lines if line]) or '待复核'
     return {'status': status, 'label': _health_status_label(status), 'detail': detail}
 
 
