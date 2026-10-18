@@ -50,7 +50,7 @@ def test_index_has_assets_view_markup(client):
                    'assetCompositionChart', 'asset-composition-legend',
                    'asset-total-value', 'updateAssetCompositionChart'):
         assert marker in html, f'页面缺少标记: {marker}'
-    assert html.count('data-performance-view=') == 3
+    assert html.count('data-performance-view=') == 4
     assert html.count('class="asset-card"') == 4
     assert 'is-assets' in html and 'updateAssetsView' in html
 

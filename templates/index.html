@@ -1187,6 +1187,7 @@
 
         .performance-switcher-header {
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
             justify-content: space-between;
             gap: 1rem;
@@ -1252,22 +1253,26 @@
 
         .performance-view-track {
             display: flex;
-            width: 300%;
+            width: 400%;
             height: 100%;
             transition: transform 360ms cubic-bezier(0.22, 0.61, 0.36, 1);
             will-change: transform;
         }
 
         .performance-view-track.is-pnl {
-            transform: translateX(-33.3333%);
+            transform: translateX(-25%);
         }
 
         .performance-view-track.is-assets {
-            transform: translateX(-66.6667%);
+            transform: translateX(-50%);
+        }
+
+        .performance-view-track.is-health {
+            transform: translateX(-75%);
         }
 
         .performance-view {
-            flex: 0 0 33.3333%;
+            flex: 0 0 25%;
             min-width: 0;
             height: 100%;
             min-height: 0;
@@ -1285,6 +1290,20 @@
             overflow-y: auto;
             padding-right: 4px;
         }
+
+        .performance-health-view {
+            display: block;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        /* 策略健康子视图：状态徽章（与独立页 /strategy_health 同一套类名） */
+        .status-ok { background:#d1fae5; color:#065f46; }
+        .status-observe { background:#e5e7eb; color:#374151; }
+        .status-yellow { background:#fef3c7; color:#92400e; }
+        .status-red { background:#fee2e2; color:#991b1b; }
+        .status-disabled { background:#f3f4f6; color:#6b7280; }
+        .gate-chip { display:inline-block; padding:2px 8px; border-radius:9999px; font-size:12px; margin:2px 4px 2px 0; }
 
         .asset-card {
             background: #fff;
@@ -1611,7 +1630,6 @@
                 <div class="text-sm font-semibold">
                     <span id="runtime" class="bg-green-100 text-green-800 px-3 py-1 rounded-full">策略已运行: 0天</span>
                 </div>
-                <a href="/strategy_health" class="text-sm font-semibold text-gray-500 hover:text-primary transition-colors">策略健康</a>
                 <a href="/skeleton" class="text-sm font-semibold text-gray-500 hover:text-primary transition-colors">系统骨架</a>
                 <a href="/logout" class="text-sm font-semibold text-gray-500 hover:text-red-500 transition-colors">退出登录</a>
             </div>
@@ -1636,6 +1654,9 @@
                         </button>
                         <button type="button" class="performance-view-button" data-performance-view="assets" role="tab" aria-selected="false">
                             <i class="fa fa-briefcase mr-1"></i>资产
+                        </button>
+                        <button type="button" class="performance-view-button" data-performance-view="health" role="tab" aria-selected="false" title="策略健康（Sentinel M1–M5）">
+                            <i class="fa fa-heartbeat mr-1"></i>策略健康
                         </button>
                     </div>
                 </div>
@@ -1795,6 +1816,10 @@
                                 </div>
                                 <div class="text-xs text-gray-500 mt-2" id="asset-top-note">资产 = 持仓均价 × 数量 + 累计盈亏；无仓位则不显示</div>
                             </section>
+                        </div>
+
+                        <div id="performance-health-view" class="performance-view performance-health-view" role="tabpanel" aria-hidden="true">
+{% include '_strategy_health_view.html' %}
                         </div>
                     </div>
                 </div>
@@ -4032,9 +4057,11 @@
         function setPerformanceView(view) {
             const isPnlView = view === 'pnl';
             const isAssetsView = view === 'assets';
+            const isHealthView = view === 'health';
             if (performanceViewTrack) {
                 performanceViewTrack.classList.toggle('is-pnl', isPnlView);
                 performanceViewTrack.classList.toggle('is-assets', isAssetsView);
+                performanceViewTrack.classList.toggle('is-health', isHealthView);
             }
             performanceViewButtons.forEach(button => {
                 const active = button.dataset.performanceView === view;
@@ -4042,11 +4069,12 @@
                 button.setAttribute('aria-selected', String(active));
             });
             if (performanceViewTitle) {
-                performanceViewTitle.textContent = isAssetsView ? '资产总览' : (isPnlView ? '交易系统盈亏' : '策略发帖动态');
+                performanceViewTitle.textContent = isHealthView ? '策略健康' : (isAssetsView ? '资产总览' : (isPnlView ? '交易系统盈亏' : '策略发帖动态'));
             }
-            document.getElementById('performance-post-view')?.setAttribute('aria-hidden', String(isPnlView || isAssetsView));
+            document.getElementById('performance-post-view')?.setAttribute('aria-hidden', String(isPnlView || isAssetsView || isHealthView));
             document.getElementById('performance-pnl-view')?.setAttribute('aria-hidden', String(!isPnlView));
             document.getElementById('performance-assets-view')?.setAttribute('aria-hidden', String(!isAssetsView));
+            document.getElementById('performance-health-view')?.setAttribute('aria-hidden', String(!isHealthView));
             if (isPnlView) {
                 window.setTimeout(() => {
                     profitCurveChart?.resize();

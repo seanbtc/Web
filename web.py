@@ -2895,7 +2895,7 @@ def update_bottom_data():
 # 主页
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', health=load_strategy_health())
 
 
 @app.route('/skeleton')
