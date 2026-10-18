@@ -1264,26 +1264,22 @@
 
         .performance-view-track {
             display: flex;
-            width: 400%;
+            width: 300%;
             height: 100%;
             transition: transform 360ms cubic-bezier(0.22, 0.61, 0.36, 1);
             will-change: transform;
         }
 
         .performance-view-track.is-pnl {
-            transform: translateX(-25%);
+            transform: translateX(-33.3333%);
         }
 
         .performance-view-track.is-assets {
-            transform: translateX(-50%);
-        }
-
-        .performance-view-track.is-health {
-            transform: translateX(-75%);
+            transform: translateX(-66.6667%);
         }
 
         .performance-view {
-            flex: 0 0 25%;
+            flex: 0 0 33.3333%;
             min-width: 0;
             height: 100%;
             min-height: 0;
@@ -1302,13 +1298,7 @@
             padding-right: 4px;
         }
 
-        .performance-health-view {
-            display: block;
-            overflow-y: auto;
-            padding-right: 4px;
-        }
-
-        /* 策略健康子视图：状态徽章（与独立页 /strategy_health 同一套类名） */
+        /* 策略健康（「策略模块」区块内切换）：状态徽章（与独立页 /strategy_health 同一套类名） */
         .status-ok { background:#d1fae5; color:#065f46; }
         .status-observe { background:#e5e7eb; color:#374151; }
         .status-yellow { background:#fef3c7; color:#92400e; }
@@ -1666,9 +1656,6 @@
                         <button type="button" class="performance-view-button" data-performance-view="assets" role="tab" aria-selected="false">
                             <i class="fa fa-briefcase mr-1"></i>资产
                         </button>
-                        <button type="button" class="performance-view-button" data-performance-view="health" role="tab" aria-selected="false" title="策略健康（Sentinel M1–M5）">
-                            <i class="fa fa-heartbeat mr-1"></i>策略健康
-                        </button>
                     </div>
                 </div>
 
@@ -1828,10 +1815,6 @@
                                 <div class="text-xs text-gray-500 mt-2" id="asset-top-note">资产 = 持仓均价 × 数量 + 累计盈亏；无仓位则不显示</div>
                             </section>
                         </div>
-
-                        <div id="performance-health-view" class="performance-view performance-health-view" role="tabpanel" aria-hidden="true">
-{% include '_strategy_health_view.html' %}
-                        </div>
                     </div>
                 </div>
             </div>
@@ -1840,18 +1823,27 @@
         <!-- 策略模块（原带单）-->
         <section id="lead-section" class="mb-12 bg-gray-100 rounded-xl p-6 panel-section">
             <div class="mb-6">
-                <div class="flex items-center mb-3">
+                <div class="flex flex-wrap items-center gap-2 mb-3">
                     <div class="w-10 h-10 bg-cyan-100 rounded-full flex items-center justify-center mr-3">
                         <i class="fa fa-users text-cyan-600 text-xl"></i>
                     </div>
                     <h3 class="text-lg font-semibold text-dark">策略模块</h3>
+                    <div class="performance-view-toggle ml-auto" role="tablist" aria-label="策略模块 / 策略健康 切换">
+                        <button type="button" class="performance-view-button is-active" data-lead-view="module" role="tab" aria-selected="true">
+                            <i class="fa fa-users mr-1"></i>策略模块
+                        </button>
+                        <button type="button" class="performance-view-button" data-lead-view="health" role="tab" aria-selected="false" title="策略健康（Sentinel M1–M5）">
+                            <i class="fa fa-heartbeat mr-1"></i>策略健康
+                        </button>
+                    </div>
                 </div>
-                <div class="flex items-center mb-4">
+                <div id="lead-status-row" class="flex items-center mb-4">
                     <span class="text-xs font-medium text-gray-500 mr-2">状态:</span>
                     <span class="px-2 py-1 rounded-full text-xs font-semibold" id="lead-status">运行</span>
                 </div>
             </div>
 
+            <div id="lead-module-view" class="flex flex-col flex-1 min-h-0">
             <div class="bg-white rounded-xl shadow-md p-6 mb-6">
                 <h4 class="text-lg font-semibold text-dark mb-4">本轮盈亏</h4>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -1897,6 +1889,11 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+            </div>
+
+            <div id="lead-health-view" class="flex-1 min-h-0 overflow-y-auto" style="display: none;">
+{% include '_strategy_health_view.html' %}
             </div>
         </section>
 
@@ -4068,11 +4065,9 @@
         function setPerformanceView(view) {
             const isPnlView = view === 'pnl';
             const isAssetsView = view === 'assets';
-            const isHealthView = view === 'health';
             if (performanceViewTrack) {
                 performanceViewTrack.classList.toggle('is-pnl', isPnlView);
                 performanceViewTrack.classList.toggle('is-assets', isAssetsView);
-                performanceViewTrack.classList.toggle('is-health', isHealthView);
             }
             performanceViewButtons.forEach(button => {
                 const active = button.dataset.performanceView === view;
@@ -4080,12 +4075,11 @@
                 button.setAttribute('aria-selected', String(active));
             });
             if (performanceViewTitle) {
-                performanceViewTitle.textContent = isHealthView ? '策略健康' : (isAssetsView ? '资产总览' : (isPnlView ? '交易系统盈亏' : '策略发帖动态'));
+                performanceViewTitle.textContent = isAssetsView ? '资产总览' : (isPnlView ? '交易系统盈亏' : '策略发帖动态');
             }
-            document.getElementById('performance-post-view')?.setAttribute('aria-hidden', String(isPnlView || isAssetsView || isHealthView));
+            document.getElementById('performance-post-view')?.setAttribute('aria-hidden', String(isPnlView || isAssetsView));
             document.getElementById('performance-pnl-view')?.setAttribute('aria-hidden', String(!isPnlView));
             document.getElementById('performance-assets-view')?.setAttribute('aria-hidden', String(!isAssetsView));
-            document.getElementById('performance-health-view')?.setAttribute('aria-hidden', String(!isHealthView));
             if (isPnlView) {
                 window.setTimeout(() => {
                     profitCurveChart?.resize();
@@ -4105,9 +4099,31 @@
             button.addEventListener('click', () => setPerformanceView(button.dataset.performanceView));
         });
 
-        // 深链：?view=health 直接定位「策略健康」标签（书签/分享用）
+        // ===== 「策略模块」区块视图切换（策略模块 / 策略健康，同一主题）=====
+        const leadViewButtons = document.querySelectorAll('[data-lead-view]');
+
+        function setLeadView(view) {
+            const isHealthView = view === 'health';
+            const moduleView = document.getElementById('lead-module-view');
+            const healthView = document.getElementById('lead-health-view');
+            const statusRow = document.getElementById('lead-status-row');
+            if (moduleView) moduleView.style.display = isHealthView ? 'none' : '';
+            if (healthView) healthView.style.display = isHealthView ? '' : 'none';
+            if (statusRow) statusRow.style.display = isHealthView ? 'none' : '';
+            leadViewButtons.forEach(button => {
+                const active = button.dataset.leadView === view;
+                button.classList.toggle('is-active', active);
+                button.setAttribute('aria-selected', String(active));
+            });
+        }
+
+        leadViewButtons.forEach(button => {
+            button.addEventListener('click', () => setLeadView(button.dataset.leadView));
+        });
+
+        // 深链：?view=health 直接定位「策略模块」区内的策略健康视图（书签/分享用）
         if (new URLSearchParams(window.location.search).get('view') === 'health') {
-            setPerformanceView('health');
+            setLeadView('health');
         }
 
         // ===== 竖屏帖子/盈亏等高同步 =====

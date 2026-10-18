@@ -96,16 +96,17 @@ def test_strategy_health_requires_login(client):
     assert resp.status_code in (301, 302)
 
 
-def test_index_has_health_tab(tmp_path, monkeypatch, client):
-    """策略健康已并入看板中央视图（帖子/盈亏/资产/策略健康）：标签与内容随首页渲染。"""
+def test_index_has_health_in_lead_section(tmp_path, monkeypatch, client):
+    """策略健康并入「策略模块」区块（同区切换；中央切换器保持 帖子/盈亏/资产 三标签）。"""
     snap = tmp_path / 'snap.json'
     snap.write_text(json.dumps(_snapshot(), ensure_ascii=False), encoding='utf-8')
     monkeypatch.setenv('SENTINEL_SNAPSHOT_PATHS', str(snap))
     _login(client)
     html = client.get('/').get_data(as_text=True)
-    for marker in ('data-performance-view="health"', 'performance-health-view',
-                   'performance-view-track.is-health', '策略健康',
+    for marker in ('data-lead-view="module"', 'data-lead-view="health"',
+                   'id="lead-module-view"', 'id="lead-health-view"',
                    'btc.um.long', '组合净敞口',
                    "get('view') === 'health'"):
         assert marker in html, f'缺少标记: {marker}'
     assert 'href="/strategy_health"' not in html
+    assert html.count('data-performance-view=') == 3
