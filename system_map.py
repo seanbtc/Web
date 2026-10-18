@@ -113,6 +113,9 @@ LAYERS = [
              'desc': '本页所在：交易/帖子/盈亏/系统骨架', 'caps': ['登录门禁']},
             {'id': 'promo', 'name': 'Promo', 'status': 'live', 'service': 'promo',
              'desc': '交易帖自动发布 + 内容资产', 'caps': ['AI 主笔', '屏蔽降级']},
+            {'id': 'arbitrage', 'name': 'Arbitrage', 'status': 'live', 'service': 'arbitrage',
+             'desc': 'U 本位现货对冲套利（R12：清单可见 + 进程巡检；默认不随统一启停，防重复实例）',
+             'caps': ['独立进程', '只告警不自动重启']},
         ],
     },
     {
