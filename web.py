@@ -2905,6 +2905,57 @@ def skeleton():
     from system_map import view_model
     return render_template('skeleton.html', system_map=view_model())
 
+
+def _sentinel_snapshot_paths():
+    """Sentinel 快照路径（环境变量 SENTINEL_SNAPSHOT_PATHS，逗号分隔；默认两实例）。"""
+    raw = str(os.getenv('SENTINEL_SNAPSHOT_PATHS') or '').strip()
+    if raw:
+        return [item.strip() for item in raw.split(',') if item.strip()]
+    base = os.path.dirname(os.path.abspath(__file__))
+    return [os.path.join(base, '..', 'Sentinel', 'data', 'sentinel_snapshot.json'),
+            os.path.join(base, '..', 'Sentinel', 'data-um-short', 'sentinel_snapshot.json')]
+
+
+def load_strategy_health():
+    """读取 Sentinel 快照（只读；缺失/损坏跳过），返回策略健康视图模型。"""
+    entries = []
+    for path in _sentinel_snapshot_paths():
+        try:
+            with open(path, 'r', encoding='utf-8') as handle:
+                snapshot = json.load(handle)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(snapshot, dict):
+            continue
+        directions = []
+        for name, branch in (snapshot.get('directions') or {}).items():
+            if not isinstance(branch, dict):
+                continue
+            directions.append({
+                'name': name,
+                'overall_status': branch.get('overall_status'),
+                'gates': [{'name': key, 'status': (value or {}).get('status'),
+                           'evidence': ((value or {}).get('evidence') or [])[:2]}
+                          for key, value in (branch.get('gates') or {}).items()],
+                'distribution': branch.get('distribution_health') or {},
+                'params_guard': branch.get('params_guard') or {},
+                'alignment': branch.get('alignment') or {},
+            })
+        entries.append({
+            'pair': snapshot.get('pair'),
+            'mode': snapshot.get('mode'),
+            'generated_at': snapshot.get('generated_at') or (snapshot.get('heartbeat') or {}).get('ts'),
+            'health': snapshot.get('health') or {},
+            'directions': directions,
+        })
+    return {'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 'entries': entries}
+
+
+@app.route('/strategy_health')
+def strategy_health():
+    """策略健康页（登录门禁自动保护）：Sentinel M1–M5（参数/对齐/分布/建议）。"""
+    return render_template('strategy_health.html', health=load_strategy_health())
+
 # 上下文处理器
 @app.context_processor
 def inject_datetime():

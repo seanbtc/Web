@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>策略健康 · Sentinel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .status-ok { background:#d1fae5; color:#065f46; }
+        .status-observe { background:#e5e7eb; color:#374151; }
+        .status-yellow { background:#fef3c7; color:#92400e; }
+        .status-red { background:#fee2e2; color:#991b1b; }
+        .status-disabled { background:#f3f4f6; color:#6b7280; }
+        .gate-chip { display:inline-block; padding:2px 8px; border-radius:9999px; font-size:12px; margin:2px 4px 2px 0; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+<header class="bg-white shadow-sm">
+    <div class="container mx-auto px-4 py-4 flex items-center justify-between">
+        <h1 class="text-lg font-semibold text-gray-800">策略健康（Sentinel M1–M5）</h1>
+        <div class="text-sm text-gray-500">
+            <a href="/" class="hover:text-blue-600 mr-4">返回看板</a>
+            <a href="/skeleton" class="hover:text-blue-600">系统骨架</a>
+        </div>
+    </div>
+</header>
+
+<main class="container mx-auto px-4 py-6">
+    <p class="text-xs text-gray-500 mb-4">数据源：Sentinel 快照（只读，更新于 {{ health.generated_at }}）</p>
+
+    {% if not health.entries %}
+    <div class="bg-white rounded-xl shadow p-6 text-gray-500">
+        暂无 Sentinel 快照（检查 Sentinel 双实例是否运行，或 <code>SENTINEL_SNAPSHOT_PATHS</code> 配置）。
+    </div>
+    {% endif %}
+
+    {% for entry in health.entries %}
+    {% set hs = entry.health or {} %}
+    <section class="bg-white rounded-xl shadow mb-6 p-6">
+        <div class="flex items-center justify-between mb-3">
+            <div>
+                <h2 class="text-base font-semibold text-gray-800">{{ entry.pair }}</h2>
+                <p class="text-xs text-gray-400">快照时间：{{ entry.generated_at }}</p>
+            </div>
+            <span class="gate-chip status-{{ hs.status or 'observe' }}">总体：{{ hs.status or 'observe' }}</span>
+        </div>
+
+        <p class="text-sm text-gray-700 mb-3">{{ hs.recommendation or '（无建议）' }}</p>
+        {% if hs.reasons %}
+        <ul class="text-xs text-gray-600 list-disc list-inside mb-3">
+            {% for reason in hs.reasons[:6] %}<li>{{ reason }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+        {% if hs.suggested_commands %}
+        <div class="bg-gray-50 rounded p-3 mb-4">
+            <div class="text-xs text-gray-500 mb-1">建议命令（人工执行）</div>
+            {% for command in hs.suggested_commands %}<div class="text-xs font-mono text-gray-700">{{ command }}</div>{% endfor %}
+        </div>
+        {% endif %}
+
+        {% for direction in entry.directions %}
+        <div class="border-t pt-3 mt-3">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="text-sm font-semibold text-gray-700">{{ direction.name }}</span>
+                <span class="gate-chip status-{{ direction.overall_status or 'observe' }}">总状态 {{ direction.overall_status or 'observe' }}</span>
+                {% for gate in direction.gates %}
+                <span class="gate-chip status-{{ gate.status or 'ok' }}">{{ gate.name }}={{ gate.status or 'ok' }}</span>
+                {% endfor %}
+            </div>
+
+            {% set dist = direction.distribution or {} %}
+            {% set metrics = dist.metrics or {} %}
+            {% if metrics %}
+            <div class="text-xs text-gray-600 mb-1">
+                分布（{{ dist.status }}）：腿数 {{ metrics.n_legs }}（{{ (dist.sample or {}).months }} 月）
+                ・胜率 {{ metrics.win_rate_pct }}% ・PF {{ metrics.profit_factor }}
+                ・腿/年 {{ metrics.legs_per_year }} ・连亏 max {{ metrics.max_losing_streak }}
+            </div>
+            {% endif %}
+
+            {% set guard = direction.params_guard or {} %}
+            {% if guard.status %}
+            <div class="text-xs text-gray-600 mb-1">参数一致性：{{ guard.status }}</div>
+            {% endif %}
+
+            {% set alignment = direction.alignment or {} %}
+            {% if alignment.pairs_n is not none %}
+            <div class="text-xs text-gray-600 mb-1">
+                开仓对齐：配对 {{ alignment.pairs_n }} ・漏单 {{ alignment.replay_missing_n }} ・多单 {{ alignment.live_extra_n }}
+                ・延迟 p90 {{ alignment.latency_seconds.p90 if alignment.latency_seconds else '-' }}s
+                ・价格偏差 p95 {{ alignment.price_bps.p95 if alignment.price_bps else '-' }}bps
+            </div>
+            {% endif %}
+
+            {% for gate in direction.gates if gate.status in ('yellow', 'red') %}
+            {% for line in gate.evidence %}
+            <div class="text-xs text-red-600">{{ gate.name }}：{{ line }}</div>
+            {% endfor %}
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </section>
+    {% endfor %}
+</main>
+</body>
+</html>
