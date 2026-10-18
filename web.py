@@ -2971,6 +2971,26 @@ def _health_status_label(status):
     return _HEALTH_STATUS_LABELS.get(status, status)
 
 
+_HEALTH_EVIDENCE_LABELS = {
+    'code_commit': '引擎版本变化',
+    'data_sha256': '数据文件变化',
+    'params_sha256': '参数哈希不一致',
+    'effective_fields': '生效参数对比',
+    'anchor_exists': '锚状态',
+    'effective_exists': '生效快照',
+}
+
+
+def _health_humanize(text):
+    """证据串人话化：检查名转中文，anchor/current 转「锚 X → 现 Y」。"""
+    out = str(text or '')
+    for prefix, label in _HEALTH_EVIDENCE_LABELS.items():
+        if out.startswith(prefix + ':'):
+            out = label + '：' + out[len(prefix) + 1:].strip()
+            break
+    return out.replace('anchor=', '锚 ').replace(' current=', ' → 现 ')
+
+
 def _format_snapshot_time(value):
     """快照时间 -> 'MM-DD HH:MM'（北京时间）；空/解析失败原样返回。"""
     text = str(value or '').strip()
@@ -3000,7 +3020,7 @@ def _health_guard_display(guard):
         for item in bad[:2]:
             name = str(item.get('name') or '').strip()
             text = str(item.get('detail') or '').strip()
-            lines.append(f'{name}: {text}' if name else text)
+            lines.append(_health_humanize(f'{name}: {text}' if name else text))
         detail = '；'.join([line for line in lines if line]) or '待复核'
     return {'status': status, 'label': _health_status_label(status), 'detail': detail}
 
@@ -3068,26 +3088,29 @@ def _health_direction_display(name, branch):
     """单方向：三个模块（M1/M2/M3）+ 其余闸门汇总 + 黄/红证据。"""
     branch = branch if isinstance(branch, dict) else {}
     gates = branch.get('gates') if isinstance(branch.get('gates'), dict) else {}
-    problems, evidence, ok_n = [], [], 0
+    problems, pending, evidence, ok_n = [], 0, [], 0
     for key, gate in gates.items():
         gate = gate if isinstance(gate, dict) else {}
         status = str(gate.get('status') or 'observe')
         if key not in ('g5_params_guard', 'g6_alignment', 'g7_distribution'):
             if status == 'ok':
                 ok_n += 1
-            else:
+            elif status in ('yellow', 'red'):
                 problems.append({'label': _HEALTH_GATE_LABELS.get(key, key),
                                  'status': status, 'status_label': _health_status_label(status)})
+            else:
+                pending += 1  # observe/disabled：未判定，不算问题
         if status in ('yellow', 'red'):
             for line in (gate.get('evidence') or [])[:2]:
                 evidence.append({'gate': _HEALTH_GATE_LABELS.get(key, key),
-                                 'status': status, 'line': str(line)})
+                                 'status': status, 'line': _health_humanize(line)})
     return {
         'name': name,
         'guard': _health_guard_display(branch.get('params_guard')),
         'align': _health_align_display(branch.get('alignment_gate')),
         'dist': _health_dist_display(branch.get('distribution_health')),
         'other_ok_n': ok_n,
+        'other_pending_n': pending,
         'other_problems': problems,
         'evidence': evidence,
     }

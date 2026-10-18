@@ -84,13 +84,19 @@
 
         <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
             <span>其他闸门：</span>
-            {% if not direction.other_problems %}
-            <span>订单对账 / 单腿收益 / 连亏空窗 / 收益带 / 浮亏回撤 —— 全部正常 ✓{% if direction.other_ok_n %}（{{ direction.other_ok_n }} 项）{% endif %}</span>
-            {% else %}
+            {% if direction.other_problems %}
             {% for gate in direction.other_problems %}
             <span class="gate-chip status-{{ gate.status }}">{{ gate.label }} {{ gate.status_label }}</span>
             {% endfor %}
-            {% if direction.other_ok_n %}<span>其余 {{ direction.other_ok_n }} 项正常</span>{% endif %}
+            <span>其余：{% if direction.other_ok_n %}正常 {{ direction.other_ok_n }} 项{% if direction.other_pending_n %} ・ {% endif %}{% endif %}{% if direction.other_pending_n %}未判定 {{ direction.other_pending_n }} 项{% endif %}</span>
+            {% elif direction.other_pending_n and direction.other_ok_n %}
+            <span>正常 {{ direction.other_ok_n }} 项 ・ 未判定 {{ direction.other_pending_n }} 项（暂无实盘数据，不作判定）</span>
+            {% elif direction.other_pending_n %}
+            <span>未判定 {{ direction.other_pending_n }} 项（暂无实盘数据，不作判定）</span>
+            {% elif direction.other_ok_n %}
+            <span>订单对账 / 单腿收益 / 连亏空窗 / 收益带 / 浮亏回撤 —— 全部正常 ✓（{{ direction.other_ok_n }} 项）</span>
+            {% else %}
+            <span>—</span>
             {% endif %}
         </div>
 

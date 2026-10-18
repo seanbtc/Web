@@ -47,10 +47,16 @@ def _snapshot(pair='btc.um.long', direction='long', status='yellow'):
             'overall_status': status,
             'gates': {'g0_order_diff': {'status': 'ok', 'evidence': []},
                       'g1_single_leg': {'status': 'ok', 'evidence': []},
+                      'g5_params_guard': {'status': 'yellow',
+                                          'evidence': ['code_commit: anchor=cb623830eb current=bed37c2044']},
                       'g6_alignment': {'status': 'yellow', 'evidence': ['多单 1（实盘多出于回放）']}},
-            'params_guard': {'status': 'ok',
+            'params_guard': {'status': 'yellow',
                              'checks': [{'name': 'params_sha256', 'ok': True,
-                                         'detail': 'anchor=abc123… current=abc123…'}]},
+                                         'detail': 'anchor=abc123… current=abc123…'},
+                                        {'name': 'code_commit', 'ok': False,
+                                         'detail': 'anchor=cb623830eb current=bed37c2044'},
+                                        {'name': 'data_sha256', 'ok': False,
+                                         'detail': 'anchor=f0c77797e4db… current=081c4b2c6161…'}]},
             'alignment_gate': {'status': 'yellow', 'evidence': ['多单 1（实盘多出于回放）'],
                                'metrics': {'pairs_n': 3, 'live_extra_n': 1, 'replay_missing_n': 0,
                                            'latency_p90_seconds': 30, 'latency_max_seconds': 45,
@@ -89,7 +95,10 @@ def _observe_snapshot(pair='btc.um.long', direction='long'):
                    'suggested_commands': []},
         'directions': {direction: {
             'overall_status': 'observe',
-            'gates': {'g0_order_diff': {'status': 'ok', 'evidence': []}},
+            'gates': {name: {'status': 'observe',
+                             'evidence': ['窗口内无实盘数据（自 live 起点以来无订单）']}
+                      for name in ('g0_order_diff', 'g1_single_leg', 'g2_streak_and_gap',
+                                   'g3_cumulative_band', 'g4_float_and_drawdown')},
             'params_guard': {'status': 'ok',
                              'checks': [{'name': 'params_sha256', 'ok': True,
                                          'detail': 'anchor=x current=x'}]},
@@ -129,7 +138,9 @@ def test_strategy_health_page_renders_snapshot(tmp_path, monkeypatch, client):
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
     for marker in ('策略健康', 'btc.um.long', '参数一致性', '开仓对齐', '分布健康',
-                   '锚与生效参数一致', '配对 3', '漏单 0', '多单 1',
+                   '引擎版本变化：锚 cb623830eb → 现 bed37c2044',
+                   '数据文件变化：锚 f0c77797e4db… → 现 081c4b2c6161…',
+                   '配对 3', '漏单 0', '多单 1',
                    '延迟 p90 30s', '偏差 p95 4.2bps',
                    '3/10 腿 · 0.50/1 月', '样本积累中',
                    '组合净敞口', '其他闸门', '全部正常', 'status-bg-yellow',
@@ -146,8 +157,9 @@ def test_strategy_health_observe_state_no_noise(tmp_path, monkeypatch, client):
     _login(client)
     html = client.get('/strategy_health').get_data(as_text=True)
     for marker in ('暂无配对样本', '样本积累中', '0/10 腿 · 0.00/1 月',
-                   '锚与生效参数一致', '全部正常'):
+                   '锚与生效参数一致', '未判定 5 项（暂无实盘数据，不作判定）'):
         assert marker in html, f'缺少标记: {marker}'
+    assert '全部正常' not in html
     assert 'None' not in html
     assert '延迟 p90' not in html
 
