@@ -45,6 +45,28 @@
             <span class="gate-chip status-{{ hs.status or 'observe' }}">总体：{{ hs.status or 'observe' }}</span>
         </div>
 
+        {% if entry.portfolio %}
+        {% set pf = entry.portfolio %}
+        <div class="mb-3 border border-gray-200 rounded-lg p-3 bg-gray-50">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="text-sm font-medium text-gray-800">组合净敞口（双腿合并）</span>
+                <span class="gate-chip status-{{ pf.status }}">{{ pf.status }}</span>
+                {% if pf.mode == 'observe' %}<span class="text-xs text-gray-400">仅记录（未启用告警）</span>{% endif %}
+            </div>
+            <div class="text-xs text-gray-600 grid grid-cols-2 md:grid-cols-3 gap-1">
+                <div>净敞口：<b>{{ pf.net_size }}</b> BTC（long {{ pf.long_size }} / short {{ pf.short_size }}）</div>
+                <div>净名义 / 总名义：{{ pf.net_notional }} / {{ pf.gross_notional }}</div>
+                <div>合计净值：{{ pf.combined_equity }}｜净比 {{ pf.net_ratio }} / 总比 {{ pf.gross_ratio }}</div>
+                <div>标记价：{{ pf.mark_price }}</div>
+            </div>
+            {% if pf.reasons %}
+            <ul class="text-xs text-gray-500 list-disc list-inside mt-1">
+                {% for reason in pf.reasons %}<li>{{ reason }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% endif %}
+
         <p class="text-sm text-gray-700 mb-3">{{ hs.recommendation or '（无建议）' }}</p>
         {% if hs.reasons %}
         <ul class="text-xs text-gray-600 list-disc list-inside mb-3">

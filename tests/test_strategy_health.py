@@ -55,6 +55,14 @@ def _snapshot(pair='btc.um.long', direction='long', status='yellow'):
             'alignment': {'pairs_n': 3, 'replay_missing_n': 0, 'live_extra_n': 1,
                           'latency_seconds': {'p90': 30}, 'price_bps': {'p95': 4.2}},
         }},
+        'portfolio': {
+            'status': 'observe', 'mode': 'observe', 'symbol': 'BTCUSDT',
+            'mark_price': 80000.0, 'net_size': -0.01, 'gross_size': 0.03,
+            'net_notional': -800.0, 'gross_notional': 2400.0,
+            'combined_equity': 10000.0, 'net_ratio': -0.08, 'gross_ratio': 0.24,
+            'legs': {'long': {'exchange_size': 0.02}, 'short': {'exchange_size': -0.03}},
+            'reasons': ['mode=observe：超阈仅记录'],
+        },
     }
 
 
@@ -71,7 +79,7 @@ def test_strategy_health_page_renders_snapshot(tmp_path, monkeypatch, client):
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
     for marker in ('策略健康', 'btc.um.long', '开仓对齐', '参数一致性',
-                   'params_anchor.py', '多单 1'):
+                   'params_anchor.py', '多单 1', '组合净敞口'):
         assert marker in html, f'缺少标记: {marker}'
 
 

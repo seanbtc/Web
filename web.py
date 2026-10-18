@@ -2915,6 +2915,36 @@ def _sentinel_snapshot_paths():
             os.path.join(base, '..', 'Sentinel', 'data-um-short', 'sentinel_snapshot.json')]
 
 
+def _portfolio_view_model(portfolio):
+    """R9：Sentinel 快照 portfolio 段 → 页面字符串模型（缺字段一律 '—'）。"""
+    if not isinstance(portfolio, dict):
+        return None
+
+    def _num(value, pattern):
+        try:
+            return pattern.format(float(value))
+        except (TypeError, ValueError):
+            return '—'
+
+    legs = portfolio.get('legs') or {}
+    net_ratio = portfolio.get('net_ratio')
+    gross_ratio = portfolio.get('gross_ratio')
+    return {
+        'status': portfolio.get('status') or 'observe',
+        'mode': portfolio.get('mode') or '',
+        'net_size': _num(portfolio.get('net_size'), '{:+.6f}'),
+        'long_size': _num((legs.get('long') or {}).get('exchange_size'), '{:+.6f}'),
+        'short_size': _num((legs.get('short') or {}).get('exchange_size'), '{:+.6f}'),
+        'net_notional': _num(portfolio.get('net_notional'), '{:+,.0f}'),
+        'gross_notional': _num(portfolio.get('gross_notional'), '{:,.0f}'),
+        'combined_equity': _num(portfolio.get('combined_equity'), '{:,.2f}'),
+        'net_ratio': '—' if net_ratio is None else _num(net_ratio, '{:+.2f}×'),
+        'gross_ratio': '—' if gross_ratio is None else _num(gross_ratio, '{:.2f}×'),
+        'mark_price': _num(portfolio.get('mark_price'), '{:,.2f}'),
+        'reasons': portfolio.get('reasons') or [],
+    }
+
+
 def load_strategy_health():
     """读取 Sentinel 快照（只读；缺失/损坏跳过），返回策略健康视图模型。"""
     entries = []
@@ -2940,12 +2970,15 @@ def load_strategy_health():
                 'params_guard': branch.get('params_guard') or {},
                 'alignment': branch.get('alignment') or {},
             })
+        portfolio = snapshot.get('portfolio')
+        portfolio_model = _portfolio_view_model(portfolio)
         entries.append({
             'pair': snapshot.get('pair'),
             'mode': snapshot.get('mode'),
             'generated_at': snapshot.get('generated_at') or (snapshot.get('heartbeat') or {}).get('ts'),
             'health': snapshot.get('health') or {},
             'directions': directions,
+            'portfolio': portfolio_model,
         })
     return {'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 'entries': entries}
 
