@@ -105,6 +105,7 @@ def test_index_has_health_tab(tmp_path, monkeypatch, client):
     html = client.get('/').get_data(as_text=True)
     for marker in ('data-performance-view="health"', 'performance-health-view',
                    'performance-view-track.is-health', '策略健康',
-                   'btc.um.long', '组合净敞口'):
+                   'btc.um.long', '组合净敞口',
+                   "get('view') === 'health'"):
         assert marker in html, f'缺少标记: {marker}'
     assert 'href="/strategy_health"' not in html

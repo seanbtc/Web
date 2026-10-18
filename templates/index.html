@@ -1214,7 +1214,10 @@
 
         .performance-view-toggle {
             display: inline-flex;
-            gap: 0.16rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.3rem 0.16rem;
+            max-width: 100%;
             padding: 0.18rem;
             border: 1px solid rgba(17, 17, 17, 0.08);
             border-radius: 9999px;
@@ -1230,6 +1233,8 @@
             font: inherit;
             font-size: 0.72rem;
             font-weight: 600;
+            white-space: nowrap;
+            flex: 0 0 auto;
             cursor: pointer;
             transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease;
         }
@@ -1242,6 +1247,12 @@
             color: var(--accent-blue);
             background: rgba(255, 255, 255, 0.96);
             box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        @media (max-width: 480px) {
+            .performance-view-button {
+                padding: 0.34rem 0.6rem;
+            }
         }
 
         .performance-viewer {
@@ -4093,6 +4104,11 @@
         performanceViewButtons.forEach(button => {
             button.addEventListener('click', () => setPerformanceView(button.dataset.performanceView));
         });
+
+        // 深链：?view=health 直接定位「策略健康」标签（书签/分享用）
+        if (new URLSearchParams(window.location.search).get('view') === 'health') {
+            setPerformanceView('health');
+        }
 
         // ===== 竖屏帖子/盈亏等高同步 =====
         const portraitPerformanceQuery = window.matchMedia('(max-width: 1199px), (max-aspect-ratio: 5/4)');

@@ -1,15 +1,15 @@
     <p class="text-xs text-gray-500 mb-4">数据源：Sentinel 快照（只读，更新于 {{ health.generated_at }}）</p>
 
     {% if not health.entries %}
-    <div class="bg-white rounded-xl shadow p-6 text-gray-500">
+    <div class="bg-white rounded-xl shadow p-4 md:p-6 text-gray-500">
         暂无 Sentinel 快照（检查 Sentinel 双实例是否运行，或 <code>SENTINEL_SNAPSHOT_PATHS</code> 配置）。
     </div>
     {% endif %}
 
     {% for entry in health.entries %}
     {% set hs = entry.health or {} %}
-    <section class="bg-white rounded-xl shadow mb-6 p-6">
-        <div class="flex items-center justify-between mb-3">
+    <section class="bg-white rounded-xl shadow mb-6 p-4 md:p-6">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
             <div>
                 <h2 class="text-base font-semibold text-gray-800">{{ entry.pair }}</h2>
                 <p class="text-xs text-gray-400">快照时间：{{ entry.generated_at }}</p>
@@ -20,12 +20,12 @@
         {% if entry.portfolio %}
         {% set pf = entry.portfolio %}
         <div class="mb-3 border border-gray-200 rounded-lg p-3 bg-gray-50">
-            <div class="flex items-center gap-2 mb-2">
+            <div class="flex flex-wrap items-center gap-2 mb-2">
                 <span class="text-sm font-medium text-gray-800">组合净敞口（双腿合并）</span>
                 <span class="gate-chip status-{{ pf.status }}">{{ pf.status }}</span>
                 {% if pf.mode == 'observe' %}<span class="text-xs text-gray-400">仅记录（未启用告警）</span>{% endif %}
             </div>
-            <div class="text-xs text-gray-600 grid grid-cols-2 md:grid-cols-3 gap-1">
+            <div class="text-xs text-gray-600 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1">
                 <div>净敞口：<b>{{ pf.net_size }}</b> BTC（long {{ pf.long_size }} / short {{ pf.short_size }}）</div>
                 <div>净名义 / 总名义：{{ pf.net_notional }} / {{ pf.gross_notional }}</div>
                 <div>合计净值：{{ pf.combined_equity }}｜净比 {{ pf.net_ratio }} / 总比 {{ pf.gross_ratio }}</div>
@@ -48,13 +48,13 @@
         {% if hs.suggested_commands %}
         <div class="bg-gray-50 rounded p-3 mb-4">
             <div class="text-xs text-gray-500 mb-1">建议命令（人工执行）</div>
-            {% for command in hs.suggested_commands %}<div class="text-xs font-mono text-gray-700">{{ command }}</div>{% endfor %}
+            {% for command in hs.suggested_commands %}<div class="text-xs font-mono text-gray-700 break-all">{{ command }}</div>{% endfor %}
         </div>
         {% endif %}
 
         {% for direction in entry.directions %}
         <div class="border-t pt-3 mt-3">
-            <div class="flex items-center gap-2 mb-2">
+            <div class="flex flex-wrap items-center gap-2 mb-2">
                 <span class="text-sm font-semibold text-gray-700">{{ direction.name }}</span>
                 <span class="gate-chip status-{{ direction.overall_status or 'observe' }}">总状态 {{ direction.overall_status or 'observe' }}</span>
                 {% for gate in direction.gates %}
