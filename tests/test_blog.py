@@ -202,3 +202,49 @@ def test_missing_markdown_dependency_raises(client, blog, monkeypatch):
     monkeypatch.setattr(web, '_markdown_module', None)
     with pytest.raises(RuntimeError):
         client.get('/blog/' + quote('第一篇'))
+
+
+# --- UI：时间线侧栏 / 宽屏布局 / 细节（2026-10-19 改版） ---------------------
+
+def test_blog_timeline_sidebar_groups_by_year(client, blog):
+    html = client.get('/blog').get_data(as_text=True)
+    assert 'blog-sidebar' in html and '时间线' in html
+    assert 'tl-year' in html
+    assert '2025' in html and '2024' in html
+    assert html.count('1 篇') == 2                      # 两个年份各 1 篇
+    assert 'tl-item' in html and 'tl-link' in html
+    assert 'tl-item is-active' not in html              # 列表页无激活项
+
+
+def test_blog_post_active_timeline_and_reading_time(client, blog):
+    html = client.get('/blog/' + quote('第一篇')).get_data(as_text=True)
+    assert 'tl-item is-active' in html                   # 当前文章高亮
+    assert '分钟阅读' in html
+    assert '上一篇' in html or '下一篇' in html           # 相邻导航
+
+
+def test_blog_reading_minutes_long_post(client, tmp_path, monkeypatch):
+    long_body = '字' * 800                               # 800 字 → ≈2 分钟
+    root = _make_blog(tmp_path, {'L.md': f'---\ntitle: L\ndate: 2024-03-03 00:00:00\n---\n{long_body}\n'})
+    monkeypatch.setattr(web, 'blog_dir', str(root))
+    web._reset_blog_cache()
+    html = client.get('/blog/L').get_data(as_text=True)
+    assert '2 分钟阅读' in html
+
+
+def test_blog_images_lazy_loaded(client, blog):
+    html = client.get('/blog/' + quote('第一篇')).get_data(as_text=True)
+    assert 'loading="lazy"' in html
+    assert 'decoding="async"' in html
+
+
+def test_blog_mobile_drawer_and_to_top_present(client, blog):
+    html = client.get('/blog').get_data(as_text=True)
+    assert 'blog-toc-toggle' in html                     # 移动端目录按钮
+    assert 'blog-to-top' in html                         # 回到顶部
+    assert 'blog-layout' in html                         # 宽屏栅格布局
+
+
+def test_blog_progress_bar_only_on_post(client, blog):
+    assert 'id="blog-progress"' not in client.get('/blog').get_data(as_text=True)
+    assert 'id="blog-progress"' in client.get('/blog/' + quote('第一篇')).get_data(as_text=True)

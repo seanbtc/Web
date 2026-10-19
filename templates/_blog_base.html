@@ -9,20 +9,105 @@
     <link href="/static/blog.css" rel="stylesheet">
 </head>
 <body class="blog-body">
-<div class="blog-shell">
-    <header class="flex items-center justify-between mb-8">
-        <a href="/blog" class="text-xl font-bold text-gray-800 hover:text-blue-600">BStartegy 博客</a>
-        <nav class="flex items-center space-x-4">
-            <a href="/blog" class="text-sm text-gray-500 hover:text-blue-600">全部文章</a>
+<header class="blog-header">
+    <div class="blog-header-inner">
+        <a href="/blog" class="blog-brand">BStartegy 博客</a>
+        <nav class="blog-nav">
+            <a href="/blog">全部文章</a>
             {% if show_dashboard %}
-            <a href="/" class="text-sm text-gray-500 hover:text-blue-600">看板</a>
+            <a href="/">看板</a>
             {% endif %}
         </nav>
-    </header>
-    {% block content %}{% endblock %}
-    <footer class="mt-14 text-center text-xs text-gray-400">
-        BStartegy · 复利之旅
-    </footer>
+    </div>
+</header>
+
+<div class="blog-layout">
+    <aside class="blog-sidebar" id="blog-sidebar" aria-label="时间线导航">
+        <div class="blog-sidebar-inner">
+            <div class="blog-sidebar-title"><i class="fa fa-clock-o" aria-hidden="true"></i>时间线</div>
+            {% include '_blog_timeline.html' %}
+        </div>
+    </aside>
+    <main class="blog-main">
+        {% block content %}{% endblock %}
+    </main>
 </div>
+
+<!-- 移动端目录（抽屉） -->
+<button type="button" class="blog-toc-toggle" id="blog-toc-toggle" aria-expanded="false" aria-controls="blog-sidebar">
+    <i class="fa fa-list-ul" aria-hidden="true"></i><span>目录</span>
+</button>
+<div class="blog-toc-backdrop" id="blog-toc-backdrop"></div>
+
+<!-- 回到顶部 -->
+<button type="button" class="blog-to-top" id="blog-to-top" title="回到顶部" hidden aria-label="回到顶部">
+    <i class="fa fa-arrow-up" aria-hidden="true"></i>
+</button>
+
+<footer class="blog-footer">BStartegy · 复利之旅</footer>
+
+<script>
+(function () {
+    var sidebar = document.getElementById('blog-sidebar');
+    var toggle = document.getElementById('blog-toc-toggle');
+    var backdrop = document.getElementById('blog-toc-backdrop');
+
+    function closeToc() {
+        if (!sidebar) return;
+        sidebar.classList.remove('is-open');
+        toggle.classList.remove('is-open');
+        backdrop.classList.remove('is-open');
+        toggle.setAttribute('aria-expanded', 'false');
+    }
+    if (toggle && sidebar && backdrop) {
+        toggle.addEventListener('click', function () {
+            var open = sidebar.classList.toggle('is-open');
+            toggle.classList.toggle('is-open', open);
+            backdrop.classList.toggle('is-open', open);
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+        backdrop.addEventListener('click', closeToc);
+    }
+
+    // 当前文章：展开所属年份，并滚动到时间线可视区
+    var active = document.querySelector('.tl-item.is-active');
+    if (active) {
+        var detail = active.closest('details');
+        if (detail) detail.open = true;
+        var scroller = document.querySelector('.blog-sidebar-inner');
+        if (scroller && scroller.scrollHeight > scroller.clientHeight) {
+            scroller.scrollTop = Math.max(0, active.offsetTop - scroller.clientHeight / 2);
+        }
+    }
+
+    // 回到顶部
+    var toTop = document.getElementById('blog-to-top');
+    if (toTop) {
+        var onScroll = function () {
+            if (window.scrollY > 400) { toTop.removeAttribute('hidden'); }
+            else { toTop.setAttribute('hidden', ''); }
+        };
+        window.addEventListener('scroll', onScroll, { passive: true });
+        onScroll();
+        toTop.addEventListener('click', function () {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
+
+    // 阅读进度条（仅文章页存在该元素）
+    var progress = document.getElementById('blog-progress');
+    if (progress) {
+        var updateProgress = function () {
+            var doc = document.documentElement;
+            var max = doc.scrollHeight - window.innerHeight;
+            var pct = max > 0 ? Math.min(100, Math.max(0, (window.scrollY / max) * 100)) : 100;
+            progress.style.width = pct + '%';
+        };
+        window.addEventListener('scroll', updateProgress, { passive: true });
+        window.addEventListener('resize', updateProgress);
+        updateProgress();
+    }
+})();
+</script>
 </body>
 </html>

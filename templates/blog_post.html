@@ -1,19 +1,20 @@
 {% extends '_blog_base.html' %}
 {% block title %}{{ post.title }} · BStartegy 博客{% endblock %}
 {% block content %}
-<article class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 md:p-8">
-    <header class="mb-6 pb-4 border-b border-gray-100">
-        <h1 class="text-2xl font-bold text-gray-800 mb-2">{{ post.title }}</h1>
-        <div class="flex flex-wrap items-center text-xs text-gray-400 gap-x-3 gap-y-1">
-            <span>{{ post.date_display }}</span>
+<div class="blog-progress" id="blog-progress"></div>
+
+<article class="post-article">
+    <header class="post-header">
+        <h1 class="post-title">{{ post.title }}</h1>
+        <div class="post-meta">
+            <span><i class="fa fa-calendar-o mr-1"></i>{{ post.date_display }}</span>
+            <span><i class="fa fa-clock-o mr-1"></i>{{ reading_minutes }} 分钟阅读</span>
             {% if post.categories %}
             <span><i class="fa fa-folder-o mr-1"></i>{{ post.categories|join(' / ') }}</span>
             {% endif %}
             {% if post.tags %}
-            <span>
-                {% for tag in post.tags %}
-                <span class="inline-block bg-blue-50 text-blue-500 rounded-full px-2 py-0.5 mr-1">{{ tag }}</span>
-                {% endfor %}
+            <span class="post-meta-tags">
+                {% for tag in post.tags %}<span class="chip chip-sm">{{ tag }}</span>{% endfor %}
             </span>
             {% endif %}
         </div>
@@ -21,19 +22,23 @@
     <div class="blog-content">{{ content|safe }}</div>
 </article>
 
-<nav class="flex items-center justify-between mt-8 text-sm gap-4">
-    <div class="flex-1 min-w-0">
+<nav class="post-nav">
+    <div class="post-nav-cell">
         {% if newer %}
-        <a href="{{ url_for('blog_post', slug=newer.slug) }}" class="text-gray-500 hover:text-blue-600" title="{{ newer.title }}">
-            ← <span class="align-middle">{{ newer.title }}</span>
+        <a class="post-nav-link" href="{{ url_for('blog_post', slug=newer.slug) }}" title="{{ newer.title }}">
+            <span class="post-nav-label">← 上一篇</span>
+            <span class="post-nav-title">{{ newer.title }}</span>
         </a>
         {% endif %}
     </div>
-    <a href="{{ url_for('blog_index') }}" class="text-gray-500 hover:text-blue-600 whitespace-nowrap">全部文章</a>
-    <div class="flex-1 min-w-0 text-right">
+    <div class="post-nav-cell post-nav-center">
+        <a class="post-nav-all" href="{{ url_for('blog_index') }}">全部文章</a>
+    </div>
+    <div class="post-nav-cell post-nav-right">
         {% if older %}
-        <a href="{{ url_for('blog_post', slug=older.slug) }}" class="text-gray-500 hover:text-blue-600" title="{{ older.title }}">
-            <span class="align-middle">{{ older.title }}</span> →
+        <a class="post-nav-link" href="{{ url_for('blog_post', slug=older.slug) }}" title="{{ older.title }}">
+            <span class="post-nav-label">下一篇 →</span>
+            <span class="post-nav-title">{{ older.title }}</span>
         </a>
         {% endif %}
     </div>

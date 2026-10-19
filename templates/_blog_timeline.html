@@ -1,0 +1,24 @@
+{% if timeline %}
+<div class="tl">
+    {% for group in timeline %}
+    <details class="tl-year"{% if loop.first %} open{% endif %}>
+        <summary class="tl-year-summary">
+            <span class="tl-year-label">{{ group.year }}</span>
+            <span class="tl-year-count">{{ group.count }} 篇</span>
+        </summary>
+        <ul class="tl-list">
+            {% for p in group.posts %}
+            <li class="tl-item{% if active_slug == p.slug %} is-active{% endif %}">
+                <a class="tl-link" href="{{ url_for('blog_post', slug=p.slug) }}" title="{{ p.title }}">
+                    <span class="tl-date">{{ p.date_display[5:] }}</span>
+                    <span class="tl-title">{{ p.title }}</span>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </details>
+    {% endfor %}
+</div>
+{% else %}
+<div class="tl-empty">暂无文章</div>
+{% endif %}

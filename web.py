@@ -3260,6 +3260,28 @@ def _blog_excerpt(body, limit=110):
     return text[:limit] + ('…' if len(text) > limit else '')
 
 
+def _build_blog_timeline(posts):
+    """把（按日期倒序的）文章列表按年份分组，供时间线侧栏渲染。"""
+    years = []
+    for post in posts:
+        year = (post.get('date_display') or '')[:4] or '未知'
+        if not years or years[-1]['year'] != year:
+            years.append({'year': year, 'count': 0, 'posts': []})
+        years[-1]['count'] += 1
+        years[-1]['posts'].append(post)
+    return years
+
+
+def _blog_reading_minutes(body):
+    """粗估阅读时长（中文 400 字/分、西文 250 词/分；最少 1 分钟）。"""
+    text = re.sub(r'```.*?```', ' ', body, flags=re.S)
+    text = re.sub(r'!\[[^\]]*\]\([^)]*\)', ' ', text)
+    text = re.sub(r'<[^>]+>', ' ', text)
+    cjk = len(re.findall(r'[\u4e00-\u9fff]', text))
+    words = len(re.findall(r'[A-Za-z0-9]+', text))
+    return max(1, int(round(cjk / 400.0 + words / 250.0)))
+
+
 def _scan_blog_posts():
     """扫描 blog/posts/*.md 构建索引（按日期倒序）。"""
     posts = []
@@ -3339,7 +3361,9 @@ def render_blog_post(slug):
         extension_configs={'codehilite': {'guess_lang': False, 'css_class': 'codehilite'}},
         output_format='html5',
     )
-    return post, html
+    # 图片懒加载（正文图片较多，宽屏下按需加载）
+    html = html.replace('<img ', '<img loading="lazy" decoding="async" ')
+    return post, html, _blog_reading_minutes(body)
 
 
 @app.route('/blog')
@@ -3357,6 +3381,7 @@ def blog_index():
         'blog_list.html',
         posts=posts[start:start + BLOG_PAGE_SIZE],
         total=len(posts), page=page, total_pages=total_pages,
+        timeline=_build_blog_timeline(posts), active_slug=None,
         show_dashboard=session.get('auth') is True,
     )
 
@@ -3367,13 +3392,15 @@ def blog_post(slug):
     result = render_blog_post(slug)
     if result is None:
         abort(404)
-    post, content = result
+    post, content, reading_minutes = result
     posts = load_blog_index()
     position = next((index for index, item in enumerate(posts) if item['slug'] == slug), 0)
     newer = posts[position - 1] if position > 0 else None
     older = posts[position + 1] if position + 1 < len(posts) else None
     return render_template(
-        'blog_post.html', post=post, content=content, newer=newer, older=older,
+        'blog_post.html', post=post, content=content, reading_minutes=reading_minutes,
+        timeline=_build_blog_timeline(posts), active_slug=slug,
+        newer=newer, older=older,
         show_dashboard=session.get('auth') is True,
     )
 
