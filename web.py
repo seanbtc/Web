@@ -15,10 +15,11 @@ if not _disable_eventlet:
     except ImportError:
         pass
 
-from flask import Flask, render_template, jsonify, request, send_from_directory, redirect, session, url_for
+from flask import Flask, render_template, jsonify, request, send_from_directory, redirect, session, url_for, abort
 import json
 import hashlib
 import secrets
+import re
 import requests
 import logging
 import sys
@@ -33,6 +34,18 @@ from flask_socketio import SocketIO
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 if not os.path.exists(data_dir):
     os.makedirs(data_dir)
+
+# 博客（Hexo 迁移，2026-10-19）：内容位于 blog/ 目录（posts/*.md 与 assets/<slug>/*），
+# 公开访问（登录门禁对 /blog 前缀豁免，见 enforce_login_guard）；渲染依赖 Markdown + Pygments。
+blog_dir = os.path.join(os.path.dirname(__file__), 'blog')
+
+try:
+    import markdown as _markdown_module
+except ImportError:  # 缺依赖不拖垮其余功能：仅博客详情页报错（部署须安装 requirements.txt）
+    _markdown_module = None
+
+BLOG_PAGE_SIZE = 20
+_blog_index_cache = {'key': None, 'posts': []}
 
 # AlphaEngine 只读状态文件：默认与 Web 位于同一项目根目录，也可由服务器环境变量覆盖。
 _alpha_engine_state_file = os.getenv('ALPHA_ENGINE_STATE_FILE', '').strip()
@@ -452,6 +465,9 @@ def enforce_login_guard():
 
     path = request.path or '/'
     if path in ('/login', '/logout', '/health') or path.startswith('/static/'):
+        return None
+    # 公开博客：仅豁免 /blog 前缀（精确边界，/blogfoo 等不受影响）
+    if path == '/blog' or path.startswith('/blog/'):
         return None
     # 写接口保持各自 @require_api_token 原有鉴权, 不受登录门禁影响
     if path.startswith('/api/update_'):
@@ -3155,6 +3171,220 @@ def strategy_health():
 @app.context_processor
 def inject_datetime():
     return {'current_datetime': datetime.now()}
+
+
+# ---------------------------------------------------------------------------
+# 博客（公开 /blog；内容 = blog/posts/*.md + blog/assets/<slug>/*，Hexo 迁移 2026-10-19）
+# ---------------------------------------------------------------------------
+
+def _split_blog_front_matter(text):
+    """拆分博客 front matter（'---' 包裹块）；返回 (meta_block 或 None, body)。"""
+    text = text.lstrip('\ufeff')
+    lines = text.split('\n')
+    if not lines or lines[0].strip() != '---':
+        return None, text
+    for index in range(1, len(lines)):
+        if lines[index].strip() == '---':
+            return '\n'.join(lines[1:index]), '\n'.join(lines[index + 1:])
+    return None, text
+
+
+def _parse_blog_meta(block):
+    """解析 title/date/tags/categories 子集（标量 / 逗号 / 列表）；容错优先、不抛错。"""
+    meta = {}
+    current_key = None
+    for raw_line in (block or '').split('\n'):
+        line = raw_line.rstrip()
+        if not line.strip() or line.lstrip().startswith('#'):
+            continue
+        if line.lstrip().startswith('- '):
+            if current_key:
+                item = line.strip()[2:].strip()
+                existing = meta.get(current_key)
+                if isinstance(existing, list):
+                    existing.append(item)
+                elif existing:
+                    meta[current_key] = [existing, item]
+                else:
+                    meta[current_key] = [item]
+            continue
+        if ':' not in line:
+            continue
+        key, _, value = line.partition(':')
+        key = key.strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+            value = value[1:-1]
+        meta[key] = value
+        current_key = key
+    return meta
+
+
+def _blog_meta_list(value):
+    """tags/categories 归一到去重列表（逗号分隔字符串或列表）。"""
+    if not value:
+        return []
+    raw = value if isinstance(value, list) else str(value).split(',')
+    items = []
+    for entry in raw:
+        entry = str(entry).strip()
+        if entry and entry not in items:
+            items.append(entry)
+    return items
+
+
+def _blog_sort_timestamp(date_str):
+    """日期字符串 → 排序时间戳；无法解析返回 0.0（不抛错）。"""
+    value = str(date_str or '').strip()
+    for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(value, fmt).timestamp()
+        except ValueError:
+            continue
+    try:
+        return datetime.strptime(value[:19], '%Y-%m-%d %H:%M:%S').timestamp()
+    except ValueError:
+        return 0.0
+
+
+def _blog_excerpt(body, limit=110):
+    """正文纯文本摘要（剥代码块/图片/链接/标记符），供列表页展示。"""
+    text = re.sub(r'```.*?```', ' ', body, flags=re.S)
+    text = re.sub(r'!\[[^\]]*\]\([^)]*\)', ' ', text)
+    text = re.sub(r'\[([^\]]*)\]\([^)]*\)', r'\1', text)
+    text = re.sub(r'`([^`]*)`', r'\1', text)
+    text = re.sub(r'<[^>]+>', ' ', text)
+    text = re.sub(r'(?m)^\s*(#{1,6}\s*|[-*+]\s+|\d+\.\s+|>\s*)', '', text)
+    text = text.replace('|', ' ')
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text[:limit] + ('…' if len(text) > limit else '')
+
+
+def _scan_blog_posts():
+    """扫描 blog/posts/*.md 构建索引（按日期倒序）。"""
+    posts = []
+    posts_path = os.path.join(blog_dir, 'posts')
+    try:
+        names = sorted(os.listdir(posts_path))
+    except OSError:
+        return posts
+    for name in names:
+        if not name.endswith('.md'):
+            continue
+        try:
+            with open(os.path.join(posts_path, name), 'r', encoding='utf-8-sig') as handle:
+                text = handle.read()
+        except OSError:
+            continue
+        meta_block, body = _split_blog_front_matter(text)
+        meta = _parse_blog_meta(meta_block)
+        slug = name[:-3]
+        date_str = str(meta.get('date') or '').strip()
+        posts.append({
+            'slug': slug,
+            'filename': name,
+            'title': str(meta.get('title') or '').strip() or slug,
+            'date': date_str,
+            'date_display': date_str[:10],
+            'sort_ts': _blog_sort_timestamp(date_str),
+            'tags': _blog_meta_list(meta.get('tags')),
+            'categories': _blog_meta_list(meta.get('categories')),
+            'excerpt': _blog_excerpt(body),
+        })
+    posts.sort(key=lambda item: (item['sort_ts'], item['title']), reverse=True)
+    return posts
+
+
+def _blog_cache_key():
+    """posts 目录 mtime 作为缓存键（mtime 热加载，仿 data/*.json 约定）。"""
+    try:
+        mtime = os.path.getmtime(os.path.join(blog_dir, 'posts'))
+    except OSError:
+        return None
+    return (blog_dir, mtime)
+
+
+def load_blog_index(force=False):
+    """博客索引（进程内缓存，posts 目录 mtime 变化自动重扫）。"""
+    key = _blog_cache_key()
+    if force or key is None or _blog_index_cache['key'] != key:
+        _blog_index_cache['posts'] = _scan_blog_posts() if key is not None else []
+        _blog_index_cache['key'] = key
+    return _blog_index_cache['posts']
+
+
+def _reset_blog_cache():
+    """测试辅助：清空索引缓存。"""
+    _blog_index_cache['key'] = None
+    _blog_index_cache['posts'] = []
+
+
+def render_blog_post(slug):
+    """按 slug 渲染文章；找不到返回 None；缺 Markdown 依赖抛 RuntimeError。"""
+    if _markdown_module is None:
+        raise RuntimeError('博客渲染依赖缺失：请安装 Markdown/Pygments（requirements.txt）')
+    post = next((item for item in load_blog_index() if item['slug'] == slug), None)
+    if post is None:
+        return None
+    try:
+        with open(os.path.join(blog_dir, 'posts', post['filename']),
+                  'r', encoding='utf-8-sig') as handle:
+            text = handle.read()
+    except OSError:
+        return None
+    _, body = _split_blog_front_matter(text)
+    html = _markdown_module.markdown(
+        body,
+        extensions=['extra', 'sane_lists', 'codehilite'],
+        extension_configs={'codehilite': {'guess_lang': False, 'css_class': 'codehilite'}},
+        output_format='html5',
+    )
+    return post, html
+
+
+@app.route('/blog')
+def blog_index():
+    """公开博客列表（登录门禁豁免；分页 ?page=）。"""
+    posts = load_blog_index()
+    try:
+        page = int(request.args.get('page') or '1')
+    except (TypeError, ValueError):
+        page = 1
+    total_pages = max(1, (len(posts) + BLOG_PAGE_SIZE - 1) // BLOG_PAGE_SIZE)
+    page = min(max(1, page), total_pages)
+    start = (page - 1) * BLOG_PAGE_SIZE
+    return render_template(
+        'blog_list.html',
+        posts=posts[start:start + BLOG_PAGE_SIZE],
+        total=len(posts), page=page, total_pages=total_pages,
+        show_dashboard=session.get('auth') is True,
+    )
+
+
+@app.route('/blog/<slug>')
+def blog_post(slug):
+    """公开博客详情（登录门禁豁免）。"""
+    result = render_blog_post(slug)
+    if result is None:
+        abort(404)
+    post, content = result
+    posts = load_blog_index()
+    position = next((index for index, item in enumerate(posts) if item['slug'] == slug), 0)
+    newer = posts[position - 1] if position > 0 else None
+    older = posts[position + 1] if position + 1 < len(posts) else None
+    return render_template(
+        'blog_post.html', post=post, content=content, newer=newer, older=older,
+        show_dashboard=session.get('auth') is True,
+    )
+
+
+@app.route('/blog/assets/<slug>/<path:filename>')
+def blog_asset(slug, filename):
+    """公开博客附件（登录门禁豁免）；slug 须为已收录文章，目录穿越由 safe_join 兜底。"""
+    if not any(item['slug'] == slug for item in load_blog_index()):
+        abort(404)
+    return send_from_directory(os.path.join(blog_dir, 'assets'), f'{slug}/{filename}')
+
 
 # 为 data 目录添加静态文件路由
 @app.route('/data/<path:filename>')

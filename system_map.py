@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections import Counter
 
 SCHEMA_VERSION = 1
-UPDATED_AT = '2026-10-18'
+UPDATED_AT = '2026-10-19'
 
 STATUS_LABELS = {
     'live': '已上线',
@@ -96,6 +96,27 @@ LAYERS = [
             {'id': 'multistart', 'name': '多起点重放', 'status': 'research', 'module': 'research/multistart.py',
              'desc': '固定参数 × 月度起点 → 分布（上线时点敏感性）；候选应用前必要流程',
              'caps': ['判据：多数为正 / 浮亏≤35% / 收敛']},
+            {'id': 'iterate', 'name': 'B-10b 单命令迭代', 'status': 'research', 'module': 'research/iterate.py',
+             'desc': '种子 → polish → neighbors → 尾门 → 决策包（SOP ①-⑦ 串联）',
+             'caps': ['一条命令', '不触碰 live']},
+            {'id': 'convert', 'name': '参数转换 convert', 'status': 'research', 'module': 'research/convert.py',
+             'desc': '候选 → live 参数文件（只改源键）+ 三段验证 + DIFF',
+             'caps': ['旧文件备份', '验证失败回滚', '不部署']},
+            {'id': 'ladder', 'name': '杠杆阶梯 ladder', 'status': 'research', 'module': 'research/ladder.py',
+             'desc': '0.5→2.5 逐档 both_sim 组合回放（供 SOP ⑤ 定档）',
+             'caps': ['pos×lev≤5 校验', 'MTM 盘中极值']},
+            {'id': 'significance', 'name': '显著性审计（K-02）', 'status': 'research',
+             'module': 'research/significance_audit.py',
+             'desc': 'DSR + BH-FDR；已接入决策包 DECISION.md',
+             'caps': ['多重检验校正', 'decision 自动输出']},
+            {'id': 'wf_eval', 'name': '折外聚合（选择级 WF）', 'status': 'research',
+             'module': 'research/wf_eval.py',
+             'desc': '固定参数 × 连续折外窗 → 正折/最差/中位；decision --rank-by wf',
+             'caps': ['B2-1 选择质量']},
+            {'id': 'governance', 'name': '累计试验与版本台账', 'status': 'research',
+             'module': 'research/trial_registry.py',
+             'desc': '累计 N（DSR）/OOS 使用留痕；版本冻结与实盘对账（version_ledger.py）',
+             'caps': ['B2-2/B4 反哺']},
         ],
     },
     {
@@ -110,7 +131,10 @@ LAYERS = [
             {'id': 'autodca', 'name': 'AutoDCA', 'status': 'idle', 'service': 'autodca',
              'desc': '定投执行（计划已到期，有意停用）', 'caps': ['需手动恢复']},
             {'id': 'web', 'name': 'Web 面板', 'status': 'live', 'service': 'web',
-             'desc': '本页所在：交易/帖子/盈亏/系统骨架', 'caps': ['登录门禁']},
+             'desc': '本页所在：交易/帖子/盈亏/系统骨架/博客', 'caps': ['登录门禁']},
+            {'id': 'blog', 'name': '博客（公开页）', 'status': 'live',
+             'desc': 'Hexo 全量迁移（2026-10-19）：公开 /blog + 看板入口；Python 渲染（Markdown/Pygments），独立于交易链路',
+             'caps': ['公开访问', '91 篇文章']},
             {'id': 'promo', 'name': 'Promo', 'status': 'live', 'service': 'promo',
              'desc': '交易帖自动发布 + 内容资产', 'caps': ['AI 主笔', '屏蔽降级']},
             {'id': 'arbitrage', 'name': 'Arbitrage', 'status': 'retired',

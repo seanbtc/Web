@@ -9,10 +9,19 @@
 - 会话时长：`WEB_SESSION_HOURS`（小时，默认 168 = 7 天）；登录后 `session.permanent=True`。
 - 回跳 `?next=` 仅允许站内相对路径，控制字符/`//`/反斜杠一律拒绝。
 - 同一 IP 连续失败 5 次锁定 60 秒（内存字典，不持久化）。
-- 写接口（`/api/update_*`，含 `/api/update_post_feed`）仍走各自的 `WEB_API_TOKEN` 鉴权，内部调用方（TradeSync/Promo/AutoDCA）不受登录门禁影响；`/health` 与 `/static/*` 免登录。
+- 写接口（`/api/update_*`，含 `/api/update_post_feed`）仍走各自的 `WEB_API_TOKEN` 鉴权，内部调用方（TradeSync/Promo/AutoDCA）不受登录门禁影响；`/health`、`/static/*` 与 `/blog` 前缀（公开博客）免登录。
 - 未登录访问读接口返回 401 JSON，页面/`/data/*` 返回 302 `/login?next=...`；Socket.IO 未登录连接会被拒绝。
 
 配置键说明见 [`.env.example`](.env.example) 或工作区根 `.env.example`。测试：`.venv\Scripts\python.exe -m pytest tests\ -q`。
+
+## 博客（公开页，Hexo 迁移 2026-10-19）
+
+- 内容结构：`blog/posts/*.md`（文章；front matter 仅 `title/date/tags/categories`）+ `blog/assets/<slug>/*`（图片附件，slug = 文章文件名）；
+- 路由：`/blog`（列表，分页 `?page=`）、`/blog/<slug>`（详情）、`/blog/assets/<slug>/<file>`（附件）——**公开访问**（门禁豁免仅限 `/blog` 前缀，其余路由仍须登录）；
+- 渲染：Python-Markdown（`extra/sane_lists/codehilite`）+ Pygments；依赖见 `requirements.txt`；样式 `static/blog.css`（含 Pygments 生成段）；
+- 新增文章：在 `blog/posts/` 新增 md（仿既有 front matter 格式即可），图片放 `blog/assets/<同名文件名>/` 并以 `/blog/assets/<文件名>/<图片>` 引用；索引按 posts 目录 mtime 热加载，无需改代码、无需重启（线上仍以 pull + 重启为准）；
+- 迁移来源：`Developer/hexo` 全量导入（91 篇/354 附件），工具 `tools/import_hexo_blog.py`（一次性、可 `--dry-run`；报告 `blog/import_report.json`——含 10 处源站引用笔误修正与 1 处不可恢复坏图引用的移除记录）；
+- 部署：服务器安装新依赖（`Markdown`/`Pygments`）后随 web 服务重启生效；公开面仅静态博客内容，不含交易/运行态数据。
 
 ## 运行态数据（data/*.json）不入库（2026-10-18）
 

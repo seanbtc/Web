@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}BStartegy 博客{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <link href="/static/blog.css" rel="stylesheet">
+</head>
+<body class="blog-body">
+<div class="blog-shell">
+    <header class="flex items-center justify-between mb-8">
+        <a href="/blog" class="text-xl font-bold text-gray-800 hover:text-blue-600">BStartegy 博客</a>
+        <nav class="flex items-center space-x-4">
+            <a href="/blog" class="text-sm text-gray-500 hover:text-blue-600">全部文章</a>
+            {% if show_dashboard %}
+            <a href="/" class="text-sm text-gray-500 hover:text-blue-600">看板</a>
+            {% endif %}
+        </nav>
+    </header>
+    {% block content %}{% endblock %}
+    <footer class="mt-14 text-center text-xs text-gray-400">
+        BStartegy · 复利之旅
+    </footer>
+</div>
+</body>
+</html>

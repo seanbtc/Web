@@ -1,0 +1,1033 @@
+{
+  "source": "/Users/xy/Developer/hexo/source/_posts",
+  "out": "/Users/xy/Developer/bot/Web/blog",
+  "dry_run": false,
+  "posts_total": 91,
+  "posts_converted": 91,
+  "posts_without_asset_dir": 22,
+  "asset_dirs": 69,
+  "asset_files_copied": 354,
+  "asset_img_replaced": 343,
+  "captions_dropped": 342,
+  "code_block_examples_kept": 1,
+  "missing_refs": [
+    "2021-03-06-XService使用笔记.md → 641.png"
+  ],
+  "fixed_refs": [
+    "2021-03-08-WindowManager基础: 畸形语法修正: {% asset_img img1.jpg)",
+    "2021-03-08-WindowManager基础: 畸形语法修正: {% asset_img img2.jpg)",
+    "交易系统第一次小结: 1.png → 1.jpg",
+    "交易系统第一次小结: 2.png → 2.jpg",
+    "复盘2021年在币圈的摸爬滚打: 19.png → 19.jpg",
+    "复盘2021年在币圈的摸爬滚打: 27.png → 27.jpg",
+    "复盘2021年在币圈的摸爬滚打: 29.png → 29.jpg",
+    "带单账号上线: 2.jpg → 2.png",
+    "带单账号上线: 3.jpg → 3.png",
+    "带单账号上线: 11.jpg → 11.png"
+  ],
+  "removed_refs": [
+    "2021-03-06-XService使用笔记: {% asset_img 641.png This is an example image %}"
+  ],
+  "unresolved_refs": [],
+  "unreferenced_files": [
+    "2021-03-06-SQLite的介绍及使用/2.png",
+    "2021-03-07-Activity基础篇/img6.jpg",
+    "2021-03-07-Activity基础篇/img7.jpg",
+    "2021-03-07-Activity基础篇/img8.jpg",
+    "2021-03-07-Activity基础篇/img9.jpg",
+    "2022-03-13-脚本使用规则/img2.jpg",
+    "「浩阳河」1-2/11.jpg",
+    "「浩阳河」1-2/23.jpg",
+    "量化交易月报第一期/11.jpg",
+    "量化交易月报第一期/22.jpg",
+    "量化交易月报第一期/33.jpg"
+  ],
+  "dropped_meta_keys": {
+    "catalog": 33,
+    "comments": 33,
+    "indexing": 33,
+    "header-img": 33,
+    "top": 33,
+    "tocnum": 33,
+    "subtitle": 33,
+    "layout": 1
+  },
+  "warnings": [],
+  "posts": [
+    {
+      "slug": "2021-03-05-MVP框架示例讲解",
+      "title": "MVP框架示例讲解",
+      "date": "2021-01-26 23:34:34",
+      "tags": [
+        "MVP"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "2021-03-06-SQLite的介绍及使用",
+      "title": "SQLite的介绍及使用",
+      "date": "2017-11-08 18:49:44",
+      "tags": [
+        "SQLite"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 3,
+      "replaced": 2
+    },
+    {
+      "slug": "2021-03-06-XService使用笔记",
+      "title": "XService使用笔记",
+      "date": "2021-1-6 10:10:17",
+      "tags": [
+        "Service",
+        "xlib"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 2,
+      "replaced": 2
+    },
+    {
+      "slug": "2021-03-06-XSpanned使用笔记",
+      "title": "XSpanned使用笔记",
+      "date": "2021-01-20 10:56:46",
+      "tags": [
+        "xlib",
+        "Spanned"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 20,
+      "replaced": 20
+    },
+    {
+      "slug": "2021-03-06-二级选择框使用笔记",
+      "title": "二级选择框使用笔记",
+      "date": "2021-02-27 00:40:15",
+      "tags": [
+        "ExpandableListView"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "2021-03-06-常用弹出对话框整理",
+      "title": "常用弹出对话框整理",
+      "date": "2020-12-14 11:47:36",
+      "tags": [
+        "AlertDialog"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 8,
+      "replaced": 8
+    },
+    {
+      "slug": "2021-03-06-解读闹钟代码",
+      "title": "解读闹钟代码",
+      "date": "2018-07-21 17:47:35",
+      "tags": [
+        "AlarmManager"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "2021-03-07-Activity基础篇",
+      "title": "Activity基础篇",
+      "date": "2020-05-18 11:37:55",
+      "tags": [
+        "Activity"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 9,
+      "replaced": 5
+    },
+    {
+      "slug": "2021-03-07-MarkDown基本语法",
+      "title": "MarkDown基本语法",
+      "date": "2018-01-17 18:04:11",
+      "tags": [
+        "MarkDown"
+      ],
+      "categories": [
+        "MarkDown"
+      ],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "2021-03-08-Activity基础篇-保存数据",
+      "title": "Activity基础篇-保存数据",
+      "date": "2017-12-21 11:20:24",
+      "tags": [
+        "Activity"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 4,
+      "replaced": 4
+    },
+    {
+      "slug": "2021-03-08-Activity基础篇-启动模式详解",
+      "title": "Activity基础篇-启动模式详解",
+      "date": "2020-05-19 10:39:40",
+      "tags": [
+        "Activity"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 13,
+      "replaced": 13
+    },
+    {
+      "slug": "2021-03-08-Intent基础",
+      "title": "Intent基础",
+      "date": "2020-05-25 14:25:09",
+      "tags": [
+        "Intent"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 10,
+      "replaced": 10
+    },
+    {
+      "slug": "2021-03-08-WindowManager基础",
+      "title": "WindowManager基础",
+      "date": "2020-05-28 09:29:19",
+      "tags": [
+        "WindowManager"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 3,
+      "replaced": 3
+    },
+    {
+      "slug": "2021-03-09-Fragment基础",
+      "title": "Fragment基础",
+      "date": "2020-05-29 09:29:19",
+      "tags": [
+        "Fragment"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 21,
+      "replaced": 21
+    },
+    {
+      "slug": "2021-03-10-XTab使用笔记",
+      "title": "XTab使用笔记",
+      "date": "2021-03-10 23:24:53",
+      "tags": [
+        "Tab",
+        "ViewPager",
+        "Fragment",
+        "xlib"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "2021-03-11-广播基础",
+      "title": "广播基础",
+      "date": "2020-05-26 09:31:14",
+      "tags": [
+        "BroadcastReceiver"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "2021-03-12-XPermission使用笔记",
+      "title": "XPermission使用笔记",
+      "date": "2021-03-12 23:47:13",
+      "tags": [
+        "xlib",
+        "Permission"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 3,
+      "replaced": 3
+    },
+    {
+      "slug": "2021-03-14-XZip使用笔记",
+      "title": "XZip使用笔记",
+      "date": "2021-03-14 14:41:07",
+      "tags": [
+        "xlib",
+        "Zip"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 3,
+      "replaced": 3
+    },
+    {
+      "slug": "2021-03-15-XScreen使用笔记",
+      "title": "XScreen使用笔记",
+      "date": "2021-03-15 19:07:58",
+      "tags": [
+        "xlib",
+        "Screen"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "2021-03-22-XToast使用笔记",
+      "title": "XToast使用笔记",
+      "date": "2021-03-21 10:16:23",
+      "tags": [
+        "xlib",
+        "Toast",
+        "WindowManager"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "2021-03-25-PackageManager基础",
+      "title": "PackageManager基础",
+      "date": "2021-03-25 19:30:51",
+      "tags": [
+        "xlib",
+        "PackageManager",
+        "ActivityManger"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "2021-03-30-ViewPager2使用笔记",
+      "title": "ViewPager2使用笔记",
+      "date": "2021-03-30 15:57:33",
+      "tags": [
+        "fragment",
+        "tab",
+        "viewpager2"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 5,
+      "replaced": 5
+    },
+    {
+      "slug": "2021-03-31-XNewWork使用笔记",
+      "title": "XNewWork使用笔记",
+      "date": "2021-03-31 14:28:08",
+      "tags": [
+        "xlib",
+        "NetWork",
+        "TelephonyManager",
+        "WifiManager"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "2021-06-05-XTime使用笔记",
+      "title": "XTime使用笔记",
+      "date": "2021-06-05 15:46:04",
+      "tags": [
+        "xlib",
+        "Time"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "2021-07-09-DW公版音乐解析",
+      "title": "DW公版音乐解析",
+      "date": "2021-07-09 10:17:15",
+      "tags": [],
+      "categories": [
+        "Android"
+      ],
+      "assets": 6,
+      "replaced": 6
+    },
+    {
+      "slug": "2021-07-17-DW公版音乐记忆的解析",
+      "title": "DW公版音乐记忆的解析",
+      "date": "2021-07-17 17:08:09",
+      "tags": [],
+      "categories": [
+        "Android"
+      ],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "2022-02-22-Crypto导航",
+      "title": "Crypto导航",
+      "date": "2022-02-22 22:54:50",
+      "tags": [],
+      "categories": [],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "2022-02-22-币安账号注册指南",
+      "title": "币安账号注册指南",
+      "date": "2022-02-22 22:57:55",
+      "tags": [],
+      "categories": [],
+      "assets": 8,
+      "replaced": 8
+    },
+    {
+      "slug": "2022-02-22-自动下单脚本接入指南",
+      "title": "自动下单脚本接入指南",
+      "date": "2022-02-22 22:58:45",
+      "tags": [],
+      "categories": [],
+      "assets": 2,
+      "replaced": 2
+    },
+    {
+      "slug": "2022-03-13-脚本使用规则",
+      "title": "脚本使用规则",
+      "date": "2022-03-13 21:22:25",
+      "tags": [],
+      "categories": [],
+      "assets": 1,
+      "replaced": 0
+    },
+    {
+      "slug": "2022年开工",
+      "title": "2022年开工",
+      "date": "2022-02-07 15:13:40",
+      "tags": [],
+      "categories": [],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "2025年度交易报告",
+      "title": "2025年度交易报告",
+      "date": "2025-12-29 10:39:39",
+      "tags": [],
+      "categories": [],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "48Month1建仓",
+      "title": "48Month1建仓",
+      "date": "2022-11-30 16:24:18",
+      "tags": [
+        "48Month"
+      ],
+      "categories": [],
+      "assets": 2,
+      "replaced": 2
+    },
+    {
+      "slug": "48Month2建仓",
+      "title": "48Month2建仓",
+      "date": "2023-02-02 09:12:37",
+      "tags": [
+        "48Month"
+      ],
+      "categories": [],
+      "assets": 2,
+      "replaced": 2
+    },
+    {
+      "slug": "48Month3建仓",
+      "title": "48Month3建仓",
+      "date": "2023-01-12 16:24:28",
+      "tags": [
+        "48Month"
+      ],
+      "categories": [],
+      "assets": 2,
+      "replaced": 2
+    },
+    {
+      "slug": "AndroidPdfViewer使用笔记",
+      "title": "AndroidPdfViewer使用笔记",
+      "date": "2021-03-19 00:15:38",
+      "tags": [
+        "PDF"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "BStartegy阅读手册",
+      "title": "BStartegy阅读手册",
+      "date": "2026-06-08 22:14:28",
+      "tags": [],
+      "categories": [],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "ZXing使用笔记",
+      "title": "ZXing使用笔记",
+      "date": "2016-02-25 21:46:47",
+      "tags": [
+        "ZXing"
+      ],
+      "categories": [
+        "Android"
+      ],
+      "assets": 3,
+      "replaced": 3
+    },
+    {
+      "slug": "ubuntu系统的talib环境安装",
+      "title": "ubuntu系统的talib环境安装",
+      "date": "2023-08-02 10:25:47",
+      "tags": [],
+      "categories": [],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "「浩阳河」1-0序",
+      "title": "「浩阳河」1.0.0序",
+      "date": "2025-02-15 17:11:40",
+      "tags": [],
+      "categories": [],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "「浩阳河」1-1",
+      "title": "「浩阳河」1.1",
+      "date": "2025-02-24 17:31:43",
+      "tags": [],
+      "categories": [],
+      "assets": 13,
+      "replaced": 13
+    },
+    {
+      "slug": "「浩阳河」1-2",
+      "title": "「浩阳河」1.2",
+      "date": "2025-05-23 17:59:36",
+      "tags": [],
+      "categories": [],
+      "assets": 10,
+      "replaced": 8
+    },
+    {
+      "slug": "交易报告-第10期",
+      "title": "交易报告-第10期",
+      "date": "2024-03-15 09:50:22",
+      "tags": [],
+      "categories": [],
+      "assets": 4,
+      "replaced": 4
+    },
+    {
+      "slug": "交易月报-第5期",
+      "title": "交易月报#第5期",
+      "date": "2023-05-31 09:35:29",
+      "tags": [],
+      "categories": [],
+      "assets": 5,
+      "replaced": 5
+    },
+    {
+      "slug": "交易月报-第6期",
+      "title": "交易月报-第6期",
+      "date": "2023-06-30 18:21:12",
+      "tags": [],
+      "categories": [],
+      "assets": 8,
+      "replaced": 8
+    },
+    {
+      "slug": "交易月报-第7期",
+      "title": "交易月报-第7期",
+      "date": "2023-07-25 14:28:03",
+      "tags": [],
+      "categories": [],
+      "assets": 8,
+      "replaced": 8
+    },
+    {
+      "slug": "交易月报-第8期",
+      "title": "交易月报-第8期",
+      "date": "2023-08-30 10:57:24",
+      "tags": [],
+      "categories": [],
+      "assets": 10,
+      "replaced": 10
+    },
+    {
+      "slug": "交易月报-第9期",
+      "title": "交易月报-第9期",
+      "date": "2023-12-22 10:46:16",
+      "tags": [],
+      "categories": [],
+      "assets": 5,
+      "replaced": 5
+    },
+    {
+      "slug": "交易系统升级自勉笔记",
+      "title": "交易系统升级自勉笔记",
+      "date": "2023-10-30 17:36:28",
+      "tags": [],
+      "categories": [],
+      "assets": 6,
+      "replaced": 6
+    },
+    {
+      "slug": "交易系统的第一次年终总结",
+      "title": "交易系统的2022年终总结",
+      "date": "2023-01-04 15:46:36",
+      "tags": [],
+      "categories": [],
+      "assets": 2,
+      "replaced": 2
+    },
+    {
+      "slug": "交易系统第一次小结",
+      "title": "交易系统2022年1/3小结",
+      "date": "2022-04-16 11:36:15",
+      "tags": [],
+      "categories": [],
+      "assets": 2,
+      "replaced": 2
+    },
+    {
+      "slug": "人生毒药",
+      "title": "人生毒药",
+      "date": "2023-04-24 11:40:14",
+      "tags": [],
+      "categories": [],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "人类的意义和生命的本质",
+      "title": "人类的意义和生命的本质",
+      "date": "2023-02-03 20:59:11",
+      "tags": [],
+      "categories": [],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "使用加密货币续费TradingView",
+      "title": "使用加密货币续费TradingView",
+      "date": "2022-11-25 14:06:20",
+      "tags": [],
+      "categories": [],
+      "assets": 8,
+      "replaced": 8
+    },
+    {
+      "slug": "入市前我向ai算了个八字",
+      "title": "入市前我向ai算了个八字",
+      "date": "2025-02-15 06:01:39",
+      "tags": [],
+      "categories": [],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "再探林彪事件",
+      "title": "再探林彪事件",
+      "date": "2024-04-22 10:25:36",
+      "tags": [],
+      "categories": [],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "回忆白沙游龙",
+      "title": "回忆白沙游龙",
+      "date": "2025-02-13 11:33:02",
+      "tags": [],
+      "categories": [],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "复利改变人生",
+      "title": "复利改变人生",
+      "date": "2023-05-18 15:18:04",
+      "tags": [],
+      "categories": [],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "复盘2021年在币圈的摸爬滚打",
+      "title": "复盘2021年在币圈的摸爬滚打",
+      "date": "2022-03-03 08:29:41",
+      "tags": [],
+      "categories": [],
+      "assets": 44,
+      "replaced": 44
+    },
+    {
+      "slug": "带单账号上线",
+      "title": "带单账号《三叉戟》正式开干",
+      "date": "2023-12-06 17:28:56",
+      "tags": [],
+      "categories": [],
+      "assets": 18,
+      "replaced": 18
+    },
+    {
+      "slug": "常用的10个行情指标",
+      "title": "常用的10个行情指标",
+      "date": "2023-04-20 10:15:21",
+      "tags": [],
+      "categories": [],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "我是如何撸一个回测模块的",
+      "title": "我是如何撸一个回测模块的",
+      "date": "2023-10-30 11:32:16",
+      "tags": [],
+      "categories": [],
+      "assets": 5,
+      "replaced": 5
+    },
+    {
+      "slug": "最后的战役",
+      "title": "最后的战役",
+      "date": "2023-11-18 09:40:10",
+      "tags": [],
+      "categories": [],
+      "assets": 3,
+      "replaced": 3
+    },
+    {
+      "slug": "标签",
+      "title": "标签",
+      "date": "2016-02-29 08:00:00",
+      "tags": [],
+      "categories": [
+        "Android"
+      ],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "策略pine代码拆解学习（1）",
+      "title": "策略pine代码拆解学习（1）strategy和src",
+      "date": "2022-11-30 14:18:47",
+      "tags": [
+        "pine"
+      ],
+      "categories": [],
+      "assets": 2,
+      "replaced": 2
+    },
+    {
+      "slug": "策略pine代码拆解学习（2）",
+      "title": "策略pine代码拆解学习（2）Support and Resistance",
+      "date": "2022-12-01 14:18:52",
+      "tags": [
+        "pine"
+      ],
+      "categories": [],
+      "assets": 4,
+      "replaced": 4
+    },
+    {
+      "slug": "策略pine代码拆解学习（3）",
+      "title": "策略pine代码拆解学习（3）ADX",
+      "date": "2022-12-02 14:18:56",
+      "tags": [
+        "pine"
+      ],
+      "categories": [],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "策略pine代码拆解学习（4）",
+      "title": "策略pine代码拆解学习（4）Volume，SAR，RSI，SMA，RMI",
+      "date": "2022-12-03 14:19:01",
+      "tags": [
+        "pine"
+      ],
+      "categories": [],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "策略pine代码拆解学习（5）",
+      "title": "策略pine代码拆解学习（5）FAST PKAMA、Centred Trend Indicator、BOLINGER BANDS",
+      "date": "2022-12-06 14:19:06",
+      "tags": [
+        "pine"
+      ],
+      "categories": [],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "策略pine代码拆解学习（6）",
+      "title": "策略pine代码拆解学习（6）TP和TL",
+      "date": "2022-12-07 14:19:10",
+      "tags": [
+        "pine"
+      ],
+      "categories": [],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "策略pine代码拆解学习（7）",
+      "title": "策略pine代码拆解学习（7）时间限制，收益图表",
+      "date": "2022-12-08 14:19:43",
+      "tags": [
+        "pine"
+      ],
+      "categories": [],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "策略失效问题引发的思考",
+      "title": "策略失效问题引发的思考",
+      "date": "2023-05-16 15:30:00",
+      "tags": [],
+      "categories": [],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "简单实现进度圆环",
+      "title": "简单实现进度圆环",
+      "date": "2023-06-14 13:59:06",
+      "tags": [],
+      "categories": [],
+      "assets": 5,
+      "replaced": 5
+    },
+    {
+      "slug": "纪念陈斌",
+      "title": "纪念陈斌",
+      "date": "2022-10-7 16:42:06",
+      "tags": [],
+      "categories": [],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "经历了一个4年的牛熊周期，才终于把21年交的学费赚回来了",
+      "title": "经历了一个4年的牛熊周期，才终于把2021年交的学费赚回来了",
+      "date": "2025-11-25 11:04:35",
+      "tags": [],
+      "categories": [],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "解决一个bug需要分几步",
+      "title": "解决一个bug需要分几步",
+      "date": "2022-05-13 11:41:26",
+      "tags": [],
+      "categories": [],
+      "assets": 11,
+      "replaced": 11
+    },
+    {
+      "slug": "詹姆斯下山",
+      "title": "詹姆斯下山",
+      "date": "2023-05-23 11:23:02",
+      "tags": [],
+      "categories": [],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "读书笔记-周恩来的政治生涯",
+      "title": "读书笔记-周恩来的政治生涯",
+      "date": "2022-12-13 15:36:52",
+      "tags": [
+        "读书笔记"
+      ],
+      "categories": [],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "读书笔记-明朝的那些事",
+      "title": "读书笔记-明朝的那些事",
+      "date": "2022-12-17 15:38:01",
+      "tags": [
+        "读书笔记"
+      ],
+      "categories": [],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "读书笔记-毛泽东传",
+      "title": "读书笔记-毛泽东传",
+      "date": "2022-12-15 15:37:40",
+      "tags": [
+        "读书笔记"
+      ],
+      "categories": [],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "读书笔记-穷爸爸富爸爸",
+      "title": "读书笔记-穷爸爸富爸爸",
+      "date": "2022-12-16 15:37:49",
+      "tags": [],
+      "categories": [],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "读书笔记-邓小平时代",
+      "title": "读书笔记-邓小平时代",
+      "date": "2022-12-14 15:37:11",
+      "tags": [
+        "读书笔记"
+      ],
+      "categories": [],
+      "assets": 2,
+      "replaced": 2
+    },
+    {
+      "slug": "资金费套利机器人",
+      "title": "资金费套利机器人",
+      "date": "2026-01-25 01:02:35",
+      "tags": [],
+      "categories": [],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "趋势震荡策略修改笔记",
+      "title": "趋势震荡策略修改笔记",
+      "date": "2024-04-22 11:28:27",
+      "tags": [],
+      "categories": [],
+      "assets": 1,
+      "replaced": 1
+    },
+    {
+      "slug": "量化交易月报第一期",
+      "title": "交易月报#第1期",
+      "date": "2023-01-30 15:52:44",
+      "tags": [],
+      "categories": [],
+      "assets": 6,
+      "replaced": 3
+    },
+    {
+      "slug": "量化交易月报第三期",
+      "title": "交易月报#第3期",
+      "date": "2023-03-31 18:33:42",
+      "tags": [],
+      "categories": [],
+      "assets": 2,
+      "replaced": 2
+    },
+    {
+      "slug": "量化交易月报第二期",
+      "title": "交易月报#第2期",
+      "date": "2023-02-28 16:46:44",
+      "tags": [],
+      "categories": [],
+      "assets": 6,
+      "replaced": 6
+    },
+    {
+      "slug": "量化交易月报第四期",
+      "title": "交易月报#第4期",
+      "date": "2023-04-30 14:19:25",
+      "tags": [],
+      "categories": [],
+      "assets": 2,
+      "replaced": 2
+    },
+    {
+      "slug": "马丁马丁",
+      "title": "马丁马丁",
+      "date": "2023-07-11 11:20:21",
+      "tags": [],
+      "categories": [],
+      "assets": 0,
+      "replaced": 0
+    },
+    {
+      "slug": "马丁马丁2",
+      "title": "马丁马丁2",
+      "date": "2023-07-21 17:41:31",
+      "tags": [],
+      "categories": [],
+      "assets": 9,
+      "replaced": 9
+    },
+    {
+      "slug": "马丁马丁3",
+      "title": "马丁马丁3",
+      "date": "2023-07-30 10:57:18",
+      "tags": [],
+      "categories": [],
+      "assets": 3,
+      "replaced": 3
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{% extends '_blog_base.html' %}
+{% block title %}BStartegy 博客{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-800">全部文章</h1>
+    <p class="text-sm text-gray-400 mt-1">共 {{ total }} 篇</p>
+</div>
+
+{% if posts %}
+<div class="space-y-5">
+    {% for post in posts %}
+    <article class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
+        <div class="flex flex-wrap items-center text-xs text-gray-400 gap-x-3 gap-y-1 mb-1">
+            <span>{{ post.date_display }}</span>
+            {% if post.categories %}
+            <span><i class="fa fa-folder-o mr-1"></i>{{ post.categories|join(' / ') }}</span>
+            {% endif %}
+        </div>
+        <h2 class="text-lg font-semibold mb-1">
+            <a href="{{ url_for('blog_post', slug=post.slug) }}" class="text-gray-800 hover:text-blue-600">{{ post.title }}</a>
+        </h2>
+        {% if post.tags %}
+        <div class="mb-1.5">
+            {% for tag in post.tags %}
+            <span class="inline-block text-xs bg-blue-50 text-blue-500 rounded-full px-2 py-0.5 mr-1 mb-1">{{ tag }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% if post.excerpt %}
+        <p class="text-sm text-gray-500 leading-relaxed">{{ post.excerpt }}</p>
+        {% endif %}
+    </article>
+    {% endfor %}
+</div>
+
+{% if total_pages > 1 %}
+<nav class="flex items-center justify-center space-x-4 mt-8 text-sm">
+    {% if page > 1 %}
+    <a href="{{ url_for('blog_index', page=page-1) }}" class="text-blue-600 hover:underline">← 上一页</a>
+    {% endif %}
+    <span class="text-gray-400">第 {{ page }} / {{ total_pages }} 页</span>
+    {% if page < total_pages %}
+    <a href="{{ url_for('blog_index', page=page+1) }}" class="text-blue-600 hover:underline">下一页 →</a>
+    {% endif %}
+</nav>
+{% endif %}
+
+{% else %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-10 text-center text-gray-400">
+    还没有文章
+</div>
+{% endif %}
+{% endblock %}
