@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>人际关系网络</title>
+<style>
+  :root {
+    --bg: #0b1220;
+    --panel: #131c2e;
+    --line: #27364f;
+    --text: #e6edf7;
+    --muted: #8fa3bf;
+    --accent: #38bdf8;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(1200px 700px at 20% -10%, #17304f 0%, var(--bg) 55%) fixed;
+    color: var(--text);
+    font: 14px/1.5 -apple-system, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  header {
+    padding: 18px 22px 10px;
+    display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center;
+  }
+  h1 { font-size: 18px; margin: 0; letter-spacing: .5px; font-weight: 600; }
+  .meta { color: var(--muted); font-size: 12px; }
+  .controls { margin-left: auto; display: flex; gap: 8px; }
+  input, button {
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 12px; font: inherit; outline: none;
+  }
+  input:focus { border-color: var(--accent); }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  .legend {
+    padding: 0 22px 10px; display: flex; flex-wrap: wrap; gap: 10px 16px;
+    color: var(--muted); font-size: 12px;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  main { position: relative; flex: 1; min-height: 0; }
+  svg { width: 100%; height: 100%; display: block; cursor: grab; }
+  svg.dragging { cursor: grabbing; }
+  .edge { stroke: #3b4d6b; stroke-width: 1.4; }
+  .edge-label { fill: #7f93b0; font-size: 10px; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
+  .node circle { stroke: #0b1220; stroke-width: 3; cursor: pointer; }
+  .node text {
+    fill: var(--text); font-size: 12px; text-anchor: middle; pointer-events: none;
+    paint-order: stroke; stroke: var(--bg); stroke-width: 3px;
+  }
+  .node.dim { opacity: .18; }
+  .node.hit circle { stroke: var(--accent); stroke-width: 4; }
+  .detail {
+    position: absolute; right: 18px; top: 10px; width: 240px;
+    background: rgba(19, 28, 46, .96); border: 1px solid var(--line);
+    border-radius: 12px; padding: 14px 16px; backdrop-filter: blur(6px);
+    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  }
+  .detail h2 { margin: 0 0 6px; font-size: 15px; }
+  .detail dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 13px; }
+  .detail dt { color: var(--muted); }
+  .detail dd { margin: 0; }
+  .hidden { display: none !important; }
+  .empty {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); text-align: center; padding: 0 24px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🕸️ 人际关系网络</h1>
+  <div class="meta" id="meta">加载中…</div>
+  <div class="controls">
+    <input id="search" placeholder="搜索名字…" autocomplete="off">
+    <button id="refresh" type="button">刷新</button>
+  </div>
+</header>
+<div id="legend" class="legend"></div>
+<main>
+  <svg id="graph" role="img" aria-label="人际关系网络图"></svg>
+  <aside id="detail" class="detail hidden"></aside>
+  <div id="empty" class="empty hidden"></div>
+</main>
+<script>
+(function () {
+  'use strict';
+
+  var COLORS = ['#38bdf8', '#a78bfa', '#f472b6', '#fb923c', '#34d399', '#facc15', '#f87171', '#22d3ee'];
+  var colorCache = {};
+  function colorFor(key) {
+    if (!colorCache[key]) {
+      var n = Object.keys(colorCache).length;
+      colorCache[key] = COLORS[n % COLORS.length];
+    }
+    return colorCache[key];
+  }
+
+  var svg = document.getElementById('graph');
+  var metaEl = document.getElementById('meta');
+  var legendEl = document.getElementById('legend');
+  var detailEl = document.getElementById('detail');
+  var emptyEl = document.getElementById('empty');
+  var searchEl = document.getElementById('search');
+
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  var viewport = document.createElementNS(SVG_NS, 'g');
+  svg.appendChild(viewport);
+  var edgeLayer = document.createElementNS(SVG_NS, 'g');
+  var edgeLabelLayer = document.createElementNS(SVG_NS, 'g');
+  var nodeLayer = document.createElementNS(SVG_NS, 'g');
+  viewport.appendChild(edgeLayer);
+  viewport.appendChild(edgeLabelLayer);
+  viewport.appendChild(nodeLayer);
+
+  var graph = { nodes: [], links: [] };
+  var size = { width: 800, height: 600 };
+  var transform = { x: 0, y: 0, k: 1 };
+  var alpha = 0;
+  var running = false;
+  var dragging = null;
+  var panning = null;
+  var lastGenerated = null;
+  var positions = {};
+
+  function resize() {
+    var rect = svg.getBoundingClientRect();
+    size.width = Math.max(320, rect.width);
+    size.height = Math.max(320, rect.height);
+    svg.setAttribute('viewBox', '0 0 ' + size.width + ' ' + size.height);
+    if (!running && graph.nodes.length) { restart(0.2); }
+  }
+
+  function applyTransform() {
+    viewport.setAttribute('transform',
+      'translate(' + transform.x + ',' + transform.y + ') scale(' + transform.k + ')');
+  }
+
+  function restart(power) {
+    alpha = Math.max(alpha, power || 0.8);
+    if (!running) { running = true; requestAnimationFrame(tick); }
+  }
+
+  function step() {
+    var nodes = graph.nodes;
+    var i, j, a, b, dx, dy, d2, d, force;
+    var k = 1400;
+    var spring = 0.008;
+    var damping = 0.86;
+    var cx = size.width / 2;
+    var cy = size.height / 2;
+
+    for (i = 0; i < nodes.length; i++) {
+      a = nodes[i];
+      a.vx = (a.vx || 0) * damping;
+      a.vy = (a.vy || 0) * damping;
+      for (j = i + 1; j < nodes.length; j++) {
+        b = nodes[j];
+        dx = a.x - b.x; dy = a.y - b.y;
+        d2 = dx * dx + dy * dy;
+        if (d2 < 1) { d2 = 1; }
+        if (d2 > 640000) { continue; }
+        force = k / d2;
+        d = Math.sqrt(d2);
+        var fx = (dx / d) * force, fy = (dy / d) * force;
+        a.vx += fx; a.vy += fy;
+        b.vx -= fx; b.vy -= fy;
+      }
+    }
+    for (i = 0; i < graph.links.length; i++) {
+      var link = graph.links[i];
+      a = link.source; b = link.target;
+      dx = b.x - a.x; dy = b.y - a.y;
+      d = Math.sqrt(dx * dx + dy * dy) || 1;
+      var target = 120 + 26 * (6 - (a.closeness + b.closeness) / 2);
+      force = (d - target) * spring;
+      var ux = dx / d, uy = dy / d;
+      a.vx += ux * force; a.vy += uy * force;
+      b.vx -= ux * force; b.vy -= uy * force;
+    }
+    for (i = 0; i < nodes.length; i++) {
+      a = nodes[i];
+      if (a === dragging) { a.vx = 0; a.vy = 0; continue; }
+      a.vx += (cx - a.x) * 0.0016;
+      a.vy += (cy - a.y) * 0.0016;
+      a.x += a.vx * alpha * 6;
+      a.y += a.vy * alpha * 6;
+      var pad = 40;
+      a.x = Math.max(pad, Math.min(size.width - pad, a.x));
+      a.y = Math.max(pad, Math.min(size.height - pad, a.y));
+    }
+    alpha *= 0.985;
+  }
+
+  function draw() {
+    while (edgeLayer.firstChild) { edgeLayer.removeChild(edgeLayer.firstChild); }
+    while (edgeLabelLayer.firstChild) { edgeLabelLayer.removeChild(edgeLabelLayer.firstChild); }
+    while (nodeLayer.firstChild) { nodeLayer.removeChild(nodeLayer.firstChild); }
+
+    var showEdgeLabels = graph.links.length <= 30;
+
+    graph.links.forEach(function (link) {
+      var line = document.createElementNS(SVG_NS, 'line');
+      line.setAttribute('class', 'edge');
+      line.setAttribute('x1', link.source.x);
+      line.setAttribute('y1', link.source.y);
+      line.setAttribute('x2', link.target.x);
+      line.setAttribute('y2', link.target.y);
+      edgeLayer.appendChild(line);
+      if (showEdgeLabels && link.relation_label) {
+        var label = document.createElementNS(SVG_NS, 'text');
+        label.setAttribute('class', 'edge-label');
+        label.setAttribute('x', (link.source.x + link.target.x) / 2);
+        label.setAttribute('y', (link.source.y + link.target.y) / 2 - 4);
+        label.textContent = link.relation_label;
+        edgeLabelLayer.appendChild(label);
+      }
+    });
+
+    graph.nodes.forEach(function (node) {
+      positions[node.id] = { x: node.x, y: node.y };
+      var group = document.createElementNS(SVG_NS, 'g');
+      group.setAttribute('class', 'node');
+      group.setAttribute('transform', 'translate(' + node.x + ',' + node.y + ')');
+      var radius = 7 + Number(node.closeness || 3) * 2.2;
+      var circle = document.createElementNS(SVG_NS, 'circle');
+      circle.setAttribute('r', radius);
+      circle.setAttribute('fill', colorFor(node.relation_label || node.relation || '其他'));
+      group.appendChild(circle);
+      var label = document.createElementNS(SVG_NS, 'text');
+      label.setAttribute('y', radius + 15);
+      label.textContent = node.name;
+      group.appendChild(label);
+      group.addEventListener('pointerdown', function (event) {
+        event.stopPropagation();
+        dragging = node;
+        svg.setPointerCapture(event.pointerId);
+        restart(0.35);
+      });
+      group.addEventListener('click', function (event) {
+        event.stopPropagation();
+        showDetail(node);
+      });
+      nodeLayer.appendChild(group);
+      node.el = group;
+    });
+  }
+
+  function tick() {
+    step();
+    if (alpha > 0.004) {
+      draw();
+      requestAnimationFrame(tick);
+    } else {
+      draw();
+      running = false;
+    }
+  }
+
+  function showDetail(node) {
+    var rows = [
+      ['关系', node.relation_label || node.relation || '其他'],
+      ['亲近度', String(node.closeness) + ' / 5'],
+      ['最近联系', node.last_contact || '从未记录'],
+      ['生日', node.birthday ? '已记录' : '未记录']
+    ];
+    var html = '<h2>' + escapeHtml(node.name) + '</h2><dl>';
+    rows.forEach(function (row) {
+      html += '<dt>' + row[0] + '</dt><dd>' + escapeHtml(row[1]) + '</dd>';
+    });
+    html += '</dl>';
+    detailEl.innerHTML = html;
+    detailEl.classList.remove('hidden');
+  }
+
+  function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, function (ch) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+    });
+  }
+
+  function renderLegend() {
+    var counts = {};
+    graph.nodes.forEach(function (node) {
+      var key = node.relation_label || node.relation || '其他';
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    legendEl.innerHTML = '';
+    Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; }).forEach(function (key) {
+      var item = document.createElement('span');
+      var dot = document.createElement('i');
+      dot.style.background = colorFor(key);
+      item.appendChild(dot);
+      item.appendChild(document.createTextNode(key + ' ' + counts[key]));
+      legendEl.appendChild(item);
+    });
+  }
+
+  function applySearch() {
+    var query = searchEl.value.trim().toLowerCase();
+    graph.nodes.forEach(function (node) {
+      if (!node.el) { return; }
+      node.el.classList.toggle('dim', !!query && node.name.toLowerCase().indexOf(query) === -1);
+      node.el.classList.toggle('hit', !!query && node.name.toLowerCase().indexOf(query) !== -1);
+    });
+  }
+
+  function load() {
+    metaEl.textContent = '加载中…';
+    fetch('/network/data.json', { cache: 'no-store' })
+      .then(function (response) {
+        if (!response.ok) { throw new Error('HTTP ' + response.status); }
+        return response.json();
+      })
+      .then(function (data) {
+        if (data.generated_at && data.generated_at === lastGenerated && graph.nodes.length) {
+          return;  // 数据没变：保留当前布局
+        }
+        lastGenerated = data.generated_at || '';
+        var rawNodes = data.nodes || [];
+        var rawEdges = data.edges || [];
+        var byId = {};
+        var nodes = rawNodes.map(function (node) {
+          var item = Object.assign({}, node);
+          var previous = positions[item.id];
+          item.x = previous ? previous.x : size.width / 2 + (Math.random() - 0.5) * 200;
+          item.y = previous ? previous.y : size.height / 2 + (Math.random() - 0.5) * 200;
+          item.vx = 0; item.vy = 0;
+          byId[item.id] = item;
+          return item;
+        });
+        var links = [];
+        rawEdges.forEach(function (edge) {
+          var source = byId[edge.source];
+          var target = byId[edge.target];
+          if (source && target) { links.push(Object.assign({}, edge, { source: source, target: target })); }
+        });
+        graph = { nodes: nodes, links: links };
+        detailEl.classList.add('hidden');
+        metaEl.textContent = nodes.length
+          ? (nodes.length + ' 人 · ' + links.length + ' 条关系 · 更新于 ' + (data.generated_at || '未知'))
+          : '暂无人物';
+        emptyEl.classList.toggle('hidden', nodes.length > 0);
+        emptyEl.textContent = '还没有数据——先在 relationships bot 里 /加人 并 /关系 添加。';
+        renderLegend();
+        resize();
+        if (nodes.length) { restart(1); } else { draw(); }
+      })
+      .catch(function (error) {
+        metaEl.textContent = '加载失败：' + error.message;
+      });
+  }
+
+  svg.addEventListener('pointerdown', function (event) {
+    if (event.target === svg) {
+      panning = { x: event.clientX, y: event.clientY, tx: transform.x, ty: transform.y };
+      svg.classList.add('dragging');
+      svg.setPointerCapture(event.pointerId);
+    }
+  });
+  svg.addEventListener('pointermove', function (event) {
+    if (dragging) {
+      var point = toWorld(event.clientX, event.clientY);
+      dragging.x = point.x; dragging.y = point.y;
+      return;
+    }
+    if (panning) {
+      transform.x = panning.tx + (event.clientX - panning.x);
+      transform.y = panning.ty + (event.clientY - panning.y);
+      applyTransform();
+    }
+  });
+  svg.addEventListener('pointerup', function () {
+    if (dragging) { dragging = null; restart(0.25); }
+    panning = null;
+    svg.classList.remove('dragging');
+  });
+  svg.addEventListener('wheel', function (event) {
+    event.preventDefault();
+    var point = toWorld(event.clientX, event.clientY);
+    var factor = event.deltaY < 0 ? 1.12 : 0.89;
+    var next = Math.max(0.35, Math.min(3, transform.k * factor));
+    transform.x = event.clientX - point.x * next;
+    transform.y = event.clientY - point.y * next;
+    transform.k = next;
+    applyTransform();
+  }, { passive: false });
+
+  function toWorld(clientX, clientY) {
+    var rect = svg.getBoundingClientRect();
+    return {
+      x: (clientX - rect.left - transform.x) / transform.k,
+      y: (clientY - rect.top - transform.y) / transform.k
+    };
+  }
+
+  document.getElementById('refresh').addEventListener('click', load);
+  searchEl.addEventListener('input', applySearch);
+  window.addEventListener('resize', resize);
+  window.setInterval(load, 60000);
+
+  resize();
+  load();
+})();
+</script>
+</body>
+</html>

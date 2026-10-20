@@ -3525,6 +3525,26 @@ def blog_asset(slug, filename):
     return send_from_directory(os.path.join(blog_dir, 'assets'), f'{slug}/{filename}')
 
 
+# 人际关系网络（独立页面：不链入面板/博客；沿用登录门禁）
+@app.route('/network')
+def network_page():
+    return render_template('network.html')
+
+
+@app.route('/network/data.json')
+def network_data():
+    """读取 relationships bot 导出的网络图数据（data/network.json）。"""
+    path = os.getenv('NETWORK_GRAPH_FILE') or os.path.join(data_dir, 'network.json')
+    try:
+        with open(path, 'r', encoding='utf-8') as fh:
+            payload = json.load(fh)
+    except (OSError, ValueError):
+        payload = {'nodes': [], 'edges': [], 'generated_at': '', 'missing': True}
+    response = jsonify(payload)
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
 # 为 data 目录添加静态文件路由
 @app.route('/data/<path:filename>')
 def serve_data_file(filename):
