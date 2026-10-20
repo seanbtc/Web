@@ -1,112 +1,182 @@
-    {% if not health.entries %}
-    <div class="bg-white rounded-xl shadow p-4 md:p-6 text-gray-500">
-        暂无 Sentinel 快照（检查 Sentinel 双实例是否运行，或 <code>SENTINEL_SNAPSHOT_PATHS</code> 配置）。
+{% if not health.entries %}
+<div class="bg-white rounded-xl shadow p-4 md:p-6 text-gray-500">
+    暂无 Sentinel 快照（检查 Sentinel 双实例是否运行，或 <code>SENTINEL_SNAPSHOT_PATHS</code> 配置）。
+</div>
+{% endif %}
+
+{% for entry in health.entries %}
+{% set hs = entry.health or {} %}
+{% set stats = entry.directions[0].gate_stats if entry.directions else None %}
+<section class="health-panel">
+    <div class="health-panel-head">
+        <div class="health-panel-title">
+            <h2>{{ entry.pair }}</h2>
+            <span class="gate-chip status-{{ hs.status or 'observe' }}">{{ hs.status_label or '观察' }}</span>
+            {% if entry.generated_at %}<span class="health-snapshot">快照 {{ entry.generated_at }}</span>{% endif %}
+        </div>
+        {% if stats and stats.total %}
+        <div class="health-score">
+            <div class="health-donut" style="background: conic-gradient(#10b981 0 {{ stats.ok_pct }}%, #94a3b8 {{ stats.ok_pct }}% {{ stats.ok_pct + stats.observe_pct }}%, #f59e0b {{ stats.ok_pct + stats.observe_pct }}% {{ stats.ok_pct + stats.observe_pct + stats.yellow_pct }}%, #ef4444 {{ stats.ok_pct + stats.observe_pct + stats.yellow_pct }}% 100%);">
+                <div class="health-donut-hole"><b>{{ stats.ok }}</b><span>/{{ stats.total }}</span><em>正常</em></div>
+            </div>
+            <div class="health-score-legend">
+                <span><i class="health-dot ok"></i>正常 {{ stats.ok }}</span>
+                <span><i class="health-dot observe"></i>未判定 {{ stats.observe }}</span>
+                <span><i class="health-dot yellow"></i>预警 {{ stats.yellow }}</span>
+                <span><i class="health-dot red"></i>异常 {{ stats.red }}</span>
+            </div>
+        </div>
+        {% endif %}
     </div>
+
+    <div class="health-banner status-bg-{{ hs.status or 'observe' }}">{{ hs.recommendation or '（无建议）' }}</div>
+    {% if hs.reasons %}
+    <ul class="health-reasons">
+        {% for reason in hs.reasons[:4] %}<li>{{ reason }}</li>{% endfor %}
+    </ul>
     {% endif %}
 
-    {% for entry in health.entries %}
-    {% set hs = entry.health or {} %}
-    <section class="bg-white rounded-xl shadow mb-6 p-4 md:p-6">
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <div class="flex flex-wrap items-center gap-2">
-                <h2 class="text-base font-semibold text-gray-800">{{ entry.pair }}</h2>
-                <span class="gate-chip status-{{ hs.status or 'observe' }}">{{ hs.status_label or '观察' }}</span>
+    {% for direction in entry.directions %}
+    {% if entry.directions | length > 1 %}
+    <div class="health-direction-label">{{ direction.name }}</div>
+    {% endif %}
+    <div class="health-panel-body">
+        <div class="health-modules">
+            <div class="health-tile">
+                <div class="health-tile-icon status-bg-{{ direction.guard.status }}">
+                    <i class="fa {{ 'fa-check' if direction.guard.status == 'ok' else 'fa-exclamation-triangle' if direction.guard.status in ('yellow', 'red') else 'fa-anchor' }}"></i>
+                </div>
+                <div class="health-tile-body">
+                    <div class="health-tile-head">
+                        <span class="health-tile-name">参数一致性</span>
+                        <span class="gate-chip status-{{ direction.guard.status }}">{{ direction.guard.label }}</span>
+                    </div>
+                    <div class="health-tile-detail">{{ direction.guard.detail }}</div>
+                </div>
+                <div class="health-tile-visual">
+                    <div class="health-orb status-bg-{{ direction.guard.status }}"><span>{{ '✓' if direction.guard.status == 'ok' else '!' if direction.guard.status in ('yellow', 'red') else '·' }}</span></div>
+                </div>
             </div>
-            {% if entry.generated_at %}<span class="text-xs text-gray-400">快照 {{ entry.generated_at }}</span>{% endif %}
+
+            <div class="health-tile">
+                <div class="health-tile-icon status-bg-{{ direction.align.status }}"><i class="fa fa-crosshairs"></i></div>
+                <div class="health-tile-body">
+                    <div class="health-tile-head">
+                        <span class="health-tile-name">开仓对齐</span>
+                        <span class="gate-chip status-{{ direction.align.status }}">{{ direction.align.label }}</span>
+                    </div>
+                    {% if direction.align.has_pairs %}
+                    <div class="health-tile-detail">配对 {{ direction.align.pairs_n }} ・ 漏单 {{ direction.align.missing }} ・ 多单 {{ direction.align.extra }}</div>
+                    <div class="health-tile-detail">延迟 p90 {{ direction.align.p90 }} ・ 偏差 p95 {{ direction.align.p95 }}</div>
+                    {% set max_count = [direction.align.pairs_n, direction.align.missing, direction.align.extra, 1] | max %}
+                    <div class="align-bars">
+                        <div class="align-row"><span>配对</span><div class="align-track"><i class="ok" style="width: {{ (direction.align.pairs_n / max_count * 100) | round(1) }}%"></i></div><b>{{ direction.align.pairs_n }}</b></div>
+                        <div class="align-row"><span>漏单</span><div class="align-track"><i class="miss" style="width: {{ (direction.align.missing / max_count * 100) | round(1) }}%"></i></div><b>{{ direction.align.missing }}</b></div>
+                        <div class="align-row"><span>多单</span><div class="align-track"><i class="extra" style="width: {{ (direction.align.extra / max_count * 100) | round(1) }}%"></i></div><b>{{ direction.align.extra }}</b></div>
+                    </div>
+                    {% else %}
+                    <div class="health-tile-detail">暂无配对样本（等首笔开平仓配对）</div>
+                    <div class="align-bars is-empty">
+                        <div class="align-row"><span>配对</span><div class="align-track"></div><b>—</b></div>
+                        <div class="align-row"><span>漏单</span><div class="align-track"></div><b>—</b></div>
+                        <div class="align-row"><span>多单</span><div class="align-track"></div><b>—</b></div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="health-tile">
+                <div class="health-tile-icon status-bg-{{ direction.dist.status }}"><i class="fa fa-chart-pie"></i></div>
+                <div class="health-tile-body">
+                    <div class="health-tile-head">
+                        <span class="health-tile-name">分布健康</span>
+                        <span class="gate-chip status-{{ direction.dist.status }}">{{ direction.dist.label }}</span>
+                    </div>
+                    <div class="health-tile-detail">{{ direction.dist.sample_text }}{% if not direction.dist.adequate %} ・ 样本积累中{% endif %}</div>
+                    {% if direction.dist.metrics %}
+                    <div class="health-metric-chips">
+                        {% for item in direction.dist.metrics %}<span>{{ item.label }} {{ item.value }}</span>{% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="health-tile-visual">
+                    <div class="health-ring" style="--progress: {{ direction.dist.progress }};"><div class="health-ring-hole">{{ direction.dist.progress | round(0) | int }}%</div></div>
+                </div>
+            </div>
         </div>
 
-        <div class="health-banner status-bg-{{ hs.status or 'observe' }}">{{ hs.recommendation or '（无建议）' }}</div>
-        {% if hs.reasons %}
-        <ul class="text-xs text-gray-600 list-disc list-inside mb-3">
-            {% for reason in hs.reasons[:6] %}<li>{{ reason }}</li>{% endfor %}
-        </ul>
-        {% endif %}
-        {% if hs.suggested_commands %}
-        <details class="mb-3">
-            <summary class="text-xs text-gray-500 cursor-pointer select-none">建议命令（人工执行，{{ hs.suggested_commands | length }} 条）</summary>
-            {% for command in hs.suggested_commands %}
-            <div class="text-xs font-mono text-gray-700 break-all mt-1">{{ command }}</div>
+        <div class="health-gate-matrix">
+            {% for gate in direction.gates %}
+            <div class="gate-cell">
+                <span class="gate-dot status-{{ gate.status }}"></span>
+                <span class="gate-name">{{ gate.label }}</span>
+                <span class="gate-state">{{ gate.status_label }}</span>
+            </div>
             {% endfor %}
-        </details>
-        {% endif %}
-
-        {% for direction in entry.directions %}
-        {% if entry.directions | length > 1 %}
-        <div class="text-xs font-medium text-gray-400 mt-3 mb-1">{{ direction.name }}</div>
-        {% endif %}
-        <div class="health-modules mb-3">
-            <div class="health-tile">
-                <div class="health-tile-head">
-                    <span class="health-tile-name">参数一致性</span>
-                    <span class="gate-chip status-{{ direction.guard.status }}">{{ direction.guard.label }}</span>
-                </div>
-                <div class="health-tile-detail">{{ direction.guard.detail }}</div>
-            </div>
-            <div class="health-tile">
-                <div class="health-tile-head">
-                    <span class="health-tile-name">开仓对齐</span>
-                    <span class="gate-chip status-{{ direction.align.status }}">{{ direction.align.label }}</span>
-                </div>
-                {% if direction.align.has_pairs %}
-                <div class="health-tile-detail">配对 {{ direction.align.pairs_n }} ・ 漏单 {{ direction.align.missing }} ・ 多单 {{ direction.align.extra }}</div>
-                <div class="health-tile-detail">延迟 p90 {{ direction.align.p90 }} ・ 偏差 p95 {{ direction.align.p95 }}</div>
-                {% else %}
-                <div class="health-tile-detail">暂无配对样本（等首笔开平仓配对）</div>
-                {% endif %}
-            </div>
-            <div class="health-tile">
-                <div class="health-tile-head">
-                    <span class="health-tile-name">分布健康</span>
-                    <span class="gate-chip status-{{ direction.dist.status }}">{{ direction.dist.label }}</span>
-                </div>
-                <div class="health-meter"><span class="health-meter-fill status-fill-{{ direction.dist.status }}" style="width: {{ direction.dist.progress }}%"></span></div>
-                <div class="health-tile-detail">{{ direction.dist.sample_text }}{% if not direction.dist.adequate %} ・ 样本积累中{% endif %}</div>
-                {% if direction.dist.metrics %}
-                <div class="health-tile-detail">
-                    {% for item in direction.dist.metrics %}{{ item.label }} {{ item.value }}{% if not loop.last %} ・ {% endif %}{% endfor %}
-                </div>
-                {% endif %}
-            </div>
         </div>
+    </div>
 
-        {% if entry.portfolio %}
-        {% set pf = entry.portfolio %}
-        <div class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-xs text-gray-600 flex flex-wrap items-center gap-x-4 gap-y-1">
-            <span class="text-gray-800 font-medium">组合净敞口</span>
-            <span class="gate-chip status-{{ pf.status }}">{{ pf.status_label }}</span>
-            <span>净敞口 <b>{{ pf.net_size }}</b> BTC（L {{ pf.long_size }} / S {{ pf.short_size }}）</span>
-            <span>总名义 {{ pf.gross_notional }}</span>
-            <span>合计净值 {{ pf.combined_equity }}</span>
-            <span>净比 {{ pf.net_ratio }} ・ 总比 {{ pf.gross_ratio }}</span>
-            {% if pf.mode == 'observe' %}<span class="text-gray-400">仅记录</span>{% endif %}
-        </div>
+    <div class="health-footer">
+        <span>其他闸门：</span>
+        {% if direction.other_problems %}
+        {% for gate in direction.other_problems %}
+        <span class="gate-chip status-{{ gate.status }}">{{ gate.label }} {{ gate.status_label }}</span>
+        {% endfor %}
+        <span>其余：{% if direction.other_ok_n %}正常 {{ direction.other_ok_n }} 项{% if direction.other_pending_n %} ・ {% endif %}{% endif %}{% if direction.other_pending_n %}未判定 {{ direction.other_pending_n }} 项{% endif %}</span>
+        {% elif direction.other_pending_n and direction.other_ok_n %}
+        <span>正常 {{ direction.other_ok_n }} 项 ・ 未判定 {{ direction.other_pending_n }} 项（暂无实盘数据，不作判定）</span>
+        {% elif direction.other_pending_n %}
+        <span>未判定 {{ direction.other_pending_n }} 项（暂无实盘数据，不作判定）</span>
+        {% elif direction.other_ok_n %}
+        <span>订单对账 / 单腿收益 / 连亏空窗 / 收益带 / 浮亏回撤 —— 全部正常 ✓（{{ direction.other_ok_n }} 项）</span>
+        {% else %}
+        <span>—</span>
         {% endif %}
+    </div>
 
-        <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-            <span>其他闸门：</span>
-            {% if direction.other_problems %}
-            {% for gate in direction.other_problems %}
-            <span class="gate-chip status-{{ gate.status }}">{{ gate.label }} {{ gate.status_label }}</span>
-            {% endfor %}
-            <span>其余：{% if direction.other_ok_n %}正常 {{ direction.other_ok_n }} 项{% if direction.other_pending_n %} ・ {% endif %}{% endif %}{% if direction.other_pending_n %}未判定 {{ direction.other_pending_n }} 项{% endif %}</span>
-            {% elif direction.other_pending_n and direction.other_ok_n %}
-            <span>正常 {{ direction.other_ok_n }} 项 ・ 未判定 {{ direction.other_pending_n }} 项（暂无实盘数据，不作判定）</span>
-            {% elif direction.other_pending_n %}
-            <span>未判定 {{ direction.other_pending_n }} 项（暂无实盘数据，不作判定）</span>
-            {% elif direction.other_ok_n %}
-            <span>订单对账 / 单腿收益 / 连亏空窗 / 收益带 / 浮亏回撤 —— 全部正常 ✓（{{ direction.other_ok_n }} 项）</span>
-            {% else %}
-            <span>—</span>
-            {% endif %}
-        </div>
-
-        {% if direction.evidence %}
-        <div class="mt-2 space-y-1">
+    {% if direction.evidence %}
+    <details class="health-evidence">
+        <summary>证据（{{ direction.evidence | length }}）</summary>
+        <div class="space-y-1">
             {% for item in direction.evidence %}
             <div class="text-xs {{ 'text-red-600' if item.status == 'red' else 'text-amber-700' }}">〔{{ item.gate }}〕{{ item.line }}</div>
             {% endfor %}
         </div>
-        {% endif %}
-        {% endfor %}
-    </section>
+    </details>
+    {% endif %}
     {% endfor %}
+
+    {% if entry.portfolio %}
+    {% set pf = entry.portfolio %}
+    <div class="health-exposure">
+        <div class="health-exposure-head">
+            <span class="text-gray-800 font-medium">组合净敞口</span>
+            <span class="gate-chip status-{{ pf.status }}">{{ pf.status_label }}</span>
+            <span>净敞口 <b>{{ pf.net_size }}</b> BTC（L {{ pf.long_size }} / S {{ pf.short_size }}）</span>
+        </div>
+        {% set max_size = [pf.long_size_num | abs, pf.short_size_num | abs, pf.net_size_num | abs, 0.000001] | max %}
+        <div class="exposure-bars">
+            <div class="exposure-row"><span>L</span><div class="exposure-track"><i class="long" style="width: {{ (pf.long_size_num | abs / max_size * 100) | round(1) }}%"></i></div><b>{{ pf.long_size }}</b></div>
+            <div class="exposure-row"><span>S</span><div class="exposure-track"><i class="short" style="width: {{ (pf.short_size_num | abs / max_size * 100) | round(1) }}%"></i></div><b>{{ pf.short_size }}</b></div>
+            <div class="exposure-row"><span>净</span><div class="exposure-track"><i class="net {{ 'pos' if pf.net_size_num >= 0 else 'neg' }}" style="width: {{ (pf.net_size_num | abs / max_size * 100) | round(1) }}%"></i></div><b>{{ pf.net_size }}</b></div>
+        </div>
+        <div class="health-exposure-meta">
+            <span>总名义 {{ pf.gross_notional }}</span>
+            <span>合计净值 {{ pf.combined_equity }}</span>
+            <span>净比 {{ pf.net_ratio }}</span>
+            <span>总比 {{ pf.gross_ratio }}</span>
+            {% if pf.mode == 'observe' %}<span>仅记录</span>{% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if hs.suggested_commands %}
+    <details class="health-commands">
+        <summary>建议命令（人工执行，{{ hs.suggested_commands | length }} 条）</summary>
+        {% for command in hs.suggested_commands %}
+        <div class="text-xs font-mono text-gray-700 break-all mt-1">{{ command }}</div>
+        {% endfor %}
+    </details>
+    {% endif %}
+</section>
+{% endfor %}

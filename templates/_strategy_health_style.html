@@ -12,18 +12,108 @@
         .status-bg-observe { background:#f3f4f6; border-color:#e5e7eb; color:#374151; }
         .status-bg-yellow { background:#fffbeb; border-color:#fde68a; color:#92400e; }
         .status-bg-red { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
+        .status-bg-disabled { background:#f3f4f6; border-color:#e5e7eb; color:#6b7280; }
 
-        /* 三模块磁贴（参数一致性 / 开仓对齐 / 分布健康） */
-        .health-modules { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:0.55rem; }
-        .health-tile { background:#f9fafb; border:1px solid #eef0f3; border-radius:0.6rem; padding:0.5rem 0.65rem; min-width:0; }
-        .health-tile-head { display:flex; flex-wrap:wrap; align-items:center; gap:0.35rem; margin-bottom:0.3rem; }
-        .health-tile-name { font-size:0.72rem; font-weight:600; color:#374151; }
-        .health-tile-detail { font-size:0.68rem; color:#6b7280; line-height:1.15rem; word-break:break-word; overflow-wrap:anywhere; }
+        /* 面板：看板内承担剩余高度，独立页按内容排布 */
+        .health-panel {
+            background:#fff;
+            border-radius:0.9rem;
+            box-shadow:0 1px 3px rgba(15,23,42,0.08);
+            padding:0.9rem 1rem;
+            display:flex;
+            flex-direction:column;
+            gap:0.55rem;
+            min-height:0;
+            margin-bottom:0.8rem;
+        }
+        #lead-health-view { display:flex; flex-direction:column; gap:0.7rem; }
+        #lead-health-view .health-panel { flex:1 0 auto; margin-bottom:0; }
+        .health-panel-head { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:0.55rem 0.8rem; }
+        .health-panel-title { display:flex; flex-wrap:wrap; align-items:center; gap:0.35rem; min-width:0; }
+        .health-panel-title h2 { font-size:0.92rem; font-weight:700; color:#1e293b; margin:0; line-height:1.2; }
+        .health-snapshot { font-size:0.64rem; color:#94a3b8; }
+        .health-score { display:flex; align-items:center; gap:0.55rem; }
+        .health-donut { width:64px; height:64px; border-radius:50%; display:grid; place-items:center; flex:0 0 auto; }
+        .health-donut-hole { width:46px; height:46px; border-radius:50%; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1; }
+        .health-donut-hole b { font-size:0.84rem; color:#0f172a; }
+        .health-donut-hole span { font-size:0.58rem; color:#94a3b8; }
+        .health-donut-hole em { font-style:normal; font-size:0.54rem; color:#94a3b8; }
+        .health-score-legend { display:grid; gap:0.12rem; font-size:0.62rem; color:#64748b; }
+        .health-score-legend span { display:flex; align-items:center; gap:0.25rem; white-space:nowrap; }
+        .health-dot { width:6px; height:6px; border-radius:50%; display:inline-block; flex:0 0 auto; }
+        .health-dot.ok { background:#10b981; }
+        .health-dot.observe { background:#94a3b8; }
+        .health-dot.yellow { background:#f59e0b; }
+        .health-dot.red { background:#ef4444; }
 
-        /* 样本进度条（分布健康） */
-        .health-meter { height:6px; border-radius:9999px; background:#e5e7eb; overflow:hidden; margin:0.25rem 0; }
-        .health-meter-fill { display:block; height:100%; border-radius:9999px; background:#93c5fd; }
-        .health-meter-fill.status-fill-ok { background:#10b981; }
-        .health-meter-fill.status-fill-yellow { background:#f59e0b; }
-        .health-meter-fill.status-fill-red { background:#ef4444; }
-        .health-meter-fill.status-fill-observe { background:#93c5fd; }
+        .health-panel .health-banner { margin-bottom:0; }
+        .health-reasons { margin:0; padding-left:1rem; font-size:0.64rem; color:#64748b; line-height:1.15rem; }
+        .health-direction-label { font-size:0.64rem; font-weight:600; color:#94a3b8; margin-top:0.2rem; }
+
+        /* 方向主体：三模块纵向铺满 + 闸门矩阵 */
+        .health-panel-body { display:flex; flex-direction:column; gap:0.55rem; flex:1 1 auto; min-height:0; }
+        .health-modules { display:grid; grid-template-rows:repeat(3, minmax(4.6rem, 1fr)); gap:0.5rem; flex:1 1 auto; min-height:0; }
+        .health-tile {
+            display:flex;
+            align-items:center;
+            gap:0.65rem;
+            background:#f8fafc;
+            border:1px solid #eef0f3;
+            border-radius:0.65rem;
+            padding:0.55rem 0.7rem;
+            min-width:0;
+        }
+        .health-tile-icon { width:2.1rem; height:2.1rem; border-radius:0.65rem; display:grid; place-items:center; flex:0 0 auto; font-size:0.9rem; }
+        .health-tile-body { flex:1 1 auto; min-width:0; }
+        .health-tile-head { display:flex; flex-wrap:wrap; align-items:center; gap:0.3rem; margin-bottom:0.2rem; }
+        .health-tile-name { font-size:0.74rem; font-weight:650; color:#334155; }
+        .health-tile-detail { font-size:0.68rem; color:#64748b; line-height:1.15rem; word-break:break-word; overflow-wrap:anywhere; }
+        .health-tile-visual { flex:0 0 auto; display:grid; place-items:center; }
+        .health-orb { width:2.2rem; height:2.2rem; border-radius:50%; display:grid; place-items:center; font-size:0.95rem; font-weight:700; flex:0 0 auto; }
+
+        /* 开仓对齐：三行迷你条形图 */
+        .align-bars { display:grid; gap:0.18rem; margin-top:0.25rem; }
+        .align-row { display:grid; grid-template-columns:2.4rem minmax(0,1fr) 1.4rem; align-items:center; gap:0.35rem; font-size:0.62rem; color:#64748b; }
+        .align-track { height:6px; border-radius:9999px; background:#e2e8f0; overflow:hidden; }
+        .align-track i { display:block; height:100%; border-radius:9999px; background:#3b82f6; }
+        .align-track i.ok { background:#10b981; }
+        .align-track i.miss { background:#f59e0b; }
+        .align-track i.extra { background:#ef4444; }
+        .align-bars.is-empty .align-track { background:repeating-linear-gradient(90deg,#e2e8f0 0 6px,#f1f5f9 6px 12px); }
+
+        /* 分布健康：样本进度环 */
+        .health-ring { width:58px; height:58px; border-radius:50%; background:conic-gradient(#3b82f6 calc(var(--progress) * 1%), #e5e7eb 0); display:grid; place-items:center; flex:0 0 auto; }
+        .health-ring-hole { width:42px; height:42px; border-radius:50%; background:#fff; display:grid; place-items:center; font-size:0.66rem; font-weight:700; color:#1e293b; }
+        .health-metric-chips { display:flex; flex-wrap:wrap; gap:0.2rem; margin-top:0.2rem; }
+        .health-metric-chips span { font-size:0.6rem; color:#475569; background:#eef2f7; border-radius:9999px; padding:1px 6px; }
+
+        /* 闸门矩阵 */
+        .health-gate-matrix { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:0.35rem; }
+        .gate-cell { background:#f8fafc; border:1px solid #eef0f3; border-radius:0.5rem; padding:0.3rem 0.4rem; display:flex; align-items:center; gap:0.25rem; min-width:0; }
+        .gate-dot { width:7px; height:7px; border-radius:50%; flex:0 0 auto; background:#94a3b8; }
+        .gate-dot.status-ok { background:#10b981; }
+        .gate-dot.status-observe { background:#94a3b8; }
+        .gate-dot.status-yellow { background:#f59e0b; }
+        .gate-dot.status-red { background:#ef4444; }
+        .gate-dot.status-disabled { background:#cbd5e1; }
+        .gate-name { font-size:0.62rem; color:#475569; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1 1 auto; min-width:0; }
+        .gate-state { margin-left:auto; font-size:0.56rem; color:#94a3b8; flex:0 0 auto; }
+
+        /* 组合净敞口：L/S/净三条横条 */
+        .health-exposure { background:#f8fafc; border:1px solid #eef0f3; border-radius:0.65rem; padding:0.5rem 0.65rem; }
+        .health-exposure-head { display:flex; flex-wrap:wrap; align-items:center; gap:0.35rem; font-size:0.68rem; color:#475569; }
+        .health-exposure-head b { color:#0f172a; }
+        .exposure-bars { display:grid; gap:0.2rem; margin-top:0.3rem; }
+        .exposure-row { display:grid; grid-template-columns:1.1rem minmax(0,1fr) 5.4rem; align-items:center; gap:0.35rem; font-size:0.62rem; color:#64748b; }
+        .exposure-track { height:8px; border-radius:9999px; background:#e2e8f0; overflow:hidden; }
+        .exposure-track i { display:block; height:100%; border-radius:9999px; }
+        .exposure-track i.long { background:#10b981; }
+        .exposure-track i.short { background:#ef4444; }
+        .exposure-track i.net.pos { background:#3b82f6; }
+        .exposure-track i.net.neg { background:#f97316; }
+        .health-exposure-meta { margin-top:0.25rem; font-size:0.6rem; color:#94a3b8; display:flex; flex-wrap:wrap; gap:0.25rem 0.6rem; }
+
+        /* 页脚：其他闸门 / 证据 / 建议命令 */
+        .health-footer { font-size:0.64rem; color:#64748b; display:flex; flex-wrap:wrap; align-items:center; gap:0.25rem; }
+        .health-evidence, .health-commands { font-size:0.64rem; color:#64748b; }
+        .health-evidence summary, .health-commands summary { cursor:pointer; color:#94a3b8; }

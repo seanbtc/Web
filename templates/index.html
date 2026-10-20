@@ -1767,7 +1767,7 @@
                             <section class="asset-card" id="asset-composition-card">
                                 <div class="flex items-center justify-between mb-2">
                                     <h3 class="text-base font-semibold text-dark"><i class="fa fa-pie-chart text-primary mr-2"></i>资产构成</h3>
-                                    <span class="text-xs text-gray-400">抄底现货（市值）· 策略模块（累计盈亏）· 摸顶策略（均价×数量+累计盈亏）</span>
+                                    <span class="text-xs text-gray-400">抄底现货（市值）· 策略模块（累计盈亏）· 摸顶策略（仓位成本+累计盈亏）</span>
                                 </div>
                                 <div class="flex flex-col md:flex-row items-center gap-5">
                                     <div class="relative" style="width:220px;height:220px;flex:0 0 auto;">
@@ -1789,21 +1789,10 @@
                                 </div>
                                 <div class="asset-stat-grid mb-3">
                                     <div class="asset-stat"><div class="asset-label">持仓数量</div><div class="asset-value" id="asset-spot-qty">-</div></div>
-                                    <div class="asset-stat"><div class="asset-label">持仓均价</div><div class="asset-value" id="asset-spot-avg">-</div></div>
                                     <div class="asset-stat"><div class="asset-label">当前价</div><div class="asset-value" id="asset-spot-price">-</div></div>
                                     <div class="asset-stat"><div class="asset-label">持仓市值</div><div class="asset-value" id="asset-spot-value">-</div></div>
                                     <div class="asset-stat"><div class="asset-label">浮动盈亏</div><div class="asset-value" id="asset-spot-float">-</div></div>
                                     <div class="asset-stat"><div class="asset-label">已了结盈亏</div><div class="asset-value" id="asset-spot-realized">-</div></div>
-                                </div>
-                                <div class="table-container overflow-x-auto compact-table-container">
-                                    <table class="asset-table min-w-full">
-                                        <thead>
-                                            <tr><th>数量</th><th>均价</th><th>状态</th><th>平仓均价</th><th>盈亏</th></tr>
-                                        </thead>
-                                        <tbody id="asset-spot-records">
-                                            <tr><td colspan="5" class="text-gray-400 text-center py-3">暂无记录</td></tr>
-                                        </tbody>
-                                    </table>
                                 </div>
                             </section>
 
@@ -1828,24 +1817,13 @@
                                 </div>
                                 <div class="asset-stat-grid mb-3">
                                     <div class="asset-stat"><div class="asset-label">持仓数量</div><div class="asset-value" id="asset-top-qty">-</div></div>
-                                    <div class="asset-stat"><div class="asset-label">持仓均价</div><div class="asset-value" id="asset-top-avg">-</div></div>
                                     <div class="asset-stat"><div class="asset-label">当前价</div><div class="asset-value" id="asset-top-price">-</div></div>
                                     <div class="asset-stat"><div class="asset-label">仓位成本</div><div class="asset-value" id="asset-top-cost">-</div></div>
                                     <div class="asset-stat"><div class="asset-label">浮动盈亏</div><div class="asset-value" id="asset-top-float">-</div></div>
                                     <div class="asset-stat"><div class="asset-label">累计盈亏</div><div class="asset-value" id="asset-top-realized">-</div></div>
                                     <div class="asset-stat"><div class="asset-label">策略资产</div><div class="asset-value" id="asset-top-asset">-</div></div>
                                 </div>
-                                <div class="table-container overflow-x-auto compact-table-container">
-                                    <table class="asset-table min-w-full">
-                                        <thead>
-                                            <tr><th>数量</th><th>均价</th><th>状态</th><th>平仓均价</th><th>盈亏</th></tr>
-                                        </thead>
-                                        <tbody id="asset-top-records">
-                                            <tr><td colspan="5" class="text-gray-400 text-center py-3">暂无记录</td></tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div class="text-xs text-gray-500 mt-2" id="asset-top-note">资产 = 持仓均价 × 数量 + 累计盈亏；无仓位则不显示</div>
+                                <div class="text-xs text-gray-500 mt-2" id="asset-top-note">资产 = 仓位成本 + 累计盈亏；无仓位则不显示</div>
                             </section>
                         </div>
                     </div>
@@ -3589,39 +3567,15 @@
         function updateSpotAssetCard() {
             const bottomData = latestBottomPositionData || {};
             const quantity = Number(bottomData.position_quantity) || 0;
-            const averagePrice = Number(bottomData.position_avg_price) || 0;
             const currentPrice = getCurrentBtcPrice();
             const statusEl = document.getElementById('asset-spot-status');
             if (statusEl) updateStatusBadge(statusEl, bottomData.status || '清仓');
             setAssetText('asset-spot-qty', quantity > 0 ? `${formatQuantity(quantity)} BTC` : '-');
-            setAssetText('asset-spot-avg', averagePrice > 0 ? formatMoney(averagePrice, 1) : '-');
             setAssetText('asset-spot-price', currentPrice ? formatMoney(currentPrice, 1) : '-');
             const marketValue = (currentPrice && quantity > 0) ? (quantity * currentPrice) : null;
             setAssetText('asset-spot-value', marketValue !== null ? formatMoney(marketValue, 2) : '-');
             const floating = calculateFloatingProfit(bottomData, 'long');
             setAssetText('asset-spot-float', floating !== null ? formatSignedMoney(floating, 2) : '-', floating);
-        }
-
-        function renderAssetRecords(tbodyId, records) {
-            const tbody = document.getElementById(tbodyId);
-            if (!tbody) return;
-            if (!records.length) {
-                tbody.innerHTML = '<tr><td colspan="5" class="text-gray-400 text-center py-3">暂无记录</td></tr>';
-                return;
-            }
-            tbody.innerHTML = records.map(record => {
-                const closed = Boolean(record.is_closed);
-                const profit = Number(record.profit) || 0;
-                const profitText = closed ? formatSignedMoney(profit, 2) : '-';
-                const profitClass = closed ? (profit >= 0 ? 'text-green-600' : 'text-red-600') : '';
-                return '<tr>'
-                    + `<td>${Number.isFinite(Number(record.quantity)) ? formatQuantity(record.quantity) : '-'}</td>`
-                    + `<td>${Number.isFinite(Number(record.avg_price)) ? formatMoney(record.avg_price, 1) : '-'}</td>`
-                    + `<td>${closed ? '已了结' : '持有中'}</td>`
-                    + `<td>${Number.isFinite(Number(record.close_avg_price)) ? formatMoney(record.close_avg_price, 1) : '-'}</td>`
-                    + `<td class="${profitClass}">${profitText}</td>`
-                    + '</tr>';
-            }).join('');
         }
 
         function updateTopAssetCard() {
@@ -3636,7 +3590,6 @@
 
             const hasPosition = quantity > 0 && averagePrice > 0;
             setAssetText('asset-top-qty', hasPosition ? `${formatQuantity(quantity)} BTC` : '-');
-            setAssetText('asset-top-avg', hasPosition ? formatMoney(averagePrice, 1) : '-');
             setAssetText('asset-top-price', currentPrice ? formatMoney(currentPrice, 1) : '-');
             const cost = hasPosition ? averagePrice * quantity : null;
             setAssetText('asset-top-cost', cost !== null ? formatMoney(cost, 2) : '-');
@@ -3649,7 +3602,7 @@
             const noteEl = document.getElementById('asset-top-note');
             if (noteEl) {
                 noteEl.textContent = hasPosition
-                    ? '资产 = 持仓均价 × 数量 + 累计盈亏（已了结）'
+                    ? '资产 = 仓位成本 + 累计盈亏（已了结）'
                     : '当前无持仓，不显示策略资产';
             }
         }
@@ -3751,12 +3704,8 @@
             const realized = closedRecords.reduce((total, record) => total + (Number(record.profit) || 0), 0);
             setAssetText('asset-spot-realized', closedRecords.length ? formatSignedMoney(realized, 2) : '$0.00',
                          closedRecords.length ? realized : 0);
-            renderAssetRecords('asset-spot-records', records);
 
-            const topData = (data && data.top) || latestTopPositionData || {};
             updateTopAssetCard();
-            renderAssetRecords('asset-top-records',
-                (topData.trade_records || []).filter(record => record && typeof record === 'object'));
 
             const leadSummary = (((data && data.lead) || {}).summary) || {};
             const realizedPnl = Number(leadSummary.total_realized_pnl);

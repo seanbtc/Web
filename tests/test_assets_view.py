@@ -43,16 +43,23 @@ def test_index_has_assets_view_markup(client):
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
     for marker in ('data-performance-view="assets"', 'performance-assets-view',
-                   'asset-spot-value', 'asset-lead-fee', 'asset-lead-realized', 'asset-spot-records',
+                   'asset-spot-value', 'asset-lead-fee', 'asset-lead-realized',
                    '抄底现货资产', '策略模块资产',
-                   'asset-top-asset', 'asset-top-records', '摸顶策略资产',
-                   'updateTopAssetCard', 'renderAssetRecords',
+                   'asset-top-asset', '摸顶策略资产',
+                   'updateTopAssetCard',
                    'assetCompositionChart', 'asset-composition-legend',
                    'asset-total-value', 'updateAssetCompositionChart'):
         assert marker in html, f'页面缺少标记: {marker}'
     assert html.count('data-performance-view=') == 3
     assert html.count('class="asset-card"') == 4
     assert 'is-assets' in html and 'updateAssetsView' in html
+    # 2026-10-20：抄底/摸顶资产卡去掉「持仓均价」小卡与整块交易记录表（与策略模块重复）
+    assert 'asset-spot-avg' not in html
+    assert 'asset-top-avg' not in html
+    assert 'asset-spot-records' not in html
+    assert 'asset-top-records' not in html
+    assert 'renderAssetRecords' not in html
+    assert '<th>数量</th><th>状态</th><th>平仓均价</th><th>盈亏</th>' not in html
 
 
 def test_get_data_payload_contains_assets_sources(client):

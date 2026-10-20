@@ -3057,12 +3057,27 @@ def _portfolio_view_model(portfolio):
     legs = portfolio.get('legs') or {}
     net_ratio = portfolio.get('net_ratio')
     gross_ratio = portfolio.get('gross_ratio')
+
+    def _raw(value):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    long_num = _raw((legs.get('long') or {}).get('exchange_size'))
+    short_num = _raw((legs.get('short') or {}).get('exchange_size'))
+    net_num = _raw(portfolio.get('net_size'))
+    gross_abs = abs(long_num) + abs(short_num)
     return {
         'status': portfolio.get('status') or 'observe',
         'mode': portfolio.get('mode') or '',
         'net_size': _num(portfolio.get('net_size'), '{:+.6f}'),
         'long_size': _num((legs.get('long') or {}).get('exchange_size'), '{:+.6f}'),
         'short_size': _num((legs.get('short') or {}).get('exchange_size'), '{:+.6f}'),
+        'long_size_num': long_num,
+        'short_size_num': short_num,
+        'net_size_num': net_num,
+        'gross_abs_num': gross_abs,
         'net_notional': _num(portfolio.get('net_notional'), '{:+,.0f}'),
         'gross_notional': _num(portfolio.get('gross_notional'), '{:,.0f}'),
         'combined_equity': _num(portfolio.get('combined_equity'), '{:,.2f}'),
@@ -3213,13 +3228,20 @@ def _health_dist_display(dist):
 
 
 def _health_direction_display(name, branch):
-    """单方向：三个模块（M1/M2/M3）+ 其余闸门汇总 + 黄/红证据。"""
+    """单方向：三个模块（M1/M2/M3）+ 闸门矩阵 + 其余闸门汇总 + 黄/红证据。"""
     branch = branch if isinstance(branch, dict) else {}
     gates = branch.get('gates') if isinstance(branch.get('gates'), dict) else {}
     problems, pending, evidence, ok_n = [], 0, [], 0
+    gate_list = []
     for key, gate in gates.items():
         gate = gate if isinstance(gate, dict) else {}
         status = str(gate.get('status') or 'observe')
+        gate_list.append({
+            'key': key,
+            'label': _HEALTH_GATE_LABELS.get(key, key),
+            'status': status,
+            'status_label': _health_status_label(status),
+        })
         if key not in ('g5_params_guard', 'g6_alignment', 'g7_distribution'):
             if status == 'ok':
                 ok_n += 1
@@ -3232,11 +3254,31 @@ def _health_direction_display(name, branch):
             for line in (gate.get('evidence') or [])[:2]:
                 evidence.append({'gate': _HEALTH_GATE_LABELS.get(key, key),
                                  'status': status, 'line': _health_humanize(line)})
+    gate_list.sort(key=lambda item: item['key'])
+    total = len(gate_list)
+    gate_stats = {
+        'total': total,
+        'ok': sum(1 for item in gate_list if item['status'] == 'ok'),
+        'observe': sum(1 for item in gate_list if item['status'] in ('observe', 'disabled')),
+        'yellow': sum(1 for item in gate_list if item['status'] == 'yellow'),
+        'red': sum(1 for item in gate_list if item['status'] == 'red'),
+    }
+    if total:
+        gate_stats.update({
+            'ok_pct': round(gate_stats['ok'] / total * 100, 1),
+            'observe_pct': round(gate_stats['observe'] / total * 100, 1),
+            'yellow_pct': round(gate_stats['yellow'] / total * 100, 1),
+            'red_pct': round(gate_stats['red'] / total * 100, 1),
+        })
+    else:
+        gate_stats.update({'ok_pct': 0.0, 'observe_pct': 0.0, 'yellow_pct': 0.0, 'red_pct': 0.0})
     return {
         'name': name,
         'guard': _health_guard_display(branch.get('params_guard')),
         'align': _health_align_display(branch.get('alignment_gate')),
         'dist': _health_dist_display(branch.get('distribution_health')),
+        'gates': gate_list,
+        'gate_stats': gate_stats,
         'other_ok_n': ok_n,
         'other_pending_n': pending,
         'other_problems': problems,

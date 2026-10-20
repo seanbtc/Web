@@ -144,7 +144,9 @@ def test_strategy_health_page_renders_snapshot(tmp_path, monkeypatch, client):
                    '延迟 p90 30s', '偏差 p95 4.2bps',
                    '3/10 腿 · 0.50/1 月', '样本积累中',
                    '组合净敞口', '其他闸门', '全部正常', 'status-bg-yellow',
-                   '快照 10-18 14:00', '多单 1（实盘多出于回放）'):
+                   '快照 10-18 14:00', '多单 1（实盘多出于回放）',
+                   'health-donut', 'health-gate-matrix', 'gate-cell',
+                   'exposure-row', 'align-bars', 'health-ring'):
         assert marker in html, f'缺少标记: {marker}'
     assert 'None' not in html
 
