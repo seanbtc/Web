@@ -30,6 +30,8 @@ import threading
 import time
 from flask_socketio import SocketIO
 
+from ahr999 import compute_ahr999
+
 # 确保数据目录存在
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 if not os.path.exists(data_dir):
@@ -59,6 +61,14 @@ else:
     alpha_engine_state_file = os.path.abspath(os.path.join(
         os.path.dirname(__file__), '..', 'AlphaEngine', 'data', 'state.json'
     ))
+
+# AHR999 独立估值指数：仅展示，不参与 AlphaEngine / 交易决策。
+AHR999_REFRESH_SECONDS = 3600
+AHR999_RETRY_SECONDS = 900
+AHR999_KLINE_LIMIT = 260
+_ahr999_datafeed_url = os.getenv('WEB_DATAFEED_URL', 'http://127.0.0.1:9550').rstrip('/')
+_ahr999_last_good = None
+
 
 ALPHA_ENGINE_REGIME_LABELS = {
     'BEAR_BOTTOM': '熊底',
@@ -156,6 +166,81 @@ def alpha_engine_update_changed(market_data, new_regime, new_alpha, new_ma):
         return True
     return (alpha_engine_ma_signature(market_data.get('alpha_engine_ma'))
             != alpha_engine_ma_signature(new_ma))
+
+
+def _fetch_ahr999_bars():
+    """取 BTCUSDT 日线：DataFeed 优先 → Binance 合约/现货回退。
+
+    返回 (bars, source, source_stale)；失败返回 ([], '', False)。
+    DataFeed 标记 stale 时仍保留其数据作为兜底，但优先尝试 Binance 新鲜数据。
+    """
+    datafeed_candidate = None
+    try:
+        response = requests.get(
+            f'{_ahr999_datafeed_url}/klines',
+            params={'symbol': 'BTCUSDT', 'interval': '1d', 'limit': AHR999_KLINE_LIMIT},
+            timeout=5,
+        )
+        if response.status_code == 200:
+            payload = response.json()
+            if isinstance(payload, dict):
+                bars = payload.get('bars')
+                if payload.get('ok') and isinstance(bars, list) and bars:
+                    source_stale = bool(payload.get('stale'))
+                    if not source_stale:
+                        return bars, 'datafeed', False
+                    datafeed_candidate = (bars, 'datafeed', True)
+    except Exception as exc:
+        print(f'[Web] AHR999 DataFeed 取数失败: {type(exc).__name__}: {exc}')
+
+    for url in (
+        'https://fapi.binance.com/fapi/v1/klines',
+        'https://api.binance.com/api/v3/klines',
+    ):
+        try:
+            response = requests.get(
+                url,
+                params={'symbol': 'BTCUSDT', 'interval': '1d', 'limit': AHR999_KLINE_LIMIT},
+                timeout=5,
+            )
+            if response.status_code == 200:
+                bars = response.json()
+                if isinstance(bars, list) and bars:
+                    return bars, 'binance', False
+        except Exception as exc:
+            print(f'[Web] AHR999 Binance 取数失败: {type(exc).__name__}: {exc}')
+    if datafeed_candidate is not None:
+        return datafeed_candidate
+    return [], '', False
+
+
+def refresh_ahr999():
+    """刷新 AHR999；失败时保留上次成功值并标记 stale。"""
+    global _ahr999_last_good
+    now_iso = datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + 'Z'
+    bars, source, source_stale = _fetch_ahr999_bars()
+    if bars:
+        result = compute_ahr999(bars)
+        result['source'] = source
+        result['source_stale'] = bool(source_stale)
+        result['updated_at'] = now_iso
+        if result.get('available'):
+            _ahr999_last_good = result
+            return result
+        print(f"[Web] AHR999 计算不可用: {result.get('error')}")
+
+    if _ahr999_last_good:
+        fallback = dict(_ahr999_last_good)
+        fallback['stale'] = True
+        fallback['error'] = '刷新失败，显示上次成功值'
+        fallback['updated_at'] = now_iso
+        return fallback
+    return {
+        'available': False,
+        'error': 'AHR999 数据不可用',
+        'source': source or '',
+        'updated_at': now_iso,
+    }
 
 
 # Promo 发帖数据只通过 HTTP 推送进入 Web (POST /api/update_post_feed),
@@ -2037,8 +2122,32 @@ def fetch_btc_price():
     EMIT_INTERVAL = 5.0
     retry_coingecko_at = 0.0
     datafeed_reported = False
+    last_ahr_fetch = 0.0
+    ahr_interval = AHR999_REFRESH_SECONDS
 
     while True:
+        now_ahr = time.time()
+        if now_ahr - last_ahr_fetch >= ahr_interval:
+            last_ahr_fetch = now_ahr
+            try:
+                ahr999_result = refresh_ahr999()
+                data_storage.update_market_data({'ahr999': ahr999_result})
+                socketio.emit('market_update', {
+                    'market_data': data_storage.market_data,
+                    'strategy_status': data_storage.strategy_status,
+                })
+                ahr_interval = (AHR999_REFRESH_SECONDS if ahr999_result.get('available')
+                                else AHR999_RETRY_SECONDS)
+                if ahr999_result.get('available'):
+                    print(f"[Web] AHR999={ahr999_result.get('value')} "
+                          f"({ahr999_result.get('zone')}) as_of={ahr999_result.get('as_of')} "
+                          f"source={ahr999_result.get('source')}")
+                else:
+                    print(f"[Web] AHR999 不可用: {ahr999_result.get('error')}")
+            except Exception as exc:
+                ahr_interval = AHR999_RETRY_SECONDS
+                print(f'[Web] AHR999 刷新失败: {type(exc).__name__}: {exc}')
+
         btc_price = 0.0
         source = 'none'
         try:
@@ -2157,6 +2266,7 @@ global_data = {
         'alpha_engine_regime': alpha_engine_regime,
         'alpha_engine_alpha': alpha_engine_alpha,
         'alpha_engine_ma': alpha_engine_ma,
+        'ahr999': None,
         'btc_price': 58000.0
     },
     'post_feed': load_promo_posts()
@@ -2665,6 +2775,8 @@ class DataStorage:
             self.market_data['alpha_engine_alpha'] = data['alpha_engine_alpha']
         if 'alpha_engine_ma' in data:
             self.market_data['alpha_engine_ma'] = data['alpha_engine_ma']
+        if 'ahr999' in data:
+            self.market_data['ahr999'] = data['ahr999']
         if 'btc_price' in data:
             self.market_data['btc_price'] = data['btc_price']
         self.update_global_data()

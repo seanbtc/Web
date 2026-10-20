@@ -145,3 +145,26 @@ def test_market_data_carries_ma_on_initial_and_update():
     assert storage.update_market_data({'alpha_engine_ma': payload}) is True
     assert storage.market_data['alpha_engine_ma'] == payload
     assert storage.get_all_data()['market_data']['alpha_engine_ma'] == payload
+
+
+def test_market_data_carries_ahr999_on_initial_and_update():
+    assert 'ahr999' in web.data_storage.market_data
+
+    storage = web.DataStorage()
+    payload = {
+        'available': True, 'value': 0.5232, 'zone': '定投区', 'zone_key': 'dca',
+        'as_of': '2026-10-08', 'stale': False,
+    }
+    assert storage.update_market_data({'ahr999': payload}) is True
+    assert storage.market_data['ahr999'] == payload
+    assert storage.get_all_data()['market_data']['ahr999'] == payload
+
+
+def test_index_template_has_ahr999_slot_next_to_alpha():
+    template = os.path.join(WEB_DIR, 'templates', 'index.html')
+    with open(template, encoding='utf-8') as file_obj:
+        html = file_obj.read()
+    assert 'id="alpha-value"' in html
+    assert 'id="ahr999-value"' in html
+    assert 'marketData.ahr999' in html
+    assert html.index('id="alpha-value"') < html.index('id="ahr999-value"')

@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections import Counter
 
 SCHEMA_VERSION = 1
-UPDATED_AT = '2026-10-19'
+UPDATED_AT = '2026-10-20'
 
 STATUS_LABELS = {
     'live': '已上线',
@@ -131,7 +131,8 @@ LAYERS = [
             {'id': 'autodca', 'name': 'AutoDCA', 'status': 'idle', 'service': 'autodca',
              'desc': '定投执行（计划已到期，有意停用）', 'caps': ['需手动恢复']},
             {'id': 'web', 'name': 'Web 面板', 'status': 'live', 'service': 'web',
-             'desc': '本页所在：交易/帖子/盈亏/系统骨架/博客', 'caps': ['登录门禁']},
+             'desc': '本页所在：交易/帖子/盈亏/系统骨架/博客；头部展示 AHR999 独立估值指数',
+             'caps': ['登录门禁', 'AHR999 估值']},
             {'id': 'blog', 'name': '博客（公开页）', 'status': 'live',
              'desc': 'Hexo 全量迁移（2026-10-19）：公开 /blog + 看板入口；Python 渲染（Markdown/Pygments），独立于交易链路',
              'caps': ['公开访问', '91 篇文章']},
@@ -239,6 +240,7 @@ EDGES = [
     {'from': 'promo', 'to': 'aiservice'},
     {'from': 'aiservice', 'to': 'ext_deepseek'},
     {'from': 'datafeed', 'to': 'alphaengine', 'label': '1d 上下文'},
+    {'from': 'datafeed', 'to': 'web', 'label': 'AHR999 日线', 'style': 'dashed'},
     {'from': 'sentinel', 'to': 'dingtalk', 'label': '告警'},
     {'from': 'ops_kb', 'to': 'kb'},
     {'from': 'ops_research', 'to': 'ledger', 'label': '周批'},

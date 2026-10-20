@@ -181,6 +181,38 @@
             border-color: rgba(71, 85, 105, 0.38) !important;
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 18px rgba(71, 85, 105, 0.12);
         }
+        #ahr999-value {
+            background: rgba(255, 255, 255, 0.82);
+            color: var(--text-primary) !important;
+            border: 1px solid rgba(17, 17, 17, 0.08);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+            white-space: nowrap;
+        }
+        #ahr999-value.ahr-bottom {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(16, 185, 129, 0.26)) !important;
+            color: #166534 !important;
+            border-color: rgba(34, 197, 94, 0.38) !important;
+        }
+        #ahr999-value.ahr-dca {
+            background: linear-gradient(135deg, rgba(20, 184, 166, 0.18), rgba(13, 148, 136, 0.24)) !important;
+            color: #0f766e !important;
+            border-color: rgba(13, 148, 136, 0.38) !important;
+        }
+        #ahr999-value.ahr-caution {
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.28)) !important;
+            color: #92400e !important;
+            border-color: rgba(245, 158, 11, 0.42) !important;
+        }
+        #ahr999-value.ahr-bubble {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(185, 28, 28, 0.28)) !important;
+            color: #991b1b !important;
+            border-color: rgba(185, 28, 28, 0.42) !important;
+        }
+        #ahr999-value.ahr-flat {
+            background: linear-gradient(135deg, rgba(100, 116, 139, 0.18), rgba(71, 85, 105, 0.24)) !important;
+            color: #334155 !important;
+            border-color: rgba(71, 85, 105, 0.38) !important;
+        }
         #market-cycle.bull {
             background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(16, 185, 129, 0.26)) !important;
             color: #166534 !important;
@@ -671,6 +703,7 @@
 
             #market-cycle,
             #alpha-ma-zone,
+            #ahr999-value,
             #runtime {
                 padding: 0.16rem 0.55rem !important;
                 font-size: 0.73rem !important;
@@ -1601,7 +1634,7 @@
     </div>
     <header class="bg-white shadow-md sticky top-0 z-50">
         <div class="container mx-auto px-4 py-3 flex flex-col md:flex-row items-start md:items-center justify-between">
-            <div class="flex items-center mb-3 md:mb-0">
+            <div class="flex flex-wrap items-center mb-3 md:mb-0">
                 <div class="flex items-center mr-6">
                     <span class="text-sm font-semibold text-gray-700 mr-2">比特币周期:</span>
                     <span class="px-3 py-1 rounded-full text-sm font-semibold flex items-center" id="market-cycle">
@@ -1615,6 +1648,10 @@
                 <div class="flex items-center ml-4">
                     <span class="text-sm font-semibold text-gray-700 mr-2">α:</span>
                     <span class="text-sm font-bold text-dark" id="alpha-value">+0.00</span>
+                </div>
+                <div class="flex items-center ml-4">
+                    <span class="text-sm font-semibold text-gray-700 mr-2">AHR999:</span>
+                    <span class="px-3 py-1 rounded-full text-sm font-semibold ahr-flat" id="ahr999-value" title="AHR999 独立估值指数 · 数据不可用">—</span>
                 </div>
                 <div class="flex items-center ml-4">
                     <span class="text-sm font-semibold text-gray-700 mr-2">K线趋势:</span>
@@ -3426,6 +3463,36 @@
                     const sign = alphaVal >= 0 ? '+' : '';
                     alphaElement.textContent = `${sign}${alphaVal.toFixed(2)}`;
                     alphaElement.className = `text-sm font-bold ${alphaVal > 0 ? 'text-green-600' : alphaVal < 0 ? 'text-red-600' : 'text-gray-500'}`;
+                }
+            }
+
+            // 更新 AHR999 独立估值指数 (只展示，不参与 alpha 决策)
+            const ahrElement = document.getElementById('ahr999-value');
+            if (ahrElement) {
+                const ahrData = marketData.ahr999;
+                const hasAhr = !!(ahrData && typeof ahrData === 'object' && ahrData.available);
+                const ahrVal = hasAhr ? Number(ahrData.value) : NaN;
+                ahrElement.classList.remove('ahr-bottom', 'ahr-dca', 'ahr-caution', 'ahr-bubble', 'ahr-flat');
+                if (hasAhr && Number.isFinite(ahrVal)) {
+                    const ahrZone = String(ahrData.zone || '').trim();
+                    const ahrZoneKey = String(ahrData.zone_key || '').trim();
+                    const allowedZones = ['bottom', 'dca', 'caution', 'bubble'];
+                    ahrElement.classList.add(allowedZones.includes(ahrZoneKey) ? `ahr-${ahrZoneKey}` : 'ahr-flat');
+                    ahrElement.textContent = `${ahrVal.toFixed(3)}${ahrZone ? ' ' + ahrZone : ''}`;
+                    const parts = [`AHR999 独立估值指数`, `值 ${ahrVal.toFixed(3)}`];
+                    if (ahrZone) parts.push(ahrZone);
+                    const ratioCost = Number(ahrData.ratio_cost);
+                    const ratioFit = Number(ahrData.ratio_fit);
+                    if (Number.isFinite(ratioCost)) parts.push(`200日成本比 ${ratioCost.toFixed(2)}`);
+                    if (Number.isFinite(ratioFit)) parts.push(`幂律估值比 ${ratioFit.toFixed(2)}`);
+                    if (ahrData.as_of) parts.push(`截至 ${ahrData.as_of}`);
+                    if (ahrData.stale) parts.push('数据可能过期');
+                    parts.push('不参与 alpha 决策');
+                    ahrElement.title = parts.join(' · ');
+                } else {
+                    ahrElement.classList.add('ahr-flat');
+                    ahrElement.textContent = '—';
+                    ahrElement.title = 'AHR999 独立估值指数 · 数据不可用';
                 }
             }
 
