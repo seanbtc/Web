@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-22T22:21:03+08:00",
+  "generated_at": "2026-10-22T22:26:26+08:00",
   "nodes": [
     {
       "id": 0,
@@ -198,20 +198,6 @@
       "family": true
     },
     {
-      "id": 5,
-      "name": "项陈心",
-      "relation": "二女儿",
-      "relation_label": "二女儿",
-      "closeness": 5,
-      "birthday": false,
-      "last_contact": "",
-      "deceased": false,
-      "rank": null,
-      "generation": 1,
-      "generation_label": "子辈",
-      "family": true
-    },
-    {
       "id": 3,
       "name": "龚春连",
       "relation": "母亲",
@@ -374,15 +360,6 @@
     },
     {
       "source": 0,
-      "target": 5,
-      "relation": "二女儿",
-      "relation_label": "二女儿",
-      "kind": "parent",
-      "family": true,
-      "self": true
-    },
-    {
-      "source": 0,
       "target": 3,
       "relation": "母亲",
       "relation_label": "母亲",
@@ -426,22 +403,6 @@
     },
     {
       "source": 4,
-      "target": 5,
-      "relation": "姐妹",
-      "relation_label": "姐妹",
-      "kind": "sibling",
-      "family": true
-    },
-    {
-      "source": 4,
-      "target": 6,
-      "relation": "姐弟",
-      "relation_label": "姐弟",
-      "kind": "sibling",
-      "family": true
-    },
-    {
-      "source": 5,
       "target": 6,
       "relation": "姐弟",
       "relation_label": "姐弟",
