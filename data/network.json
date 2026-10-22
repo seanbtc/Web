@@ -1,6 +1,16 @@
 {
-  "generated_at": "2026-10-22T21:24:59+08:00",
+  "generated_at": "2026-10-22T21:27:39+08:00",
   "nodes": [
+    {
+      "id": 0,
+      "name": "项咏",
+      "relation": "self",
+      "relation_label": "我",
+      "closeness": 5,
+      "birthday": true,
+      "last_contact": "",
+      "self": true
+    },
     {
       "id": 4,
       "name": "向卢义",
@@ -74,5 +84,62 @@
       "last_contact": ""
     }
   ],
-  "edges": []
+  "edges": [
+    {
+      "source": 0,
+      "target": 4,
+      "relation": "family",
+      "relation_label": "家人",
+      "self": true
+    },
+    {
+      "source": 0,
+      "target": 6,
+      "relation": "family",
+      "relation_label": "家人",
+      "self": true
+    },
+    {
+      "source": 0,
+      "target": 7,
+      "relation": "family",
+      "relation_label": "家人",
+      "self": true
+    },
+    {
+      "source": 0,
+      "target": 2,
+      "relation": "family",
+      "relation_label": "家人",
+      "self": true
+    },
+    {
+      "source": 0,
+      "target": 5,
+      "relation": "family",
+      "relation_label": "家人",
+      "self": true
+    },
+    {
+      "source": 0,
+      "target": 8,
+      "relation": "family",
+      "relation_label": "家人",
+      "self": true
+    },
+    {
+      "source": 0,
+      "target": 1,
+      "relation": "夫妻",
+      "relation_label": "夫妻",
+      "self": true
+    },
+    {
+      "source": 0,
+      "target": 3,
+      "relation": "family",
+      "relation_label": "家人",
+      "self": true
+    }
+  ]
 }
