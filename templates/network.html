@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>人际关系网络</title>
+<title>人际关系 · 家谱</title>
 <style>
   :root {
     --bg: #0b1220;
@@ -69,23 +69,67 @@
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     color: var(--muted); text-align: center; padding: 0 24px;
   }
+
+  .viewswitch { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .viewswitch button { border: 0; border-radius: 0; background: transparent; padding: 7px 14px; }
+  .viewswitch button.active { background: var(--accent); color: #06121f; font-weight: 600; }
+  .viewswitch button:disabled { opacity: .35; cursor: default; }
+  .edge.dashed { stroke-dasharray: 5 5; opacity: .55; }
+  .spouse-line { stroke: #f472b6; stroke-width: 2; opacity: .85; }
+  .parent-line { fill: none; stroke: #3b4d6b; stroke-width: 1.6; }
+  .gen-line { stroke: #1e2b40; stroke-dasharray: 4 7; }
+  .gen-label { fill: #5f7392; font-size: 11px; letter-spacing: 2px; }
+  .node .rel-label { fill: var(--muted); font-size: 10px; }
+  .node .name-label { font-weight: 600; }
+  .node.deceased { opacity: .55; }
+  .node.deceased circle { stroke-dasharray: 3 3; }
+  .node.minor { opacity: .68; }
+  .node.minor text { font-size: 10px; }
+  .node.minor .rel-label { font-size: 8px; }
+  .node.minor circle { stroke-width: 2; }
+  .parent-line.minor { stroke-width: .9; opacity: .5; }
+  .spouse-line.minor { stroke: #8a5f74; stroke-width: 1; opacity: .55; }
+  .gen-line.minor { stroke-width: .8; opacity: .45; }
+  select {
+    background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 7px 10px; font: inherit; outline: none;
+  }
+  select:focus { border-color: var(--accent); }
+  #scene { width: 100%; height: 100%; display: block; }
+  .hint3d {
+    position: absolute; left: 18px; bottom: 14px; color: var(--muted); font-size: 12px;
+    background: rgba(19,28,46,.8); border: 1px solid var(--line); border-radius: 8px;
+    padding: 6px 10px;
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1>🕸️ 人际关系网络</h1>
+  <h1>🌳 家谱 / 人际关系</h1>
   <div class="meta" id="meta">加载中…</div>
   <div class="controls">
+    <div class="viewswitch">
+      <button id="view-tree" type="button" class="active">家谱</button>
+      <button id="view-network" type="button">网络</button>
+      <button id="view-3d" type="button">3D</button>
+    </div>
+    <select id="branchfilter" title="只看某一支">
+      <option value="">全部</option>
+    </select>
     <input id="search" placeholder="搜索名字…" autocomplete="off">
     <button id="refresh" type="button">刷新</button>
   </div>
 </header>
 <div id="legend" class="legend"></div>
 <main>
-  <svg id="graph" role="img" aria-label="人际关系网络图"></svg>
+  <svg id="graph" role="img" aria-label="家谱关系图"></svg>
+  <canvas id="scene" class="hidden"></canvas>
+  <div id="hint3d" class="hint3d hidden">拖拽旋转 · 滚轮缩放 · 右键平移 · 点人物看档案</div>
   <aside id="detail" class="detail hidden"></aside>
   <div id="empty" class="empty hidden"></div>
 </main>
+<script src="/static/three.min.js"></script>
+<script src="/static/OrbitControls.js"></script>
 <script>
 (function () {
   'use strict';
@@ -100,45 +144,89 @@
     return colorCache[key];
   }
 
+  var SVG_NS = 'http://www.w3.org/2000/svg';
   var svg = document.getElementById('graph');
   var metaEl = document.getElementById('meta');
   var legendEl = document.getElementById('legend');
   var detailEl = document.getElementById('detail');
   var emptyEl = document.getElementById('empty');
   var searchEl = document.getElementById('search');
+  var treeBtn = document.getElementById('view-tree');
+  var netBtn = document.getElementById('view-network');
+  var d3Btn = document.getElementById('view-3d');
+  var hintEl = document.getElementById('hint3d');
+  var branchEl = document.getElementById('branchfilter');
+  var filterName = '';
 
-  var SVG_NS = 'http://www.w3.org/2000/svg';
   var viewport = document.createElementNS(SVG_NS, 'g');
-  svg.appendChild(viewport);
+  var guideLayer = document.createElementNS(SVG_NS, 'g');
   var edgeLayer = document.createElementNS(SVG_NS, 'g');
   var edgeLabelLayer = document.createElementNS(SVG_NS, 'g');
   var nodeLayer = document.createElementNS(SVG_NS, 'g');
+  viewport.appendChild(guideLayer);
   viewport.appendChild(edgeLayer);
   viewport.appendChild(edgeLabelLayer);
   viewport.appendChild(nodeLayer);
+  svg.appendChild(viewport);
 
   var graph = { nodes: [], links: [] };
   var size = { width: 800, height: 600 };
   var transform = { x: 0, y: 0, k: 1 };
+  var mode = 'tree';
   var alpha = 0;
   var running = false;
   var dragging = null;
   var panning = null;
   var lastGenerated = null;
   var positions = {};
+  var treeLayout = null;
+
+  var TREE = {
+    NODE_W: 112, COUPLE_GAP: 82, SIBLING_GAP: 38, ROOT_GAP: 100, EX_GAP: 70,
+    ROW_H: 158, TOP: 110
+  };
+
+  function svgEl(tag, attrs) {
+    var el = document.createElementNS(SVG_NS, tag);
+    Object.keys(attrs || {}).forEach(function (key) { el.setAttribute(key, attrs[key]); });
+    return el;
+  }
+
+  function radius(node) { return 7 + Number(node.closeness || 3) * 2.2; }
+
+  function isPlaced(node) { return Number.isInteger(node.generation); }
+
+  function generationLabel(g) {
+    var labels = { '-2': '祖辈', '-1': '父辈', '0': '我辈', '1': '子辈', '2': '孙辈' };
+    if (labels[String(g)]) { return labels[String(g)]; }
+    return g < 0 ? ('上 ' + Math.abs(g) + ' 辈') : ('下 ' + g + ' 辈');
+  }
 
   function resize() {
     var rect = svg.getBoundingClientRect();
     size.width = Math.max(320, rect.width);
     size.height = Math.max(320, rect.height);
     svg.setAttribute('viewBox', '0 0 ' + size.width + ' ' + size.height);
-    if (!running && graph.nodes.length) { restart(0.2); }
+    if (mode === 'tree') {
+      if (treeLayout) { fitTree(); }
+    } else if (!running && graph.nodes.length) {
+      restart(0.2);
+    }
   }
 
   function applyTransform() {
     viewport.setAttribute('transform',
       'translate(' + transform.x + ',' + transform.y + ') scale(' + transform.k + ')');
   }
+
+  function clearLayers() {
+    [guideLayer, edgeLayer, edgeLabelLayer, nodeLayer].forEach(function (layer) {
+      while (layer.firstChild) { layer.removeChild(layer.firstChild); }
+    });
+    graph.nodes.forEach(function (node) { node.el = null; });
+  }
+
+  // ---------- 力导向（网络视图） ----------
 
   function restart(power) {
     alpha = Math.max(alpha, power || 0.8);
@@ -196,78 +284,855 @@
     alpha *= 0.985;
   }
 
-  function draw() {
-    while (edgeLayer.firstChild) { edgeLayer.removeChild(edgeLayer.firstChild); }
-    while (edgeLabelLayer.firstChild) { edgeLabelLayer.removeChild(edgeLabelLayer.firstChild); }
-    while (nodeLayer.firstChild) { nodeLayer.removeChild(nodeLayer.firstChild); }
+  function tick() {
+    step();
+    if (alpha > 0.004) {
+      drawNetwork();
+      requestAnimationFrame(tick);
+    } else {
+      drawNetwork();
+      running = false;
+    }
+  }
 
+  function drawNetwork() {
+    clearLayers();
     var showEdgeLabels = graph.links.length <= 30;
-
     graph.links.forEach(function (link) {
-      var line = document.createElementNS(SVG_NS, 'line');
-      line.setAttribute('class', 'edge');
-      line.setAttribute('x1', link.source.x);
-      line.setAttribute('y1', link.source.y);
-      line.setAttribute('x2', link.target.x);
-      line.setAttribute('y2', link.target.y);
+      var line = svgEl('line', {
+        class: 'edge' + (link.family === false ? ' dashed' : ''),
+        x1: link.source.x, y1: link.source.y,
+        x2: link.target.x, y2: link.target.y
+      });
       edgeLayer.appendChild(line);
       if (showEdgeLabels && link.relation_label) {
-        var label = document.createElementNS(SVG_NS, 'text');
-        label.setAttribute('class', 'edge-label');
-        label.setAttribute('x', (link.source.x + link.target.x) / 2);
-        label.setAttribute('y', (link.source.y + link.target.y) / 2 - 4);
+        var label = svgEl('text', {
+          class: 'edge-label',
+          x: (link.source.x + link.target.x) / 2,
+          y: (link.source.y + link.target.y) / 2 - 4
+        });
         label.textContent = link.relation_label;
         edgeLabelLayer.appendChild(label);
       }
     });
-
     graph.nodes.forEach(function (node) {
       positions[node.id] = { x: node.x, y: node.y };
-      var group = document.createElementNS(SVG_NS, 'g');
-      group.setAttribute('class', 'node');
-      group.setAttribute('transform', 'translate(' + node.x + ',' + node.y + ')');
-      var radius = 7 + Number(node.closeness || 3) * 2.2;
-      var circle = document.createElementNS(SVG_NS, 'circle');
-      circle.setAttribute('r', radius);
-      circle.setAttribute('fill', colorFor(node.relation_label || node.relation || '其他'));
-      group.appendChild(circle);
-      var label = document.createElementNS(SVG_NS, 'text');
-      label.setAttribute('y', radius + 15);
-      label.textContent = node.name;
-      group.appendChild(label);
+      drawNode(node, true);
+    });
+  }
+
+  // ---------- 家谱（辈分线） ----------
+
+  function memberRank(node) {
+    var r = node.relation_label || '';
+    if (node.id === 0) { return 0; }
+    if (r.indexOf('父') >= 0 || r.indexOf('夫') >= 0) { return 1; }
+    if (r.indexOf('母') >= 0 || r.indexOf('妻') >= 0) { return 2; }
+    return 3;
+  }
+
+  function isFatherRole(node) {
+    var r = node.relation_label || node.relation || '';
+    var male = ['父亲', '爸爸', '爷爷', '外公', '姥爷', '丈夫', '老公', '儿子', '哥哥', '弟弟',
+               '伯父', '伯伯', '叔父', '叔叔', '姑父', '舅舅', '姨父'];
+    for (var i = 0; i < male.length; i++) {
+      if (r.indexOf(male[i]) >= 0) { return true; }
+    }
+    return false;
+  }
+
+  // 排行：优先用导出的 rank（备注里的「排行N」），否则看称谓前缀（大伯=1、二伯=2、六叔=6…）
+  function rankOf(node) {
+    if (Number.isInteger(node.rank)) { return node.rank; }
+    var rel = node.relation_label || '';
+    var cn = { '十一': 11, '十二': 12, '十': 10, '大': 1, '一': 1, '二': 2, '三': 3,
+               '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
+    var keys = Object.keys(cn);
+    for (var i = 0; i < keys.length; i++) {
+      if (rel.indexOf(keys[i]) === 0) { return cn[keys[i]]; }
+    }
+    return null;
+  }
+
+  function cmpByRank(a, b) {
+    var ra = rankOf(a.anchor);
+    var rb = rankOf(b.anchor);
+    var va = (ra === null) ? Infinity : ra;
+    var vb = (rb === null) ? Infinity : rb;
+    if (va !== vb) { return va - vb; }
+    return a.anchor.id - b.anchor.id;
+  }
+
+  function buildTreeModel(nodes, links) {
+    nodes = nodes || graph.nodes;
+    links = links || graph.links;
+    var byId = {};
+    var uf = {};
+    nodes.forEach(function (node) { byId[node.id] = node; uf[node.id] = node.id; });
+
+    function find(x) {
+      while (uf[x] !== x) { uf[x] = uf[uf[x]]; x = uf[x]; }
+      return x;
+    }
+    function union(a, b) {
+      a = find(a); b = find(b);
+      if (a !== b) { uf[b] = a; }
+    }
+
+    links.forEach(function (link) {
+      if (link.kind !== 'spouse') { return; }
+      if (!isPlaced(link.source) || !isPlaced(link.target)) { return; }
+      if (link.source.generation !== link.target.generation) { return; }
+      union(link.source.id, link.target.id);
+    });
+
+    // 人物级亲子关系（保留“谁是父/母、谁是子/女”）
+    var parentOf = {};
+    var childrenOf = {};
+    function addParent(childId, parentId, relation) {
+      childId = Number(childId); parentId = Number(parentId);
+      if (!parentOf[childId]) { parentOf[childId] = []; }
+      var seen = false;
+      parentOf[childId].forEach(function (item) { if (item.id === parentId) { seen = true; } });
+      if (!seen) { parentOf[childId].push({ id: parentId, rel: relation || '' }); }
+      if (!childrenOf[parentId]) { childrenOf[parentId] = []; }
+      if (childrenOf[parentId].indexOf(childId) === -1) { childrenOf[parentId].push(childId); }
+    }
+    links.forEach(function (link) {
+      if (link.kind !== 'parent') { return; }
+      var s = link.source, t = link.target;
+      if (!isPlaced(s) || !isPlaced(t)) { return; }
+      if (Math.abs(s.generation - t.generation) !== 1) { return; }
+      var parent = s.generation < t.generation ? s : t;
+      var child = s.generation < t.generation ? t : s;
+      addParent(child.id, parent.id, link.relation_label || '');
+    });
+
+    // 血缘主干：我 → 父系 → 继续向上；向下覆盖我的所有后代
+    var spine = {};
+    spine[0] = true;
+    var current = 0;
+    while (true) {
+      var parents = parentOf[current] || [];
+      if (!parents.length) { break; }
+      var next = null;
+      for (var i = 0; i < parents.length; i++) {
+        if (spine[parents[i].id]) { next = parents[i].id; break; }
+      }
+      if (next === null) {
+        for (var j = 0; j < parents.length; j++) {
+          if (isFatherRole(byId[parents[j].id])) { next = parents[j].id; break; }
+        }
+      }
+      if (next === null) { next = parents[0].id; }
+      if (spine[next]) { break; }
+      spine[next] = true;
+      current = next;
+    }
+    var queue = [0];
+    while (queue.length) {
+      var pid = queue.shift();
+      (childrenOf[pid] || []).forEach(function (cid) {
+        spine[cid] = true;
+        queue.push(cid);
+      });
+    }
+
+    // 离异关系：离婚/离异/前夫/前妻 —— 同一代的人挂在原配偶旁边，用虚线连
+    var exSpouseOf = {};
+    links.forEach(function (link) {
+      var rel = link.relation_label || link.relation || '';
+      if (!/离婚|离异|分手|前夫|前妻/.test(rel)) { return; }
+      if (!isPlaced(link.source) || !isPlaced(link.target)) { return; }
+      if (link.source.generation !== link.target.generation) { return; }
+      var ex = null, other = null;
+      if (/^前/.test(link.source.relation_label || '')) { ex = link.source; other = link.target; }
+      else if (/^前/.test(link.target.relation_label || '')) { ex = link.target; other = link.source; }
+      if (ex) { exSpouseOf[ex.id] = other.id; }
+    });
+
+    // 夫妻合成 unit；anchor = 血缘主干上的人（没有则取有父母记录的一方）
+    var units = {};
+    nodes.forEach(function (node) {
+      if (!isPlaced(node)) { return; }
+      var root = find(node.id);
+      if (!units[root]) {
+        units[root] = { id: root, gen: node.generation, members: [], children: [],
+                        parent: null, anchor: null };
+      }
+      units[root].members.push(node);
+      units[root].gen = Math.min(units[root].gen, node.generation);
+    });
+
+    Object.keys(units).forEach(function (key) {
+      var unit = units[key];
+      var anchor = null;
+      for (var i = 0; i < unit.members.length; i++) {
+        if (spine[unit.members[i].id]) { anchor = unit.members[i]; break; }
+      }
+      if (!anchor) {
+        for (var j = 0; j < unit.members.length; j++) {
+          if ((parentOf[unit.members[j].id] || []).length) { anchor = unit.members[j]; break; }
+        }
+      }
+      if (!anchor) { anchor = unit.members[0]; }
+      unit.anchor = anchor;
+      unit.members.sort(function (a, b) {
+        if (a === anchor) { return -1; }
+        if (b === anchor) { return 1; }
+        return memberRank(a) - memberRank(b) || a.id - b.id;
+      });
+    });
+
+    function pickParent(unit) {
+      var cands = parentOf[unit.anchor.id] || [];
+      if (!cands.length) { return null; }
+      function unitOf(pid) { return units[find(pid)]; }
+      if (cands.length > 1) {
+        var first = unitOf(cands[0].id);
+        var together = true;
+        for (var i = 1; i < cands.length; i++) {
+          if (unitOf(cands[i].id) !== first) { together = false; break; }
+        }
+        if (together) { return cands[0].id; }
+        // 父母不是夫妻（如离婚/再婚）→ 孩子画在母亲名下，两任妻子自然分开
+        var mothers = cands.filter(function (c) { return /母|妈/.test(c.rel || ''); });
+        if (mothers.length === 1) { return mothers[0].id; }
+      }
+      for (var j = 0; j < cands.length; j++) {
+        if (spine[cands[j].id]) { return cands[j].id; }
+      }
+      for (var k = 0; k < cands.length; k++) {
+        if (isFatherRole(byId[cands[k].id])) { return cands[k].id; }
+      }
+      return cands[0].id;
+    }
+
+    // 离异配偶：挂到原配偶所在 unit 的同一行（画在左边，虚线相连）
+    var attached = {};
+    Object.keys(exSpouseOf).forEach(function (exId) {
+      var exUnit = units[find(Number(exId))];
+      var mainUnit = units[find(exSpouseOf[exId])];
+      if (!exUnit || !mainUnit || exUnit === mainUnit) { return; }
+      mainUnit.attachments = mainUnit.attachments || [];
+      if (mainUnit.attachments.indexOf(exUnit) === -1) {
+        mainUnit.attachments.push(exUnit);
+        attached[exUnit.id] = true;
+      }
+    });
+
+    Object.keys(units).forEach(function (key) {
+      var unit = units[key];
+      var parentId = pickParent(unit);
+      if (parentId === null) { return; }
+      var parentUnit = units[find(parentId)];
+      if (!parentUnit || parentUnit === unit) { return; }
+      unit.parent = parentUnit;
+      parentUnit.children.push(unit);
+    });
+
+    Object.keys(units).forEach(function (key) {
+      units[key].children.sort(function (a, b) {
+        return a.gen - b.gen || cmpByRank(a, b);
+      });
+    });
+
+    var list = Object.keys(units).map(function (key) { return units[key]; });
+    var roots = list.filter(function (unit) { return !unit.parent && !attached[unit.id]; });
+    roots.sort(function (a, b) {
+      return a.gen - b.gen || cmpByRank(a, b);
+    });
+    return { units: units, list: list, roots: roots, parentOf: parentOf, childrenOf: childrenOf };
+  }
+
+  function measureUnit(unit) {
+    var count = unit.members.length;
+    var ownLeft = TREE.NODE_W / 2;
+    var ownRight = (count - 1) * (TREE.NODE_W + TREE.COUPLE_GAP) + TREE.NODE_W / 2;
+    var attachW = 0;
+    (unit.attachments || []).forEach(function (att) {
+      measureUnit(att);   // 同代挂靠先量宽度
+      attachW += att._w + TREE.EX_GAP;
+    });
+    var childW = 0;
+    unit.children.forEach(function (child, index) {
+      childW += measureUnit(child);
+      if (index) { childW += TREE.SIBLING_GAP; }
+    });
+    // 子女块以「夫妻连线中点」为中心（中点比本人靠右半个夫妻间距）
+    var midOffset = count > 1 ? (TREE.NODE_W + TREE.COUPLE_GAP) / 2 : 0;
+    var left = ownLeft + attachW;
+    var right = ownRight;
+    if (unit.children.length === 1) {
+      left = Math.max(left, unit.children[0]._left + midOffset);
+      right = Math.max(right, unit.children[0]._right - midOffset);
+    } else if (unit.children.length > 1) {
+      left = Math.max(left, midOffset + childW / 2);
+      right = Math.max(right, childW / 2 - midOffset);
+    }
+    unit._left = left;
+    unit._right = right;
+    unit._w = left + right;
+    unit._childW = childW;
+    unit._attachSpan = attachW;
+    unit._anchorOffset = left;
+    return unit._w;
+  }
+
+  function placeUnit(unit, anchorX, minGen) {
+    unit.anchorX = anchorX;
+    unit.members.forEach(function (node, index) {
+      node.x = anchorX + index * (TREE.NODE_W + TREE.COUPLE_GAP);
+      node.y = TREE.TOP + (node.generation - minGen) * TREE.ROW_H;
+    });
+    // 同代挂靠（离异配偶）排在本体左侧
+    var cursor = anchorX - (unit._attachSpan || 0);
+    (unit.attachments || []).forEach(function (att) {
+      placeUnit(att, cursor + att._anchorOffset, minGen);
+      cursor += att._w + TREE.EX_GAP;
+    });
+    if (!unit.children.length) { return; }
+    // 引线从夫妻连线中点下来 → 子女块整体对齐到中点正下方
+    var centerX = anchorX;
+    if (unit.members.length > 1) {
+      var memberXs = unit.members.map(function (m) { return m.x; });
+      centerX = (Math.min.apply(null, memberXs) + Math.max.apply(null, memberXs)) / 2;
+    }
+    if (unit.children.length === 1) {
+      placeUnit(unit.children[0], centerX, minGen);
+      return;
+    }
+    var left = centerX - unit._childW / 2;
+    unit.children.forEach(function (child) {
+      placeUnit(child, left + child._anchorOffset, minGen);
+      left += child._w + TREE.SIBLING_GAP;
+    });
+  }
+
+  // 本家 = 我所在的一支（含我、我的祖先、我的配偶、我的子女及其后代）
+  function computeFocus(model) {
+    var focus = {};
+    function markUnit(unit) {
+      if (!unit || focus[unit.id]) { return; }
+      focus[unit.id] = true;
+      unit.members.forEach(function (m) { focus['n' + m.id] = true; });
+    }
+    var selfUnit = null;
+    model.list.forEach(function (unit) {
+      unit.members.forEach(function (m) { if (m.id === 0) { selfUnit = unit; } });
+    });
+    if (!selfUnit) { return null; }
+    var up = selfUnit;
+    while (up && up.parent) { up = up.parent; markUnit(up); }
+    markUnit(selfUnit);
+    var stack = [selfUnit];
+    while (stack.length) {
+      var cur = stack.pop();
+      (cur.children || []).forEach(function (c) { markUnit(c); stack.push(c); });
+    }
+    return focus;
+  }
+
+  function layoutTree(nodes, links) {
+    nodes = nodes || graph.nodes;
+    links = links || graph.links;
+    var model = buildTreeModel(nodes, links);
+    if (!model.roots.length) { return null; }
+    var minGen = Math.min.apply(null, model.list.map(function (unit) { return unit.gen; }));
+    // 同一辈人很多时收紧间距，保证一屏能看全
+    var perGen = {};
+    model.list.forEach(function (unit) {
+      perGen[unit.gen] = (perGen[unit.gen] || 0) + unit.members.length;
+    });
+    var widest = 0;
+    Object.keys(perGen).forEach(function (g) { widest = Math.max(widest, perGen[g]); });
+    if (widest > 14) {
+      TREE.NODE_W = 84; TREE.COUPLE_GAP = 46; TREE.SIBLING_GAP = 10; TREE.EX_GAP = 52;
+    } else if (widest > 9) {
+      TREE.NODE_W = 100; TREE.COUPLE_GAP = 62; TREE.SIBLING_GAP = 22; TREE.EX_GAP = 62;
+    } else {
+      TREE.NODE_W = 112; TREE.COUPLE_GAP = 82; TREE.SIBLING_GAP = 38; TREE.EX_GAP = 70;
+    }
+    model.roots.forEach(function (root) { measureUnit(root); });
+    var left = 0;
+    model.roots.forEach(function (root) {
+      placeUnit(root, left + root._anchorOffset, minGen);
+      left += root._w + TREE.ROOT_GAP;
+    });
+
+    var placed = nodes.filter(isPlaced);
+    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    placed.forEach(function (node) {
+      var r = radius(node);
+      minX = Math.min(minX, node.x - r - 30);
+      maxX = Math.max(maxX, node.x + r + 30);
+      minY = Math.min(minY, node.y - r - 20);
+      maxY = Math.max(maxY, node.y + r + 46);
+    });
+    minX -= 90;
+    return {
+      model: model, nodes: nodes, links: links, minGen: minGen,
+      focus: computeFocus(model),
+      bounds: { minX: minX, maxX: maxX, minY: minY, maxY: maxY }
+    };
+  }
+
+  function drawTree() {
+    clearLayers();
+    if (!treeLayout) { return; }
+    var model = treeLayout.model;
+    var bounds = treeLayout.bounds;
+    var focus = treeLayout.focus;
+    function focusNode(node) { return !focus || focus['n' + node.id]; }
+    function focusUnit(unit) { return !focus || focus[unit.id]; }
+    function rOf(node) {
+      var r = radius(node);
+      return focusNode(node) ? r : r * 0.76;
+    }
+    var generations = model.list.map(function (unit) { return unit.gen; })
+      .filter(function (g, i, arr) { return arr.indexOf(g) === i; })
+      .sort(function (a, b) { return a - b; });
+
+    generations.forEach(function (gen) {
+      var y = TREE.TOP + (gen - treeLayout.minGen) * TREE.ROW_H;
+      guideLayer.appendChild(svgEl('line', {
+        class: 'gen-line' + (focus && Object.keys(focus).length ? '' : ''),
+        x1: bounds.minX, y1: y, x2: bounds.maxX, y2: y
+      }));
+      var label = svgEl('text', {
+        class: 'gen-label', x: bounds.minX - 14, y: y + 4, 'text-anchor': 'end'
+      });
+      label.textContent = generationLabel(gen);
+      guideLayer.appendChild(label);
+    });
+
+    // 夫妻双线（anchor 与配偶之间）
+    model.list.forEach(function (unit) {
+      if (unit.members.length < 2) { return; }
+      var minorUnit = focusUnit(unit) ? '' : ' minor';
+      for (var i = 0; i < unit.members.length - 1; i++) {
+        var a = unit.members[i], b = unit.members[i + 1];
+        edgeLayer.appendChild(svgEl('line', {
+          class: 'spouse-line' + minorUnit,
+          x1: a.x + rOf(a), y1: a.y,
+          x2: b.x - rOf(b), y2: b.y
+        }));
+      }
+    });
+
+    // 离异虚线：原配偶 ↔ 离异配偶
+    model.list.forEach(function (unit) {
+      (unit.attachments || []).forEach(function (att) {
+        var a = unit.anchor, b = att.anchor;
+        edgeLayer.appendChild(svgEl('line', {
+          class: 'edge dashed' + (focusUnit(unit) ? '' : ' minor'),
+          x1: a.x - rOf(a), y1: a.y,
+          x2: b.x + rOf(b), y2: b.y
+        }));
+      });
+    });
+
+    // 血缘线：从父母中“血缘本人”的节点直接下到孩子本人在的节点，不走夫妻横线中点
+    model.list.forEach(function (unit) {
+      if (!unit.children.length) { return; }
+      var parentNode = unit.anchor;
+      // 引线起点：夫妻连线的中点（单身则用自己的位置）
+      var px = parentNode.x;
+      if (unit.members.length > 1) {
+        var memberXs = unit.members.map(function (m) { return m.x; });
+        px = (Math.min.apply(null, memberXs) + Math.max.apply(null, memberXs)) / 2;
+      }
+      var py = parentNode.y + rOf(parentNode);
+      var childNodes = unit.children.map(function (child) { return child.anchor; });
+      var childTops = childNodes.map(function (node) { return node.y - rOf(node); });
+      var cy = Math.min.apply(null, childTops);
+      var busY = py + (cy - py) * 0.55;
+      var xs = childNodes.map(function (node) { return node.x; });
+      var minor = (focusUnit(unit) && focusNode(childNodes[0])) ? '' : ' minor';
+      if (unit.children.length === 1) {
+        edgeLayer.appendChild(svgEl('path', {
+          class: 'parent-line' + minor,
+          d: 'M' + px + ',' + py + ' V' + busY + ' H' + xs[0] + ' V' + cy
+        }));
+      } else {
+        edgeLayer.appendChild(svgEl('path', {
+          class: 'parent-line' + minor, d: 'M' + px + ',' + py + ' V' + busY
+        }));
+        edgeLayer.appendChild(svgEl('path', {
+          class: 'parent-line' + minor,
+          d: 'M' + Math.min.apply(null, xs) + ',' + busY +
+             ' H' + Math.max.apply(null, xs)
+        }));
+        childNodes.forEach(function (node, index) {
+          edgeLayer.appendChild(svgEl('path', {
+            class: 'parent-line' + (focusNode(node) ? '' : ' minor'),
+            d: 'M' + node.x + ',' + busY + ' V' + childTops[index]
+          }));
+        });
+      }
+    });
+
+    treeLayout.nodes.filter(isPlaced).forEach(function (node) {
+      positions[node.id] = { x: node.x, y: node.y };
+      var isFocus = focusNode(node);
+      drawNode(node, false, isFocus ? null : 'minor',
+               isFocus ? radius(node) : radius(node) * 0.76,
+               !isFocus && node.generation !== -1);
+    });
+  }
+
+  function drawNode(node, draggable, extraClass, radiusOverride, hideRel) {
+    var group = document.createElementNS(SVG_NS, 'g');
+    group.setAttribute('class', 'node' + (node.deceased ? ' deceased' : '') +
+                                  (extraClass ? ' ' + extraClass : ''));
+    group.setAttribute('transform', 'translate(' + node.x + ',' + node.y + ')');
+    var r = radiusOverride || radius(node);
+    var circle = document.createElementNS(SVG_NS, 'circle');
+    circle.setAttribute('r', r);
+    circle.setAttribute('fill', colorFor(node.relation_label || node.relation || '其他'));
+    group.appendChild(circle);
+
+    var name = document.createElementNS(SVG_NS, 'text');
+    name.setAttribute('class', 'name-label');
+    name.setAttribute('y', r + 16);
+    name.textContent = node.name;
+    group.appendChild(name);
+
+    if (!hideRel || node.deceased) {
+      var rel = document.createElementNS(SVG_NS, 'text');
+      rel.setAttribute('class', 'rel-label');
+      rel.setAttribute('y', r + 31);
+      rel.textContent = (node.relation_label || node.relation || '') +
+                        (node.deceased ? ' · 已故' : '');
+      group.appendChild(rel);
+    }
+
+    if (draggable) {
       group.addEventListener('pointerdown', function (event) {
         event.stopPropagation();
         dragging = node;
         svg.setPointerCapture(event.pointerId);
         restart(0.35);
       });
-      group.addEventListener('click', function (event) {
-        event.stopPropagation();
-        showDetail(node);
-      });
-      nodeLayer.appendChild(group);
-      node.el = group;
+    }
+    group.addEventListener('click', function (event) {
+      event.stopPropagation();
+      showDetail(node);
     });
+    nodeLayer.appendChild(group);
+    node.el = group;
   }
 
-  function tick() {
-    step();
-    if (alpha > 0.004) {
-      draw();
-      requestAnimationFrame(tick);
-    } else {
-      draw();
-      running = false;
+  function fitTree() {
+    if (!treeLayout) { return; }
+    var b = treeLayout.bounds;
+    var pad = 54;
+    var w = (b.maxX - b.minX) + pad * 2;
+    var h = (b.maxY - b.minY) + pad * 2;
+    var k = Math.min(size.width / Math.max(1, w), size.height / Math.max(1, h), 1.25);
+    transform.k = k;
+    transform.x = (size.width - w * k) / 2 - (b.minX - pad) * k;
+    transform.y = (size.height - h * k) / 2 - (b.minY - pad) * k;
+    applyTransform();
+  }
+
+  // ---------- 通用 ----------
+
+  // ---------- 3D 视图（three.js，本地 /static 加载，无外网依赖） ----------
+
+  var three = { ready: false, renderer: null, scene: null, camera: null, controls: null,
+                group: null, meshes: [], raycaster: null, looping: false };
+
+  function init3D() {
+    if (three.renderer) { return true; }
+    if (typeof THREE === 'undefined' || typeof THREE.OrbitControls === 'undefined') {
+      return false;
     }
+    var canvas = document.getElementById('scene');
+    try {
+      three.renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+      three.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      three.scene = new THREE.Scene();
+      three.camera = new THREE.PerspectiveCamera(50, 1, 1, 6000);
+      three.camera.position.set(0, 80, 320);
+      three.controls = new THREE.OrbitControls(three.camera, canvas);
+      three.controls.enableDamping = true;
+      three.controls.dampingFactor = 0.08;
+      three.controls.maxPolarAngle = Math.PI * 0.92;
+      three.group = new THREE.Group();
+      three.scene.add(three.group);
+      three.scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+      var light = new THREE.DirectionalLight(0xffffff, 0.55);
+      light.position.set(120, 200, 160);
+      three.scene.add(light);
+      three.raycaster = new THREE.Raycaster();
+      canvas.addEventListener('pointerdown', on3DPick);
+      three.ready = true;
+      resize3D();
+      return true;
+    } catch (err) {
+      if (window.console) { window.console.warn('3D 初始化失败：' + err); }
+      return false;
+    }
+  }
+
+  function makeLabelSprite(text, color, px) {
+    var canvas = document.createElement('canvas');
+    var ctx = canvas.getContext('2d');
+    var size = px || 12;
+    var font = 'bold ' + size + 'px -apple-system, "PingFang SC", sans-serif';
+    ctx.font = font;
+    var w = Math.ceil(ctx.measureText(text).width) + 10;
+    var h = size + 10;
+    var scale = 2;
+    canvas.width = w * scale;
+    canvas.height = h * scale;
+    ctx.scale(scale, scale);
+    ctx.font = font;
+    ctx.fillStyle = 'rgba(11,18,32,0.78)';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 5, h / 2);
+    var texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    var sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: texture, depthTest: false, transparent: true
+    }));
+    sprite.scale.set(w * 0.62, h * 0.62, 1);
+    return sprite;
+  }
+
+  function clear3D() {
+    if (!three.group) { return; }
+    while (three.group.children.length) {
+      var child = three.group.children[0];
+      three.group.remove(child);
+      if (child.geometry && child.geometry.dispose) { child.geometry.dispose(); }
+      if (child.material) {
+        if (child.material.map && child.material.map.dispose) { child.material.map.dispose(); }
+        if (child.material.dispose) { child.material.dispose(); }
+      }
+    }
+    three.meshes = [];
+  }
+
+  function buildView() {
+    if (!filterName || !graph.nodes.length) {
+      return { nodes: graph.nodes, links: graph.links };
+    }
+    var person = null;
+    graph.nodes.forEach(function (n) { if (n.name === filterName) { person = n; } });
+    if (!person) { return { nodes: graph.nodes, links: graph.links }; }
+    var full = buildTreeModel(graph.nodes, graph.links);
+    var unitOf = {};
+    full.list.forEach(function (u) { u.members.forEach(function (m) { unitOf[m.id] = u; }); });
+    var start = unitOf[person.id];
+    if (!start) { return { nodes: graph.nodes, links: graph.links }; }
+    var keep = {};
+    function collect(u, down) {
+      if (!u || keep[u.id]) { return; }
+      keep[u.id] = true;
+      u.members.forEach(function (m) { keep['n' + m.id] = true; });
+      (u.attachments || []).forEach(function (a) { collect(a, down); });
+      if (down) { (u.children || []).forEach(function (c) { collect(c, true); }); }
+    }
+    collect(start, true);
+    var up = start.parent;
+    while (up) { collect(up, false); up = up.parent; }
+    var nodes = graph.nodes.filter(function (n) { return keep['n' + n.id]; });
+    var ids = {};
+    nodes.forEach(function (n) { ids[n.id] = true; });
+    var links = graph.links.filter(function (l) { return ids[l.source.id] && ids[l.target.id]; });
+    return { nodes: nodes, links: links };
+  }
+
+  function populateBranches() {
+    var current = filterName;
+    var names = [];
+    graph.nodes.forEach(function (n) {
+      if (n.generation === -1 &&
+          ['父亲', '伯父', '叔父', '姑姑'].indexOf(n.relation_label) !== -1) {
+        names.push(n.name);
+      }
+    });
+    names.sort(function (a, b) {
+      if (a === '项平芳') { return -1; }
+      if (b === '项平芳') { return 1; }
+      return 0;
+    });
+    while (branchEl.firstChild) { branchEl.removeChild(branchEl.firstChild); }
+    function addOption(value, label) {
+      var opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = label;
+      branchEl.appendChild(opt);
+    }
+    addOption('', '全部');
+    if (names.indexOf('项平芳') !== -1) { addOption('项平芳', '本家（我的支）'); }
+    names.forEach(function (name) {
+      if (name !== '项平芳') { addOption(name, name); }
+    });
+    var valid = current === '' || current === '项平芳' || names.indexOf(current) !== -1;
+    branchEl.value = valid ? current : '';
+    filterName = branchEl.value || '';
+  }
+
+  function build3D() {
+    if (!three.ready) { return; }
+    clear3D();
+    var view = buildView();
+    var layout = layoutTree(view.nodes, view.links);
+    if (!layout) { return; }
+    var model = layout.model;
+    var focus = layout.focus;
+
+    // 辈分 = 高度
+    var gens = [];
+    model.list.forEach(function (u) { if (gens.indexOf(u.gen) === -1) { gens.push(u.gen); } });
+    gens.sort(function (a, b) { return a - b; });
+    var genY = {};
+    gens.forEach(function (g, i) { genY[g] = (gens.length - 1 - i) * 54; });
+
+    // 每个辈分内按「家庭分支」分深度；本家那一支放在中间
+    function branchKey(unit) {
+      return unit.parent ? unit.parent.anchor.name : '__root__';
+    }
+    var byGen = {};
+    model.list.forEach(function (u) {
+      var key = branchKey(u);
+      if (!byGen[u.gen]) { byGen[u.gen] = []; }
+      if (byGen[u.gen].indexOf(key) === -1) { byGen[u.gen].push(key); }
+    });
+    var branchZ = {};
+    Object.keys(byGen).forEach(function (g) {
+      var keys = byGen[g].slice();
+      keys.sort(function (a, b) {
+        if (a === '项平芳') { return -1; }
+        if (b === '项平芳') { return 1; }
+        return a < b ? -1 : 1;
+      });
+      keys.forEach(function (k, i) {
+        branchZ[g + '|' + k] = (i - (keys.length - 1) / 2) * 52;
+      });
+    });
+
+    var pos = {};
+    model.list.forEach(function (unit) {
+      var z = branchZ[unit.gen + '|' + branchKey(unit)] || 0;
+      unit.members.forEach(function (node) {
+        pos[node.id] = {
+          x: node.x * 0.62,
+          y: genY[unit.gen],
+          z: z + (unit.members.length > 1 ? (node === unit.anchor ? -16 : 16) : 0)
+        };
+      });
+    });
+
+    // 辈分参考线
+    gens.forEach(function (g) {
+      var y = genY[g];
+      var geom = new THREE.BufferGeometry();
+      geom.setAttribute('position', new THREE.Float32BufferAttribute([-1200, y, -260, 1200, y, -260], 3));
+      var mat = new THREE.LineBasicMaterial({ color: 0x27364f, transparent: true, opacity: 0.7 });
+      three.group.add(new THREE.Line(geom, mat));
+    });
+
+    // 节点
+    model.list.forEach(function (unit) {
+      unit.members.forEach(function (node) {
+        var isFocus = !focus || focus['n' + node.id];
+        var r = (0.5 + Number(node.closeness || 3) * 0.2) * (isFocus ? 1.3 : 0.8);
+        var color = new THREE.Color(colorFor(node.relation_label || node.relation || '其他'));
+        var mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(r, 20, 14),
+          new THREE.MeshLambertMaterial({ color: color, transparent: !isFocus, opacity: isFocus ? 1 : 0.5 })
+        );
+        mesh.position.set(pos[node.id].x, pos[node.id].y, pos[node.id].z);
+        mesh.userData = { node: node };
+        three.group.add(mesh);
+        three.meshes.push(mesh);
+        var label = makeLabelSprite(node.name, isFocus ? '#e6edf7' : '#8fa3bf', isFocus ? 13 : 10);
+        label.position.set(mesh.position.x, mesh.position.y + r + 7, mesh.position.z);
+        three.group.add(label);
+      });
+    });
+
+    // 连线
+    var pts = [], cols = [];
+    view.links.forEach(function (link) {
+      var a = pos[link.source.id], b = pos[link.target.id];
+      if (!a || !b) { return; }
+      var kind = link.kind || 'other';
+      var col = kind === 'spouse' ? new THREE.Color('#f472b6')
+              : kind === 'parent' ? new THREE.Color('#6d8bb5')
+              : new THREE.Color('#3b4d6b');
+      var bothFocus = focus && focus['n' + link.source.id] && focus['n' + link.target.id];
+      var fade = bothFocus ? 1 : 0.45;
+      pts.push(a.x, a.y, a.z, b.x, b.y, b.z);
+      cols.push(col.r * fade, col.g * fade, col.b * fade, col.r * fade, col.g * fade, col.b * fade);
+    });
+    var geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    geom.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+    three.group.add(new THREE.LineSegments(geom,
+      new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9 })));
+
+    // 取景
+    var box = new THREE.Box3();
+    Object.keys(pos).forEach(function (id) {
+      var p = pos[id];
+      box.expandByPoint(new THREE.Vector3(p.x, p.y, p.z));
+    });
+    var center = box.getCenter(new THREE.Vector3());
+    var extent = box.getSize(new THREE.Vector3());
+    three.controls.target.copy(center);
+    var dist = Math.max(extent.x, extent.y * 1.4, 120) * 1.15 + 60;
+    three.camera.position.set(center.x, center.y + dist * 0.28, dist);
+    three.controls.update();
+    resize3D();
+  }
+
+  function on3DPick(event) {
+    if (!three.ready) { return; }
+    var canvas = document.getElementById('scene');
+    var rect = canvas.getBoundingClientRect();
+    var mouse = new THREE.Vector2(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1
+    );
+    three.raycaster.setFromCamera(mouse, three.camera);
+    var hits = three.raycaster.intersectObjects(three.meshes);
+    if (hits.length) { showDetail(hits[0].object.userData.node); }
+  }
+
+  function resize3D() {
+    if (!three.ready) { return; }
+    var canvas = document.getElementById('scene');
+    var rect = canvas.getBoundingClientRect();
+    var w = Math.max(320, rect.width), h = Math.max(320, rect.height);
+    three.renderer.setSize(w, h, false);
+    three.camera.aspect = w / h;
+    three.camera.updateProjectionMatrix();
+  }
+
+  function animate3D() {
+    if (!three.ready) { return; }
+    requestAnimationFrame(animate3D);
+    if (mode !== '3d') { return; }
+    three.controls.update();
+    three.renderer.render(three.scene, three.camera);
   }
 
   function showDetail(node) {
     var rows = [
       ['关系', node.relation_label || node.relation || '其他'],
+      ['辈分', node.generation_label || '未定位'],
       ['亲近度', String(node.closeness) + ' / 5'],
       ['最近联系', node.last_contact || '从未记录'],
       ['生日', node.birthday ? '已记录' : '未记录']
     ];
+    if (node.deceased) { rows.push(['状态', '已故']); }
     var html = '<h2>' + escapeHtml(node.name) + '</h2><dl>';
     rows.forEach(function (row) {
       html += '<dt>' + row[0] + '</dt><dd>' + escapeHtml(row[1]) + '</dd>';
@@ -309,8 +1174,101 @@
     });
   }
 
+  function hasGenerations() {
+    return graph.nodes.some(isPlaced);
+  }
+
+  function generationCount() {
+    var seen = {};
+    graph.nodes.forEach(function (node) {
+      if (isPlaced(node)) { seen[node.generation] = true; }
+    });
+    return Object.keys(seen).length;
+  }
+
+  function updateMeta(extra) {
+    if (!graph.nodes.length) {
+      metaEl.textContent = '暂无人物';
+      return;
+    }
+    var nodes = (mode === 'tree' && treeLayout && treeLayout.nodes) ? treeLayout.nodes : graph.nodes;
+    var links = (mode === 'tree' && treeLayout && treeLayout.links) ? treeLayout.links : graph.links;
+    if (mode === 'tree') {
+      metaEl.textContent = nodes.length + ' 人 · ' + generationCount() + ' 代 · ' +
+        links.length + ' 条关系 · 更新于 ' + (lastGenerated || '未知') +
+        (extra ? ' · ' + extra : '');
+    } else {
+      metaEl.textContent = nodes.length + ' 人 · ' + links.length +
+        ' 条关系 · 更新于 ' + (lastGenerated || '未知') + (extra ? ' · ' + extra : '');
+    }
+  }
+
+  function drawTreeView() {
+    running = false;
+    if (!hasGenerations()) {
+      setMode('network');
+      return;
+    }
+    var view = buildView();
+    treeLayout = layoutTree(view.nodes, view.links);
+    drawTree();
+    fitTree();
+    var unplaced = view.nodes.filter(function (node) { return !isPlaced(node); }).length;
+    var extra = filterName ? ('筛选：' + (filterName === '项平芳' ? '本家' : filterName)) : '';
+    if (unplaced) { extra += (extra ? ' · ' : '') + '另有 ' + unplaced + ' 位非亲属/未定位'; }
+    updateMeta(extra);
+  }
+
+  function setMode(next) {
+    mode = next;
+    treeBtn.classList.toggle('active', mode === 'tree');
+    netBtn.classList.toggle('active', mode === 'network');
+    d3Btn.classList.toggle('active', mode === '3d');
+    detailEl.classList.add('hidden');
+    var svgEl = document.getElementById('graph');
+    var sceneEl = document.getElementById('scene');
+    if (mode === '3d') {
+      if (!init3D()) {
+        mode = 'tree';
+        treeBtn.classList.add('active');
+        d3Btn.classList.remove('active');
+        svgEl.classList.remove('hidden');
+        sceneEl.classList.add('hidden');
+        hintEl.classList.add('hidden');
+        drawTreeView();
+        return;
+      }
+      svgEl.classList.add('hidden');
+      sceneEl.classList.remove('hidden');
+      hintEl.classList.remove('hidden');
+      build3D();
+      if (!three.looping) { three.looping = true; animate3D(); }
+      updateMeta('');
+      return;
+    }
+    hintEl.classList.add('hidden');
+    svgEl.classList.remove('hidden');
+    sceneEl.classList.add('hidden');
+    if (mode === 'tree') {
+      drawTreeView();
+    } else {
+      initNetworkPositions();
+      updateMeta('');
+      restart(0.9);
+    }
+  }
+
+  function initNetworkPositions() {
+    graph.nodes.forEach(function (node) {
+      var previous = positions[node.id];
+      node.x = previous ? previous.x : size.width / 2 + (Math.random() - 0.5) * 240;
+      node.y = previous ? previous.y : size.height / 2 + (Math.random() - 0.5) * 240;
+      node.vx = 0;
+      node.vy = 0;
+    });
+  }
+
   function load() {
-    metaEl.textContent = '加载中…';
     fetch('/network/data.json', { cache: 'no-store' })
       .then(function (response) {
         if (!response.ok) { throw new Error('HTTP ' + response.status); }
@@ -318,42 +1276,63 @@
       })
       .then(function (data) {
         if (data.generated_at && data.generated_at === lastGenerated && graph.nodes.length) {
-          return;  // 数据没变：保留当前布局
+          return;
         }
         lastGenerated = data.generated_at || '';
-        var rawNodes = data.nodes || [];
-        var rawEdges = data.edges || [];
         var byId = {};
-        var nodes = rawNodes.map(function (node) {
+        var nodes = (data.nodes || []).map(function (node) {
           var item = Object.assign({}, node);
           var previous = positions[item.id];
-          item.x = previous ? previous.x : size.width / 2 + (Math.random() - 0.5) * 200;
-          item.y = previous ? previous.y : size.height / 2 + (Math.random() - 0.5) * 200;
+          item.x = previous ? previous.x : size.width / 2;
+          item.y = previous ? previous.y : size.height / 2;
           item.vx = 0; item.vy = 0;
           byId[item.id] = item;
           return item;
         });
         var links = [];
-        rawEdges.forEach(function (edge) {
+        (data.edges || []).forEach(function (edge) {
           var source = byId[edge.source];
           var target = byId[edge.target];
-          if (source && target) { links.push(Object.assign({}, edge, { source: source, target: target })); }
+          if (source && target) {
+            links.push(Object.assign({}, edge, { source: source, target: target }));
+          }
         });
         graph = { nodes: nodes, links: links };
+        populateBranches();
         detailEl.classList.add('hidden');
-        metaEl.textContent = nodes.length
-          ? (nodes.length + ' 人 · ' + links.length + ' 条关系 · 更新于 ' + (data.generated_at || '未知'))
-          : '暂无人物';
+        treeBtn.disabled = !hasGenerations();
+        treeBtn.title = hasGenerations() ? '按辈分排列的家谱视图' : '还没有辈分关系，先用关系边补全';
         emptyEl.classList.toggle('hidden', nodes.length > 0);
         emptyEl.textContent = '还没有数据——先在 relationships bot 里 /加人 并 /关系 添加。';
         renderLegend();
+        if (!hasGenerations()) { mode = 'network'; }
+        treeBtn.classList.toggle('active', mode === 'tree');
+        netBtn.classList.toggle('active', mode === 'network');
+        if (mode === '3d') {
+          build3D();
+          updateMeta('');
+        } else if (mode === 'tree') {
+          drawTreeView();
+        } else {
+          initNetworkPositions();
+          updateMeta('');
+          if (nodes.length) { restart(1); } else { clearLayers(); }
+        }
         resize();
-        if (nodes.length) { restart(1); } else { draw(); }
       })
       .catch(function (error) {
         metaEl.textContent = '加载失败：' + error.message;
       });
   }
+
+  treeBtn.addEventListener('click', function () { setMode('tree'); });
+  netBtn.addEventListener('click', function () { setMode('network'); });
+  d3Btn.addEventListener('click', function () { setMode('3d'); });
+  branchEl.addEventListener('change', function () {
+    filterName = branchEl.value || '';
+    if (mode === '3d') { build3D(); }
+    else if (mode === 'tree') { drawTreeView(); }
+  });
 
   svg.addEventListener('pointerdown', function (event) {
     if (event.target === svg) {
@@ -400,12 +1379,14 @@
 
   document.getElementById('refresh').addEventListener('click', load);
   searchEl.addEventListener('input', applySearch);
-  window.addEventListener('resize', resize);
+  window.addEventListener('resize', function () { resize(); resize3D(); });
   window.setInterval(load, 60000);
 
   resize();
   load();
 })();
+
+
 </script>
 </body>
 </html>
