@@ -1,15 +1,14 @@
 {
-  "generated_at": "2026-10-22T21:16:27+08:00",
+  "generated_at": "2026-10-22T21:20:11+08:00",
   "nodes": [
     {
-      "id": 0,
-      "name": "项咏",
-      "relation": "self",
-      "relation_label": "我",
+      "id": 2,
+      "name": "向平方",
+      "relation": "family",
+      "relation_label": "家人",
       "closeness": 5,
-      "birthday": true,
-      "last_contact": "",
-      "self": true
+      "birthday": false,
+      "last_contact": ""
     },
     {
       "id": 1,
@@ -19,15 +18,16 @@
       "closeness": 5,
       "birthday": true,
       "last_contact": ""
+    },
+    {
+      "id": 3,
+      "name": "龚春莲",
+      "relation": "family",
+      "relation_label": "家人",
+      "closeness": 5,
+      "birthday": false,
+      "last_contact": ""
     }
   ],
-  "edges": [
-    {
-      "source": 0,
-      "target": 1,
-      "relation": "夫妻",
-      "relation_label": "夫妻",
-      "self": true
-    }
-  ]
+  "edges": []
 }
