@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-22T22:18:11+08:00",
+  "generated_at": "2026-10-22T22:21:03+08:00",
   "nodes": [
     {
       "id": 0,
@@ -501,6 +501,46 @@
       "target": 13,
       "relation": "父子",
       "relation_label": "父子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 7,
+      "target": 14,
+      "relation": "父子",
+      "relation_label": "父子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 7,
+      "target": 15,
+      "relation": "父子",
+      "relation_label": "父子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 7,
+      "target": 16,
+      "relation": "父子",
+      "relation_label": "父子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 7,
+      "target": 17,
+      "relation": "父子",
+      "relation_label": "父子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 7,
+      "target": 18,
+      "relation": "父女",
+      "relation_label": "父女",
       "kind": "parent",
       "family": true
     }
