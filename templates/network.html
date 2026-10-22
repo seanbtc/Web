@@ -25,32 +25,6 @@
     display: flex; flex-direction: column;
     -webkit-font-smoothing: antialiased;
   }
-  /* 星空背景：细星层 + 亮星层（缓慢闪烁）+ 两团星云 */
-  body::before, body::after {
-    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
-  }
-  body::before {
-    background-image:
-      url('/static/stars.svg'),
-      radial-gradient(900px 620px at 78% 18%, rgba(56,189,248,.10), transparent 62%),
-      radial-gradient(820px 600px at 14% 84%, rgba(167,139,250,.08), transparent 62%);
-    background-size: 640px 640px, auto, auto;
-    background-repeat: repeat, no-repeat, no-repeat;
-    opacity: .9;
-  }
-  body::after {
-    background-image: url('/static/stars-bright.svg');
-    background-size: 1100px 1100px;
-    background-repeat: repeat;
-    animation: twinkle 9s ease-in-out infinite;
-    will-change: opacity;
-  }
-  @keyframes twinkle {
-    0%, 100% { opacity: .30; }
-    50%      { opacity: .85; }
-  }
-  image.solar { opacity: .42; pointer-events: none; }
-  header, .legend, main { position: relative; z-index: 2; }
   header {
     padding: 18px 22px 10px;
     display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center;
@@ -212,14 +186,6 @@
   var edgeLayer = document.createElementNS(SVG_NS, 'g');
   var edgeLabelLayer = document.createElementNS(SVG_NS, 'g');
   var nodeLayer = document.createElementNS(SVG_NS, 'g');
-  var solar = document.createElementNS(SVG_NS, 'image');
-  solar.setAttribute('class', 'solar');
-  solar.setAttribute('href', '/static/solar.svg');
-  solar.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '/static/solar.svg');
-  solar.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-  solar.setAttribute('pointer-events', 'none');
-  viewport.appendChild(solar);
-
   var grid = document.createElementNS(SVG_NS, 'rect');
   grid.setAttribute('class', 'grid');
   grid.setAttribute('x', '-8000');
@@ -735,20 +701,10 @@
       maxY = Math.max(maxY, node.y + r + 46);
     });
     minX -= 90;
-    var bounds = { minX: minX, maxX: maxX, minY: minY, maxY: maxY };
-    // 太阳系：放在家谱内容中心，作为可缩放/平移的背景（随 viewport 变换）
-    var cx = (bounds.minX + bounds.maxX) / 2;
-    var cy = (bounds.minY + bounds.maxY) / 2;
-    var span = bounds.maxX - bounds.minX;
-    var solarSize = Math.max(900, Math.min(1800, span * 0.42));
-    solar.setAttribute('x', cx - solarSize / 2);
-    solar.setAttribute('y', cy - solarSize / 2);
-    solar.setAttribute('width', solarSize);
-    solar.setAttribute('height', solarSize);
     return {
       model: model, nodes: nodes, links: links, minGen: minGen,
       focus: computeFocus(model),
-      bounds: bounds
+      bounds: { minX: minX, maxX: maxX, minY: minY, maxY: maxY }
     };
   }
 
