@@ -1393,11 +1393,20 @@
   });
   svg.addEventListener('wheel', function (event) {
     event.preventDefault();
-    var point = toWorld(event.clientX, event.clientY);
-    var factor = event.deltaY < 0 ? 1.12 : 0.89;
-    var next = Math.max(0.35, Math.min(3, transform.k * factor));
-    transform.x = event.clientX - point.x * next;
-    transform.y = event.clientY - point.y * next;
+    var rect = svg.getBoundingClientRect();
+    // 鼠标相对 SVG 的坐标（之前漏减了 SVG 在页面里的偏移，纵向会跑偏）
+    var px = event.clientX - rect.left;
+    var py = event.clientY - rect.top;
+    var delta = Number(event.deltaY) || 0;
+    if (event.deltaMode === 1) { delta *= 16; }        // 行 → 像素
+    else if (event.deltaMode === 2) { delta *= 100; }  // 页 → 像素
+    // 按滚动量平滑缩放（触控板小步长也顺滑），±100px ≈ ±16%
+    var factor = Math.exp(-delta * 0.0015);
+    var next = Math.max(0.2, Math.min(4, transform.k * factor));
+    var scale = next / transform.k;
+    // 以鼠标为原点：该点下的世界坐标缩放前后保持不动
+    transform.x = px - (px - transform.x) * scale;
+    transform.y = py - (py - transform.y) * scale;
     transform.k = next;
     applyTransform();
   }, { passive: false });
