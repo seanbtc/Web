@@ -49,7 +49,11 @@
     0%, 100% { opacity: .30; }
     50%      { opacity: .85; }
   }
-  header, .legend, main { position: relative; z-index: 1; }
+  .solar {
+    position: fixed; right: -150px; bottom: -170px; width: 700px; height: 700px;
+    opacity: .55; pointer-events: none; z-index: 1; user-select: none;
+  }
+  header, .legend, main { position: relative; z-index: 2; }
   header {
     padding: 18px 22px 10px;
     display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center;
@@ -161,6 +165,7 @@
   <aside id="detail" class="detail hidden"></aside>
   <div id="empty" class="empty hidden"></div>
 </main>
+<img class="solar" src="/static/solar.svg" alt="" aria-hidden="true">
 <script src="/static/three.min.js"></script>
 <script src="/static/OrbitControls.js"></script>
 <script>
