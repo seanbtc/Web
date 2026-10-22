@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-22T22:07:52+08:00",
+  "generated_at": "2026-10-22T22:15:11+08:00",
   "nodes": [
     {
       "id": 0,
@@ -16,6 +16,48 @@
       "family": true
     },
     {
+      "id": 12,
+      "name": "二伯",
+      "relation": "伯父",
+      "relation_label": "伯父",
+      "closeness": 5,
+      "birthday": false,
+      "last_contact": "",
+      "deceased": false,
+      "rank": 2,
+      "generation": -1,
+      "generation_label": "父辈",
+      "family": true
+    },
+    {
+      "id": 13,
+      "name": "六叔",
+      "relation": "叔父",
+      "relation_label": "叔父",
+      "closeness": 5,
+      "birthday": false,
+      "last_contact": "",
+      "deceased": false,
+      "rank": 6,
+      "generation": -1,
+      "generation_label": "父辈",
+      "family": true
+    },
+    {
+      "id": 11,
+      "name": "大伯",
+      "relation": "伯父",
+      "relation_label": "伯父",
+      "closeness": 5,
+      "birthday": false,
+      "last_contact": "",
+      "deceased": false,
+      "rank": 1,
+      "generation": -1,
+      "generation_label": "父辈",
+      "family": true
+    },
+    {
       "id": 1,
       "name": "陈圆圆",
       "relation": "夫妻",
@@ -24,6 +66,7 @@
       "birthday": true,
       "last_contact": "",
       "deceased": false,
+      "rank": null,
       "generation": 0,
       "generation_label": "我辈",
       "family": true
@@ -37,6 +80,7 @@
       "birthday": true,
       "last_contact": "",
       "deceased": false,
+      "rank": null,
       "generation": 1,
       "generation_label": "子辈",
       "family": true
@@ -50,6 +94,7 @@
       "birthday": true,
       "last_contact": "",
       "deceased": false,
+      "rank": null,
       "generation": 1,
       "generation_label": "子辈",
       "family": true
@@ -63,6 +108,7 @@
       "birthday": true,
       "last_contact": "",
       "deceased": false,
+      "rank": 5,
       "generation": -1,
       "generation_label": "父辈",
       "family": true
@@ -76,6 +122,7 @@
       "birthday": true,
       "last_contact": "",
       "deceased": false,
+      "rank": null,
       "generation": 1,
       "generation_label": "子辈",
       "family": true
@@ -89,6 +136,7 @@
       "birthday": false,
       "last_contact": "",
       "deceased": false,
+      "rank": null,
       "generation": 1,
       "generation_label": "子辈",
       "family": true
@@ -102,6 +150,7 @@
       "birthday": true,
       "last_contact": "",
       "deceased": false,
+      "rank": null,
       "generation": -1,
       "generation_label": "父辈",
       "family": true
@@ -115,6 +164,7 @@
       "birthday": false,
       "last_contact": "",
       "deceased": true,
+      "rank": null,
       "generation": -2,
       "generation_label": "祖辈",
       "family": true
@@ -128,12 +178,40 @@
       "birthday": false,
       "last_contact": "",
       "deceased": true,
+      "rank": null,
       "generation": -2,
       "generation_label": "祖辈",
       "family": true
     }
   ],
   "edges": [
+    {
+      "source": 0,
+      "target": 12,
+      "relation": "伯父",
+      "relation_label": "伯父",
+      "kind": "kin",
+      "family": true,
+      "self": true
+    },
+    {
+      "source": 0,
+      "target": 13,
+      "relation": "叔父",
+      "relation_label": "叔父",
+      "kind": "kin",
+      "family": true,
+      "self": true
+    },
+    {
+      "source": 0,
+      "target": 11,
+      "relation": "伯父",
+      "relation_label": "伯父",
+      "kind": "kin",
+      "family": true,
+      "self": true
+    },
     {
       "source": 0,
       "target": 1,
@@ -285,6 +363,30 @@
       "relation": "姐弟",
       "relation_label": "姐弟",
       "kind": "sibling",
+      "family": true
+    },
+    {
+      "source": 7,
+      "target": 11,
+      "relation": "父子",
+      "relation_label": "父子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 7,
+      "target": 12,
+      "relation": "父子",
+      "relation_label": "父子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 7,
+      "target": 13,
+      "relation": "父子",
+      "relation_label": "父子",
+      "kind": "parent",
       "family": true
     }
   ]
