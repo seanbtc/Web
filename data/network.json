@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-22T22:15:11+08:00",
+  "generated_at": "2026-10-22T22:18:11+08:00",
   "nodes": [
     {
       "id": 0,
@@ -16,6 +16,34 @@
       "family": true
     },
     {
+      "id": 16,
+      "name": "七叔",
+      "relation": "叔父",
+      "relation_label": "叔父",
+      "closeness": 5,
+      "birthday": false,
+      "last_contact": "",
+      "deceased": false,
+      "rank": 7,
+      "generation": -1,
+      "generation_label": "父辈",
+      "family": true
+    },
+    {
+      "id": 14,
+      "name": "三伯",
+      "relation": "伯父",
+      "relation_label": "伯父",
+      "closeness": 5,
+      "birthday": false,
+      "last_contact": "",
+      "deceased": false,
+      "rank": 3,
+      "generation": -1,
+      "generation_label": "父辈",
+      "family": true
+    },
+    {
       "id": 12,
       "name": "二伯",
       "relation": "伯父",
@@ -25,6 +53,20 @@
       "last_contact": "",
       "deceased": false,
       "rank": 2,
+      "generation": -1,
+      "generation_label": "父辈",
+      "family": true
+    },
+    {
+      "id": 17,
+      "name": "八叔",
+      "relation": "叔父",
+      "relation_label": "叔父",
+      "closeness": 5,
+      "birthday": false,
+      "last_contact": "",
+      "deceased": false,
+      "rank": 8,
       "generation": -1,
       "generation_label": "父辈",
       "family": true
@@ -44,6 +86,20 @@
       "family": true
     },
     {
+      "id": 15,
+      "name": "四伯",
+      "relation": "伯父",
+      "relation_label": "伯父",
+      "closeness": 5,
+      "birthday": false,
+      "last_contact": "",
+      "deceased": false,
+      "rank": 4,
+      "generation": -1,
+      "generation_label": "父辈",
+      "family": true
+    },
+    {
       "id": 11,
       "name": "大伯",
       "relation": "伯父",
@@ -53,6 +109,20 @@
       "last_contact": "",
       "deceased": false,
       "rank": 1,
+      "generation": -1,
+      "generation_label": "父辈",
+      "family": true
+    },
+    {
+      "id": 18,
+      "name": "姑姑",
+      "relation": "姑姑",
+      "relation_label": "姑姑",
+      "closeness": 5,
+      "birthday": false,
+      "last_contact": "",
+      "deceased": false,
+      "rank": null,
       "generation": -1,
       "generation_label": "父辈",
       "family": true
@@ -187,9 +257,36 @@
   "edges": [
     {
       "source": 0,
+      "target": 16,
+      "relation": "叔父",
+      "relation_label": "叔父",
+      "kind": "kin",
+      "family": true,
+      "self": true
+    },
+    {
+      "source": 0,
+      "target": 14,
+      "relation": "伯父",
+      "relation_label": "伯父",
+      "kind": "kin",
+      "family": true,
+      "self": true
+    },
+    {
+      "source": 0,
       "target": 12,
       "relation": "伯父",
       "relation_label": "伯父",
+      "kind": "kin",
+      "family": true,
+      "self": true
+    },
+    {
+      "source": 0,
+      "target": 17,
+      "relation": "叔父",
+      "relation_label": "叔父",
       "kind": "kin",
       "family": true,
       "self": true
@@ -205,9 +302,27 @@
     },
     {
       "source": 0,
+      "target": 15,
+      "relation": "伯父",
+      "relation_label": "伯父",
+      "kind": "kin",
+      "family": true,
+      "self": true
+    },
+    {
+      "source": 0,
       "target": 11,
       "relation": "伯父",
       "relation_label": "伯父",
+      "kind": "kin",
+      "family": true,
+      "self": true
+    },
+    {
+      "source": 0,
+      "target": 18,
+      "relation": "姑姑",
+      "relation_label": "姑姑",
       "kind": "kin",
       "family": true,
       "self": true
