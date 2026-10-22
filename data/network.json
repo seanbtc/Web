@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-22T22:57:37+08:00",
+  "generated_at": "2026-10-22T23:03:32+08:00",
   "nodes": [
     {
       "id": 0,
@@ -255,9 +255,9 @@
     },
     {
       "id": 51,
-      "name": "二伯次子之女",
-      "relation": "堂侄女",
-      "relation_label": "堂侄女",
+      "name": "二伯次子之子",
+      "relation": "堂侄",
+      "relation_label": "堂侄",
       "closeness": 5,
       "birthday": false,
       "last_contact": "",
@@ -1027,8 +1027,8 @@
     {
       "source": 0,
       "target": 51,
-      "relation": "堂侄女",
-      "relation_label": "堂侄女",
+      "relation": "堂侄",
+      "relation_label": "堂侄",
       "kind": "other",
       "family": true,
       "self": true
@@ -1959,16 +1959,16 @@
     {
       "source": 28,
       "target": 51,
-      "relation": "父女",
-      "relation_label": "父女",
+      "relation": "父子",
+      "relation_label": "父子",
       "kind": "parent",
       "family": true
     },
     {
       "source": 50,
       "target": 51,
-      "relation": "母女",
-      "relation_label": "母女",
+      "relation": "母子",
+      "relation_label": "母子",
       "kind": "parent",
       "family": true
     },
