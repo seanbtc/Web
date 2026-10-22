@@ -1,9 +1,36 @@
 {
-  "generated_at": "2026-10-22T21:20:11+08:00",
+  "generated_at": "2026-10-22T21:23:27+08:00",
   "nodes": [
+    {
+      "id": 4,
+      "name": "向卢义",
+      "relation": "family",
+      "relation_label": "家人",
+      "closeness": 5,
+      "birthday": false,
+      "last_contact": ""
+    },
+    {
+      "id": 6,
+      "name": "向后圆",
+      "relation": "family",
+      "relation_label": "家人",
+      "closeness": 5,
+      "birthday": false,
+      "last_contact": ""
+    },
     {
       "id": 2,
       "name": "向平方",
+      "relation": "family",
+      "relation_label": "家人",
+      "closeness": 5,
+      "birthday": false,
+      "last_contact": ""
+    },
+    {
+      "id": 5,
+      "name": "向陈心",
       "relation": "family",
       "relation_label": "家人",
       "closeness": 5,
