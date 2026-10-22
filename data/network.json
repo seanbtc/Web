@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-22T22:37:43+08:00",
+  "generated_at": "2026-10-22T22:39:14+08:00",
   "nodes": [
     {
       "id": 0,
@@ -675,6 +675,14 @@
       "relation_label": "母女",
       "kind": "parent",
       "family": true
+    },
+    {
+      "source": 11,
+      "target": 19,
+      "relation": "离婚",
+      "relation_label": "离婚",
+      "kind": "other",
+      "family": false
     }
   ]
 }
