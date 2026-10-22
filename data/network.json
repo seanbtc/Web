@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-22T21:27:39+08:00",
+  "generated_at": "2026-10-22T21:32:42+08:00",
   "nodes": [
     {
       "id": 0,
@@ -9,61 +9,8 @@
       "closeness": 5,
       "birthday": true,
       "last_contact": "",
-      "self": true
-    },
-    {
-      "id": 4,
-      "name": "向卢义",
-      "relation": "family",
-      "relation_label": "家人",
-      "closeness": 5,
-      "birthday": false,
-      "last_contact": ""
-    },
-    {
-      "id": 6,
-      "name": "向后圆",
-      "relation": "family",
-      "relation_label": "家人",
-      "closeness": 5,
-      "birthday": false,
-      "last_contact": ""
-    },
-    {
-      "id": 7,
-      "name": "向家瑶",
-      "relation": "family",
-      "relation_label": "家人",
-      "closeness": 5,
-      "birthday": false,
-      "last_contact": ""
-    },
-    {
-      "id": 2,
-      "name": "向平方",
-      "relation": "family",
-      "relation_label": "家人",
-      "closeness": 5,
-      "birthday": false,
-      "last_contact": ""
-    },
-    {
-      "id": 5,
-      "name": "向陈心",
-      "relation": "family",
-      "relation_label": "家人",
-      "closeness": 5,
-      "birthday": false,
-      "last_contact": ""
-    },
-    {
-      "id": 8,
-      "name": "瑶",
-      "relation": "family",
-      "relation_label": "家人",
-      "closeness": 5,
-      "birthday": false,
-      "last_contact": ""
+      "self": true,
+      "deceased": false
     },
     {
       "id": 1,
@@ -72,61 +19,71 @@
       "relation_label": "夫妻",
       "closeness": 5,
       "birthday": true,
-      "last_contact": ""
+      "last_contact": "",
+      "deceased": false
+    },
+    {
+      "id": 6,
+      "name": "项厚元",
+      "relation": "儿子",
+      "relation_label": "儿子",
+      "closeness": 5,
+      "birthday": false,
+      "last_contact": "",
+      "deceased": false
+    },
+    {
+      "id": 4,
+      "name": "项如懿",
+      "relation": "大女儿",
+      "relation_label": "大女儿",
+      "closeness": 5,
+      "birthday": false,
+      "last_contact": "",
+      "deceased": false
+    },
+    {
+      "id": 7,
+      "name": "项家耀",
+      "relation": "爷爷",
+      "relation_label": "爷爷",
+      "closeness": 5,
+      "birthday": false,
+      "last_contact": "",
+      "deceased": true
+    },
+    {
+      "id": 2,
+      "name": "项平芳",
+      "relation": "父亲",
+      "relation_label": "父亲",
+      "closeness": 5,
+      "birthday": true,
+      "last_contact": "",
+      "deceased": false
+    },
+    {
+      "id": 5,
+      "name": "项陈心",
+      "relation": "二女儿",
+      "relation_label": "二女儿",
+      "closeness": 5,
+      "birthday": false,
+      "last_contact": "",
+      "deceased": false
     },
     {
       "id": 3,
-      "name": "龚春莲",
-      "relation": "family",
-      "relation_label": "家人",
+      "name": "龚春连",
+      "relation": "母亲",
+      "relation_label": "母亲",
       "closeness": 5,
       "birthday": false,
-      "last_contact": ""
+      "last_contact": "",
+      "deceased": false
     }
   ],
   "edges": [
-    {
-      "source": 0,
-      "target": 4,
-      "relation": "family",
-      "relation_label": "家人",
-      "self": true
-    },
-    {
-      "source": 0,
-      "target": 6,
-      "relation": "family",
-      "relation_label": "家人",
-      "self": true
-    },
-    {
-      "source": 0,
-      "target": 7,
-      "relation": "family",
-      "relation_label": "家人",
-      "self": true
-    },
-    {
-      "source": 0,
-      "target": 2,
-      "relation": "family",
-      "relation_label": "家人",
-      "self": true
-    },
-    {
-      "source": 0,
-      "target": 5,
-      "relation": "family",
-      "relation_label": "家人",
-      "self": true
-    },
-    {
-      "source": 0,
-      "target": 8,
-      "relation": "family",
-      "relation_label": "家人",
-      "self": true
-    },
     {
       "source": 0,
       "target": 1,
@@ -136,10 +93,111 @@
     },
     {
       "source": 0,
-      "target": 3,
-      "relation": "family",
-      "relation_label": "家人",
+      "target": 6,
+      "relation": "儿子",
+      "relation_label": "儿子",
       "self": true
+    },
+    {
+      "source": 0,
+      "target": 4,
+      "relation": "大女儿",
+      "relation_label": "大女儿",
+      "self": true
+    },
+    {
+      "source": 0,
+      "target": 7,
+      "relation": "爷爷",
+      "relation_label": "爷爷",
+      "self": true
+    },
+    {
+      "source": 0,
+      "target": 2,
+      "relation": "父亲",
+      "relation_label": "父亲",
+      "self": true
+    },
+    {
+      "source": 0,
+      "target": 5,
+      "relation": "二女儿",
+      "relation_label": "二女儿",
+      "self": true
+    },
+    {
+      "source": 0,
+      "target": 3,
+      "relation": "母亲",
+      "relation_label": "母亲",
+      "self": true
+    },
+    {
+      "source": 2,
+      "target": 3,
+      "relation": "夫妻",
+      "relation_label": "夫妻"
+    },
+    {
+      "source": 2,
+      "target": 4,
+      "relation": "父女",
+      "relation_label": "父女"
+    },
+    {
+      "source": 2,
+      "target": 5,
+      "relation": "父女",
+      "relation_label": "父女"
+    },
+    {
+      "source": 2,
+      "target": 6,
+      "relation": "父子",
+      "relation_label": "父子"
+    },
+    {
+      "source": 3,
+      "target": 4,
+      "relation": "母女",
+      "relation_label": "母女"
+    },
+    {
+      "source": 3,
+      "target": 5,
+      "relation": "母女",
+      "relation_label": "母女"
+    },
+    {
+      "source": 3,
+      "target": 6,
+      "relation": "母子",
+      "relation_label": "母子"
+    },
+    {
+      "source": 2,
+      "target": 7,
+      "relation": "父子",
+      "relation_label": "父子"
+    },
+    {
+      "source": 4,
+      "target": 5,
+      "relation": "姐妹",
+      "relation_label": "姐妹"
+    },
+    {
+      "source": 4,
+      "target": 6,
+      "relation": "姐弟",
+      "relation_label": "姐弟"
+    },
+    {
+      "source": 5,
+      "target": 6,
+      "relation": "姐弟",
+      "relation_label": "姐弟"
     }
   ]
 }
