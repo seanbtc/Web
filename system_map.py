@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections import Counter
 
 SCHEMA_VERSION = 1
-UPDATED_AT = '2026-10-20'
+UPDATED_AT = '2026-10-22'
 
 STATUS_LABELS = {
     'live': '已上线',
@@ -177,10 +177,10 @@ LAYERS = [
         'subtitle': '告警 / 对账 / 安全债',
         'nodes': [
             {'id': 'sentinel', 'name': 'Sentinel', 'status': 'live', 'service': 'sentinel',
-             'desc': '订单轻量回放对账 + 六闸门 + 全程序巡检（um long 腿实例）', 'caps': ['钉钉 fact-only']},
+             'desc': '订单轻量回放对账 + 六闸门 + 全程序巡检（um long 腿实例）', 'caps': ['钉钉 fact-only', 'AI 告警复核（降噪）']},
             {'id': 'sentinel_um_short', 'name': 'Sentinel · um short', 'status': 'live',
              'service': 'sentinel-um-short',
-             'desc': 'um short 腿实例（独立 data_dir；watchdog 关闭防双份巡检推送）', 'caps': ['钉钉 fact-only']},
+             'desc': 'um short 腿实例（独立 data_dir；watchdog 关闭防双份巡检推送）', 'caps': ['钉钉 fact-only', 'AI 告警复核（降噪）']},
             {'id': 'strategy_health', 'name': '策略健康页', 'status': 'live',
              'desc': 'Sentinel M1–M5：参数一致性 / 开仓对齐 / 分布健康 / 维护建议（只读；看板「策略模块」区块内切换，独立页保留）',
              'caps': ['登录门禁', '策略模块区切换']},
