@@ -1,5 +1,15 @@
 {
-  "generated_at": "2026-10-20T14:45:57+08:00",
-  "nodes": [],
+  "generated_at": "2026-10-22T20:32:06+08:00",
+  "nodes": [
+    {
+      "id": 1,
+      "name": "陈圆圆",
+      "relation": "夫妻",
+      "relation_label": "夫妻",
+      "closeness": 5,
+      "birthday": true,
+      "last_contact": ""
+    }
+  ],
   "edges": []
 }
