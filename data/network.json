@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-22T21:38:09+08:00",
+  "generated_at": "2026-10-22T21:46:19+08:00",
   "nodes": [
     {
       "id": 0,
@@ -13,6 +13,19 @@
       "deceased": false,
       "generation": 0,
       "generation_label": "我辈",
+      "family": true
+    },
+    {
+      "id": 9,
+      "name": "习长娇",
+      "relation": "奶奶",
+      "relation_label": "奶奶",
+      "closeness": 5,
+      "birthday": false,
+      "last_contact": "",
+      "deceased": true,
+      "generation": -2,
+      "generation_label": "祖辈",
       "family": true
     },
     {
@@ -108,6 +121,15 @@
     }
   ],
   "edges": [
+    {
+      "source": 0,
+      "target": 9,
+      "relation": "奶奶",
+      "relation_label": "奶奶",
+      "kind": "parent",
+      "family": true,
+      "self": true
+    },
     {
       "source": 0,
       "target": 1,
@@ -209,6 +231,22 @@
       "relation": "姐弟",
       "relation_label": "姐弟",
       "kind": "sibling",
+      "family": true
+    },
+    {
+      "source": 7,
+      "target": 9,
+      "relation": "夫妻",
+      "relation_label": "夫妻",
+      "kind": "spouse",
+      "family": true
+    },
+    {
+      "source": 2,
+      "target": 9,
+      "relation": "母子",
+      "relation_label": "母子",
+      "kind": "parent",
       "family": true
     }
   ]
