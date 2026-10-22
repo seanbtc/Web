@@ -25,6 +25,31 @@
     display: flex; flex-direction: column;
     -webkit-font-smoothing: antialiased;
   }
+  /* 星空背景：细星层 + 亮星层（缓慢闪烁）+ 两团星云 */
+  body::before, body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  }
+  body::before {
+    background-image:
+      url('/static/stars.svg'),
+      radial-gradient(900px 620px at 78% 18%, rgba(56,189,248,.10), transparent 62%),
+      radial-gradient(820px 600px at 14% 84%, rgba(167,139,250,.08), transparent 62%);
+    background-size: 640px 640px, auto, auto;
+    background-repeat: repeat, no-repeat, no-repeat;
+    opacity: .9;
+  }
+  body::after {
+    background-image: url('/static/stars-bright.svg');
+    background-size: 1100px 1100px;
+    background-repeat: repeat;
+    animation: twinkle 9s ease-in-out infinite;
+    will-change: opacity;
+  }
+  @keyframes twinkle {
+    0%, 100% { opacity: .30; }
+    50%      { opacity: .85; }
+  }
+  header, .legend, main { position: relative; z-index: 1; }
   header {
     padding: 18px 22px 10px;
     display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center;
