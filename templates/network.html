@@ -14,12 +14,16 @@
     --accent: #38bdf8;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
+  html, body {
+    height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+  }
   body {
-    background: radial-gradient(1200px 700px at 20% -10%, #17304f 0%, var(--bg) 55%) fixed;
+    background: radial-gradient(1200px 700px at 20% -10%, #17304f 0%, var(--bg) 55%);
     color: var(--text);
     font: 14px/1.5 -apple-system, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
     display: flex; flex-direction: column;
+    -webkit-font-smoothing: antialiased;
   }
   header {
     padding: 18px 22px 10px;
@@ -43,7 +47,10 @@
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
   main { position: relative; flex: 1; min-height: 0; }
-  svg { width: 100%; height: 100%; display: block; cursor: grab; }
+  svg {
+    width: 100%; height: 100%; display: block; cursor: grab;
+    touch-action: none; -webkit-user-select: none; user-select: none;
+  }
   svg.dragging { cursor: grabbing; }
   .edge { stroke: #3b4d6b; stroke-width: 1.4; }
   .edge-label { fill: #7f93b0; font-size: 10px; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
@@ -57,7 +64,7 @@
   .detail {
     position: absolute; right: 18px; top: 10px; width: 240px;
     background: rgba(19, 28, 46, .96); border: 1px solid var(--line);
-    border-radius: 12px; padding: 14px 16px; backdrop-filter: blur(6px);
+    border-radius: 12px; padding: 14px 16px;
     box-shadow: 0 10px 30px rgba(0,0,0,.35);
   }
   .detail h2 { margin: 0 0 6px; font-size: 15px; }
@@ -77,6 +84,7 @@
   .edge.dashed { stroke-dasharray: 5 5; opacity: .55; }
   .spouse-line { stroke: #f472b6; stroke-width: 2; opacity: .85; }
   .parent-line { fill: none; stroke: #3b4d6b; stroke-width: 1.6; }
+  .grid { pointer-events: none; }
   .gen-line { stroke: #1e2b40; stroke-dasharray: 4 7; }
   .gen-label { fill: #5f7392; font-size: 11px; letter-spacing: 2px; }
   .node .rel-label { fill: var(--muted); font-size: 10px; }
@@ -95,7 +103,7 @@
     border-radius: 8px; padding: 7px 10px; font: inherit; outline: none;
   }
   select:focus { border-color: var(--accent); }
-  #scene { width: 100%; height: 100%; display: block; }
+  #scene { width: 100%; height: 100%; display: block; touch-action: none; }
   .hint3d {
     position: absolute; left: 18px; bottom: 14px; color: var(--muted); font-size: 12px;
     background: rgba(19,28,46,.8); border: 1px solid var(--line); border-radius: 8px;
@@ -158,11 +166,34 @@
   var branchEl = document.getElementById('branchfilter');
   var filterName = '';
 
+  var defs = document.createElementNS(SVG_NS, 'defs');
+  var pattern = document.createElementNS(SVG_NS, 'pattern');
+  pattern.setAttribute('id', 'dotgrid');
+  pattern.setAttribute('width', '26');
+  pattern.setAttribute('height', '26');
+  pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+  var dot = document.createElementNS(SVG_NS, 'circle');
+  dot.setAttribute('cx', '1');
+  dot.setAttribute('cy', '1');
+  dot.setAttribute('r', '1');
+  dot.setAttribute('fill', '#1b2738');
+  pattern.appendChild(dot);
+  defs.appendChild(pattern);
+  svg.appendChild(defs);
+
   var viewport = document.createElementNS(SVG_NS, 'g');
   var guideLayer = document.createElementNS(SVG_NS, 'g');
   var edgeLayer = document.createElementNS(SVG_NS, 'g');
   var edgeLabelLayer = document.createElementNS(SVG_NS, 'g');
   var nodeLayer = document.createElementNS(SVG_NS, 'g');
+  var grid = document.createElementNS(SVG_NS, 'rect');
+  grid.setAttribute('class', 'grid');
+  grid.setAttribute('x', '-8000');
+  grid.setAttribute('y', '-8000');
+  grid.setAttribute('width', '16000');
+  grid.setAttribute('height', '16000');
+  grid.setAttribute('fill', 'url(#dotgrid)');
+  viewport.appendChild(grid);
   viewport.appendChild(guideLayer);
   viewport.appendChild(edgeLayer);
   viewport.appendChild(edgeLabelLayer);
@@ -810,8 +841,9 @@
     if (draggable) {
       group.addEventListener('pointerdown', function (event) {
         event.stopPropagation();
+        if (event.preventDefault) { event.preventDefault(); }
         dragging = node;
-        svg.setPointerCapture(event.pointerId);
+        try { svg.setPointerCapture(event.pointerId); } catch (err) { /* 老浏览器忽略 */ }
         restart(0.35);
       });
     }
@@ -1336,9 +1368,10 @@
 
   svg.addEventListener('pointerdown', function (event) {
     if (event.target === svg) {
+      if (event.preventDefault) { event.preventDefault(); }
       panning = { x: event.clientX, y: event.clientY, tx: transform.x, ty: transform.y };
       svg.classList.add('dragging');
-      svg.setPointerCapture(event.pointerId);
+      try { svg.setPointerCapture(event.pointerId); } catch (err) { /* 老浏览器忽略 */ }
     }
   });
   svg.addEventListener('pointermove', function (event) {
