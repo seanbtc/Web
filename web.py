@@ -63,9 +63,14 @@ else:
     ))
 
 # AHR999 独立估值指数：仅展示，不参与 AlphaEngine / 交易决策。
-AHR999_REFRESH_SECONDS = 3600
+# 日线只需每天更新一次；以 Binance 现货为主源，DataFeed/合约作为兜底。
+AHR999_REFRESH_SECONDS = 24 * 60 * 60
 AHR999_RETRY_SECONDS = 900
 AHR999_KLINE_LIMIT = 260
+AHR999_DAILY_REFRESH_UTC_MINUTE = 5
+AHR999_HTTP_TIMEOUT_SECONDS = 10
+AHR999_SPOT_KLINES_URL = 'https://api.binance.com/api/v3/klines'
+AHR999_FUTURES_KLINES_URL = 'https://fapi.binance.com/fapi/v1/klines'
 _ahr999_datafeed_url = os.getenv('WEB_DATAFEED_URL', 'http://127.0.0.1:9550').rstrip('/')
 _ahr999_last_good = None
 
@@ -169,17 +174,32 @@ def alpha_engine_update_changed(market_data, new_regime, new_alpha, new_ma):
 
 
 def _fetch_ahr999_bars():
-    """取 BTCUSDT 日线：DataFeed 优先 → Binance 合约/现货回退。
+    """取 BTCUSDT 日线：Binance 现货优先 → DataFeed → Binance 合约回退。
 
     返回 (bars, source, source_stale)；失败返回 ([], '', False)。
-    DataFeed 标记 stale 时仍保留其数据作为兜底，但优先尝试 Binance 新鲜数据。
+    AHR999 是日频指标，调用方每天只在 UTC 日线收盘后刷新一次。
     """
+    # 1. Binance 现货日线（主源，AHR999 常规口径）
+    try:
+        response = requests.get(
+            AHR999_SPOT_KLINES_URL,
+            params={'symbol': 'BTCUSDT', 'interval': '1d', 'limit': AHR999_KLINE_LIMIT},
+            timeout=AHR999_HTTP_TIMEOUT_SECONDS,
+        )
+        if response.status_code == 200:
+            bars = response.json()
+            if isinstance(bars, list) and bars:
+                return bars, 'binance_spot', False
+    except Exception as exc:
+        print(f'[Web] AHR999 Binance 现货取数失败: {type(exc).__name__}: {exc}')
+
+    # 2. 本机 DataFeed（本地 archive；stale 时先留作最终兜底）
     datafeed_candidate = None
     try:
         response = requests.get(
             f'{_ahr999_datafeed_url}/klines',
             params={'symbol': 'BTCUSDT', 'interval': '1d', 'limit': AHR999_KLINE_LIMIT},
-            timeout=5,
+            timeout=AHR999_HTTP_TIMEOUT_SECONDS,
         )
         if response.status_code == 200:
             payload = response.json()
@@ -193,25 +213,37 @@ def _fetch_ahr999_bars():
     except Exception as exc:
         print(f'[Web] AHR999 DataFeed 取数失败: {type(exc).__name__}: {exc}')
 
-    for url in (
-        'https://fapi.binance.com/fapi/v1/klines',
-        'https://api.binance.com/api/v3/klines',
-    ):
-        try:
-            response = requests.get(
-                url,
-                params={'symbol': 'BTCUSDT', 'interval': '1d', 'limit': AHR999_KLINE_LIMIT},
-                timeout=5,
-            )
-            if response.status_code == 200:
-                bars = response.json()
-                if isinstance(bars, list) and bars:
-                    return bars, 'binance', False
-        except Exception as exc:
-            print(f'[Web] AHR999 Binance 取数失败: {type(exc).__name__}: {exc}')
+    # 3. Binance U 本位合约日线（现货/DataFeed 都不可用时）
+    try:
+        response = requests.get(
+            AHR999_FUTURES_KLINES_URL,
+            params={'symbol': 'BTCUSDT', 'interval': '1d', 'limit': AHR999_KLINE_LIMIT},
+            timeout=AHR999_HTTP_TIMEOUT_SECONDS,
+        )
+        if response.status_code == 200:
+            bars = response.json()
+            if isinstance(bars, list) and bars:
+                return bars, 'binance_futures', False
+    except Exception as exc:
+        print(f'[Web] AHR999 Binance 合约取数失败: {type(exc).__name__}: {exc}')
+
     if datafeed_candidate is not None:
         return datafeed_candidate
     return [], '', False
+
+
+def _seconds_until_next_ahr999_refresh(now: datetime | None = None) -> float:
+    """返回距离下一个 UTC 00:05 的秒数（日线收盘后留 5 分钟缓冲）。"""
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    current = current.astimezone(timezone.utc)
+    next_run = current.replace(
+        hour=0, minute=AHR999_DAILY_REFRESH_UTC_MINUTE, second=0, microsecond=0,
+    )
+    if next_run <= current:
+        next_run += timedelta(days=1)
+    return max(1.0, (next_run - current).total_seconds())
 
 
 def refresh_ahr999():
@@ -2136,7 +2168,8 @@ def fetch_btc_price():
                     'market_data': data_storage.market_data,
                     'strategy_status': data_storage.strategy_status,
                 })
-                ahr_interval = (AHR999_REFRESH_SECONDS if ahr999_result.get('available')
+                ahr_interval = (_seconds_until_next_ahr999_refresh()
+                                if ahr999_result.get('available')
                                 else AHR999_RETRY_SECONDS)
                 if ahr999_result.get('available'):
                     print(f"[Web] AHR999={ahr999_result.get('value')} "

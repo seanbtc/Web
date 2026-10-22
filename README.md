@@ -14,13 +14,13 @@
 
 配置键说明见 [`.env.example`](.env.example) 或工作区根 `.env.example`。测试：`.venv\Scripts\python.exe -m pytest tests\ -q`。
 
-## AHR999 独立估值指数（只读展示，2026-10-20）
+## AHR999 独立估值指数（只读展示，2026-10-21）
 
 - 面板头部 `α` 右侧展示 AHR999 当前值与分区（抄底区 / 定投区 / 等待起飞区 / 泡沫区），**独立指数，不参与 AlphaEngine 决策、不影响下单**；
-- 计算：`ahr999.py` 纯函数；日线来源优先本机 DataFeed `/klines`（`WEB_DATAFEED_URL`，默认 `http://127.0.0.1:9550`），不可用时回退 Binance 合约/现货日线；仅使用已收盘 UTC 日线；
+- 计算：`ahr999.py` 纯函数；日线优先 Binance 现货 `/api/v3/klines`，失败回退本机 DataFeed `/klines`（`WEB_DATAFEED_URL`，默认 `http://127.0.0.1:9550`），再回退 Binance U 本位合约日线；仅使用已收盘 UTC 日线；
 - 口径：200 日几何平均成本 + 币龄幂律估值（`10 ** (5.84*log10(币龄)-17.01)`），返回 gmean/SMA 两个成本供核对；
-- 刷新：随价格线程每小时刷新（失败 15 分钟重试）；缺数据时显示 `—`，有上次成功值时标记“数据可能过期”；
-- 测试：`tests/test_ahr999.py`（公式/边界/未完成日线/Binance 行格式）+ `tests/test_alpha_ma.py`（market_data 接线）。
+- 刷新：启动取一次，之后每天 UTC 00:05 后刷新一次（失败 15 分钟重试）；缺数据时显示 `—`，有上次成功值时标记“数据可能过期”；
+- 测试：`tests/test_ahr999.py`（公式/边界/未完成日线/Binance 行格式）+ `tests/test_ahr999_source.py`（现货优先/DataFeed 兜底/每日调度）+ `tests/test_alpha_ma.py`（market_data 接线）。
 
 ## 博客（公开页，Hexo 迁移 2026-10-19）
 
