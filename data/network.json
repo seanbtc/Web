@@ -1,6 +1,16 @@
 {
-  "generated_at": "2026-10-22T20:32:06+08:00",
+  "generated_at": "2026-10-22T21:16:27+08:00",
   "nodes": [
+    {
+      "id": 0,
+      "name": "项咏",
+      "relation": "self",
+      "relation_label": "我",
+      "closeness": 5,
+      "birthday": true,
+      "last_contact": "",
+      "self": true
+    },
     {
       "id": 1,
       "name": "陈圆圆",
@@ -11,5 +21,13 @@
       "last_contact": ""
     }
   ],
-  "edges": []
+  "edges": [
+    {
+      "source": 0,
+      "target": 1,
+      "relation": "夫妻",
+      "relation_label": "夫妻",
+      "self": true
+    }
+  ]
 }
