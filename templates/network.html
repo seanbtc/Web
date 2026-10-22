@@ -49,10 +49,7 @@
     0%, 100% { opacity: .30; }
     50%      { opacity: .85; }
   }
-  .solar {
-    position: fixed; right: -150px; bottom: -170px; width: 700px; height: 700px;
-    opacity: .55; pointer-events: none; z-index: 1; user-select: none;
-  }
+  image.solar { opacity: .42; pointer-events: none; }
   header, .legend, main { position: relative; z-index: 2; }
   header {
     padding: 18px 22px 10px;
@@ -165,7 +162,6 @@
   <aside id="detail" class="detail hidden"></aside>
   <div id="empty" class="empty hidden"></div>
 </main>
-<img class="solar" src="/static/solar.svg" alt="" aria-hidden="true">
 <script src="/static/three.min.js"></script>
 <script src="/static/OrbitControls.js"></script>
 <script>
@@ -216,6 +212,14 @@
   var edgeLayer = document.createElementNS(SVG_NS, 'g');
   var edgeLabelLayer = document.createElementNS(SVG_NS, 'g');
   var nodeLayer = document.createElementNS(SVG_NS, 'g');
+  var solar = document.createElementNS(SVG_NS, 'image');
+  solar.setAttribute('class', 'solar');
+  solar.setAttribute('href', '/static/solar.svg');
+  solar.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '/static/solar.svg');
+  solar.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  solar.setAttribute('pointer-events', 'none');
+  viewport.appendChild(solar);
+
   var grid = document.createElementNS(SVG_NS, 'rect');
   grid.setAttribute('class', 'grid');
   grid.setAttribute('x', '-8000');
@@ -731,10 +735,20 @@
       maxY = Math.max(maxY, node.y + r + 46);
     });
     minX -= 90;
+    var bounds = { minX: minX, maxX: maxX, minY: minY, maxY: maxY };
+    // 太阳系：放在家谱内容中心，作为可缩放/平移的背景（随 viewport 变换）
+    var cx = (bounds.minX + bounds.maxX) / 2;
+    var cy = (bounds.minY + bounds.maxY) / 2;
+    var span = bounds.maxX - bounds.minX;
+    var solarSize = Math.max(900, Math.min(1800, span * 0.42));
+    solar.setAttribute('x', cx - solarSize / 2);
+    solar.setAttribute('y', cy - solarSize / 2);
+    solar.setAttribute('width', solarSize);
+    solar.setAttribute('height', solarSize);
     return {
       model: model, nodes: nodes, links: links, minGen: minGen,
       focus: computeFocus(model),
-      bounds: { minX: minX, maxX: maxX, minY: minY, maxY: maxY }
+      bounds: bounds
     };
   }
 
