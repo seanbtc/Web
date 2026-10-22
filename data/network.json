@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-22T22:56:45+08:00",
+  "generated_at": "2026-10-22T22:57:37+08:00",
   "nodes": [
     {
       "id": 0,
@@ -1890,6 +1890,254 @@
       "relation": "母子",
       "relation_label": "母子",
       "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 21,
+      "target": 46,
+      "relation": "父女",
+      "relation_label": "父女",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 45,
+      "target": 46,
+      "relation": "母女",
+      "relation_label": "母女",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 21,
+      "target": 45,
+      "relation": "离婚",
+      "relation_label": "离婚",
+      "kind": "other",
+      "family": false
+    },
+    {
+      "source": 27,
+      "target": 48,
+      "relation": "父子",
+      "relation_label": "父子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 47,
+      "target": 48,
+      "relation": "母子",
+      "relation_label": "母子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 27,
+      "target": 49,
+      "relation": "父女",
+      "relation_label": "父女",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 47,
+      "target": 49,
+      "relation": "母女",
+      "relation_label": "母女",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 27,
+      "target": 47,
+      "relation": "夫妻",
+      "relation_label": "夫妻",
+      "kind": "spouse",
+      "family": true
+    },
+    {
+      "source": 28,
+      "target": 51,
+      "relation": "父女",
+      "relation_label": "父女",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 50,
+      "target": 51,
+      "relation": "母女",
+      "relation_label": "母女",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 28,
+      "target": 50,
+      "relation": "夫妻",
+      "relation_label": "夫妻",
+      "kind": "spouse",
+      "family": true
+    },
+    {
+      "source": 30,
+      "target": 53,
+      "relation": "父子",
+      "relation_label": "父子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 52,
+      "target": 53,
+      "relation": "母子",
+      "relation_label": "母子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 30,
+      "target": 54,
+      "relation": "父子",
+      "relation_label": "父子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 52,
+      "target": 54,
+      "relation": "母子",
+      "relation_label": "母子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 30,
+      "target": 52,
+      "relation": "夫妻",
+      "relation_label": "夫妻",
+      "kind": "spouse",
+      "family": true
+    },
+    {
+      "source": 31,
+      "target": 56,
+      "relation": "父子",
+      "relation_label": "父子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 55,
+      "target": 56,
+      "relation": "母子",
+      "relation_label": "母子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 31,
+      "target": 57,
+      "relation": "父子",
+      "relation_label": "父子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 55,
+      "target": 57,
+      "relation": "母子",
+      "relation_label": "母子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 31,
+      "target": 55,
+      "relation": "夫妻",
+      "relation_label": "夫妻",
+      "kind": "spouse",
+      "family": true
+    },
+    {
+      "source": 35,
+      "target": 59,
+      "relation": "父女",
+      "relation_label": "父女",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 58,
+      "target": 59,
+      "relation": "母女",
+      "relation_label": "母女",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 35,
+      "target": 60,
+      "relation": "父女",
+      "relation_label": "父女",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 58,
+      "target": 60,
+      "relation": "母女",
+      "relation_label": "母女",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 35,
+      "target": 61,
+      "relation": "父子",
+      "relation_label": "父子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 58,
+      "target": 61,
+      "relation": "母子",
+      "relation_label": "母子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 35,
+      "target": 58,
+      "relation": "夫妻",
+      "relation_label": "夫妻",
+      "kind": "spouse",
+      "family": true
+    },
+    {
+      "source": 36,
+      "target": 63,
+      "relation": "父子",
+      "relation_label": "父子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 62,
+      "target": 63,
+      "relation": "母子",
+      "relation_label": "母子",
+      "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 36,
+      "target": 62,
+      "relation": "夫妻",
+      "relation_label": "夫妻",
+      "kind": "spouse",
       "family": true
     }
   ]
