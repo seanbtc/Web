@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-22T21:46:19+08:00",
+  "generated_at": "2026-10-22T22:07:52+08:00",
   "nodes": [
     {
       "id": 0,
@@ -13,19 +13,6 @@
       "deceased": false,
       "generation": 0,
       "generation_label": "我辈",
-      "family": true
-    },
-    {
-      "id": 9,
-      "name": "习长娇",
-      "relation": "奶奶",
-      "relation_label": "奶奶",
-      "closeness": 5,
-      "birthday": false,
-      "last_contact": "",
-      "deceased": true,
-      "generation": -2,
-      "generation_label": "祖辈",
       "family": true
     },
     {
@@ -47,7 +34,7 @@
       "relation": "儿子",
       "relation_label": "儿子",
       "closeness": 5,
-      "birthday": false,
+      "birthday": true,
       "last_contact": "",
       "deceased": false,
       "generation": 1,
@@ -60,24 +47,11 @@
       "relation": "大女儿",
       "relation_label": "大女儿",
       "closeness": 5,
-      "birthday": false,
+      "birthday": true,
       "last_contact": "",
       "deceased": false,
       "generation": 1,
       "generation_label": "子辈",
-      "family": true
-    },
-    {
-      "id": 7,
-      "name": "项家耀",
-      "relation": "爷爷",
-      "relation_label": "爷爷",
-      "closeness": 5,
-      "birthday": false,
-      "last_contact": "",
-      "deceased": true,
-      "generation": -2,
-      "generation_label": "祖辈",
       "family": true
     },
     {
@@ -91,6 +65,19 @@
       "deceased": false,
       "generation": -1,
       "generation_label": "父辈",
+      "family": true
+    },
+    {
+      "id": 10,
+      "name": "项晨芯",
+      "relation": "二女儿",
+      "relation_label": "二女儿",
+      "closeness": 5,
+      "birthday": true,
+      "last_contact": "",
+      "deceased": false,
+      "generation": 1,
+      "generation_label": "子辈",
       "family": true
     },
     {
@@ -112,24 +99,41 @@
       "relation": "母亲",
       "relation_label": "母亲",
       "closeness": 5,
-      "birthday": false,
+      "birthday": true,
       "last_contact": "",
       "deceased": false,
       "generation": -1,
       "generation_label": "父辈",
       "family": true
+    },
+    {
+      "id": 9,
+      "name": "习长娇",
+      "relation": "奶奶",
+      "relation_label": "奶奶",
+      "closeness": 4,
+      "birthday": false,
+      "last_contact": "",
+      "deceased": true,
+      "generation": -2,
+      "generation_label": "祖辈",
+      "family": true
+    },
+    {
+      "id": 7,
+      "name": "项家耀",
+      "relation": "爷爷",
+      "relation_label": "爷爷",
+      "closeness": 4,
+      "birthday": false,
+      "last_contact": "",
+      "deceased": true,
+      "generation": -2,
+      "generation_label": "祖辈",
+      "family": true
     }
   ],
   "edges": [
-    {
-      "source": 0,
-      "target": 9,
-      "relation": "奶奶",
-      "relation_label": "奶奶",
-      "kind": "parent",
-      "family": true,
-      "self": true
-    },
     {
       "source": 0,
       "target": 1,
@@ -159,18 +163,18 @@
     },
     {
       "source": 0,
-      "target": 7,
-      "relation": "爷爷",
-      "relation_label": "爷爷",
+      "target": 2,
+      "relation": "父亲",
+      "relation_label": "父亲",
       "kind": "parent",
       "family": true,
       "self": true
     },
     {
       "source": 0,
-      "target": 2,
-      "relation": "父亲",
-      "relation_label": "父亲",
+      "target": 10,
+      "relation": "二女儿",
+      "relation_label": "二女儿",
       "kind": "parent",
       "family": true,
       "self": true
@@ -189,6 +193,24 @@
       "target": 3,
       "relation": "母亲",
       "relation_label": "母亲",
+      "kind": "parent",
+      "family": true,
+      "self": true
+    },
+    {
+      "source": 0,
+      "target": 9,
+      "relation": "奶奶",
+      "relation_label": "奶奶",
+      "kind": "parent",
+      "family": true,
+      "self": true
+    },
+    {
+      "source": 0,
+      "target": 7,
+      "relation": "爷爷",
+      "relation_label": "爷爷",
       "kind": "parent",
       "family": true,
       "self": true
@@ -247,6 +269,22 @@
       "relation": "母子",
       "relation_label": "母子",
       "kind": "parent",
+      "family": true
+    },
+    {
+      "source": 4,
+      "target": 10,
+      "relation": "姐妹",
+      "relation_label": "姐妹",
+      "kind": "sibling",
+      "family": true
+    },
+    {
+      "source": 6,
+      "target": 10,
+      "relation": "姐弟",
+      "relation_label": "姐弟",
+      "kind": "sibling",
       "family": true
     }
   ]
