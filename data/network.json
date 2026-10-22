@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-22T22:34:13+08:00",
+  "generated_at": "2026-10-22T22:37:43+08:00",
   "nodes": [
     {
       "id": 0,
@@ -116,16 +116,16 @@
     {
       "id": 19,
       "name": "大伯前妻",
-      "relation": "前妻",
-      "relation_label": "前妻",
+      "relation": "前伯母",
+      "relation_label": "前伯母",
       "closeness": 5,
       "birthday": false,
       "last_contact": "",
       "deceased": false,
       "rank": null,
-      "generation": null,
-      "generation_label": null,
-      "family": false
+      "generation": -1,
+      "generation_label": "父辈",
+      "family": true
     },
     {
       "id": 20,
@@ -377,10 +377,10 @@
     {
       "source": 0,
       "target": 19,
-      "relation": "前妻",
-      "relation_label": "前妻",
+      "relation": "前伯母",
+      "relation_label": "前伯母",
       "kind": "other",
-      "family": false,
+      "family": true,
       "self": true
     },
     {
