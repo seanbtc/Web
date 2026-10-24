@@ -451,27 +451,49 @@ socketio = SocketIO(app, cors_allowed_origins='*', async_mode=SOCKETIO_ASYNC_MOD
 # whatif 推演面板（挂载到 /whatif/）
 # 复用 whatif/dashboard/parser.py（只读 Markdown → JSON），支持热更新：
 # 修改 whatif 项目里的 Markdown 后，无需重启此服务即可生效。
-# 环境变量 WHATIF_WORKSPACE 可指定 whatif 工作区根目录，
-# 默认 /Users/xy/Developer/whatif。
+# 环境变量 WHATIF_DASHBOARD 指定 whatif/dashboard 目录；未设置时按常见部署
+# 位置自动探测（Web 同级/上级的 whatif/dashboard、/opt、/srv 等）。
 # ---------------------------------------------------------------------------
-_WHATIF_DASHBOARD = os.getenv(
-    'WHATIF_DASHBOARD',
-    '/Users/xy/Developer/whatif/dashboard',
-).strip()
-os.environ.setdefault('WHATIF_DASHBOARD', _WHATIF_DASHBOARD)
+def _find_whatif_dashboard():
+    env = os.path.expanduser(str(os.getenv('WHATIF_DASHBOARD', '') or '').strip())
+    if env:
+        return env
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(here, 'whatif', 'dashboard'),
+        os.path.join(os.path.dirname(here), 'whatif', 'dashboard'),
+        os.path.join(os.path.dirname(os.path.dirname(here)), 'whatif', 'dashboard'),
+        '/opt/whatif/dashboard',
+        '/srv/whatif/dashboard',
+        '/Users/xy/Developer/whatif/dashboard',
+    ]
+    for path in candidates:
+        if os.path.isfile(os.path.join(path, 'parser.py')) and os.path.isdir(os.path.join(path, 'static')):
+            return path
+    return candidates[-1]
+
+
+_WHATIF_DASHBOARD = _find_whatif_dashboard()
 _WHATIF_STATIC = os.path.join(_WHATIF_DASHBOARD, 'static')
-if _WHATIF_DASHBOARD and _WHATIF_DASHBOARD not in sys.path:
-    sys.path.insert(0, _WHATIF_DASHBOARD)
 
 try:  # 可选依赖：缺 whatif 目录时不拖垮主应用
-    import parser as whatif_parser  # noqa: E402
+    import importlib.util
+
+    _spec = importlib.util.spec_from_file_location(
+        'whatif_dashboard_parser',
+        os.path.join(_WHATIF_DASHBOARD, 'parser.py'),
+    )
+    whatif_parser = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(whatif_parser)
+
     from werkzeug.utils import secure_filename
 
     whatif_bp = Blueprint('whatif', __name__, url_prefix='/whatif')
 
     @whatif_bp.route('/')
     def whatif_index():
-        return open(os.path.join(_WHATIF_STATIC, 'index.html'), encoding='utf-8').read()
+        with open(os.path.join(_WHATIF_STATIC, 'index.html'), encoding='utf-8') as fh:
+            return fh.read()
 
     @whatif_bp.route('/static/<path:filename>')
     def whatif_static(filename):
@@ -516,7 +538,8 @@ try:  # 可选依赖：缺 whatif 目录时不拖垮主应用
     app.register_blueprint(whatif_bp)
     print('[Web] whatif 推演面板已挂载到 /whatif/ (WHATIF_DASHBOARD=%s)' % _WHATIF_DASHBOARD)
 except Exception as exc:  # noqa: BLE001
-    print('[Web] whatif 推演面板挂载失败: %s' % exc)
+    print('[Web] whatif 推演面板挂载失败（不影响主站）: %s' % exc)
+    print('[Web] 请设置环境变量 WHATIF_DASHBOARD 指向 whatif/dashboard 目录')
 
 
 # ---------------------------------------------------------------------------
@@ -668,6 +691,9 @@ def enforce_login_guard():
         return None
 
     if path.startswith('/api/'):
+        return jsonify({'status': 'error', 'message': 'login required'}), 401
+    # whatif 面板的 API 也返回 JSON 401，避免前端 fetch 收到登录页 HTML
+    if path.startswith('/whatif/api/'):
         return jsonify({'status': 'error', 'message': 'login required'}), 401
     if path == '/':
         return redirect(url_for('login'))
