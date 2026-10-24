@@ -3056,7 +3056,14 @@ def update_bottom_data():
 # 主页
 @app.route('/')
 def index():
-    return render_template('index.html', health=load_strategy_health())
+    return render_template('index.html', health=load_strategy_health(),
+                           grid=load_grid_state())
+
+
+@app.route('/api/grid_status', methods=['GET'])
+def api_grid_status():
+    """GridBot 只读状态（登录门禁由 before_request 统一保护）。"""
+    return jsonify(load_grid_state())
 
 
 @app.route('/skeleton')
@@ -3316,6 +3323,109 @@ def _health_direction_display(name, branch):
         'other_pending_n': pending,
         'other_problems': problems,
         'evidence': evidence,
+    }
+
+
+GRIDBOT_STATE_FILE = os.getenv('GRIDBOT_STATE_FILE') or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), '..', 'GridBot', 'runtime', 'live_state.json')
+GRIDBOT_SYMBOL = os.getenv('GRIDBOT_SYMBOL', 'BTCUSDC')
+_grid_price_cache = {'ts': 0.0, 'price': None}
+
+
+def _grid_price(timeout=5.0):
+    """BTCUSDC 现价（30s 缓存；失败回退上次值/None，不阻塞页面）。"""
+    now = time.time()
+    cached = _grid_price_cache.get('price')
+    if cached and now - float(_grid_price_cache.get('ts') or 0) < 30:
+        return cached
+    try:
+        response = requests.get(
+            'https://fapi.binance.com/fapi/v1/ticker/price',
+            params={'symbol': GRIDBOT_SYMBOL}, timeout=timeout)
+        if response.status_code == 200:
+            price = float(response.json().get('price') or 0.0)
+            if price > 0:
+                _grid_price_cache.update(ts=now, price=price)
+                return price
+    except Exception:
+        pass
+    return cached
+
+
+def load_grid_state():
+    """读取 GridBot live 状态（只读）：库存/lots/TP/下一档/浮盈/数据新鲜度。"""
+    try:
+        with open(GRIDBOT_STATE_FILE, 'r', encoding='utf-8') as handle:
+            state = json.load(handle)
+    except (OSError, ValueError):
+        return {'available': False, 'status': '未启用', 'reason': 'state 文件缺失',
+                'lots': [], 'inventory': 0.0, 'lot_count': 0, 'tp_count': 0,
+                'next_buy': None, 'price': None, 'unrealized': None,
+                'last_fill': '', 'age_seconds': None, 'symbol': GRIDBOT_SYMBOL,
+                'baseline': 0.0, 'distance': 0.0, 'order_qty': 0.0, 'max_levels': 0,
+                'paused': False, 'updated_at': ''}
+
+    updated_raw = str(state.get('updated_at') or '')
+    age_seconds = None
+    try:
+        stamp = datetime.fromisoformat(updated_raw.replace('Z', '+00:00'))
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=timezone.utc)
+        age_seconds = max(0.0, (datetime.now(timezone.utc) - stamp).total_seconds())
+    except (TypeError, ValueError):
+        age_seconds = None
+
+    if age_seconds is None or age_seconds > 60:
+        status = '数据过期'
+    elif state.get('paused'):
+        status = '已暂停'
+    elif state.get('started'):
+        status = '运行中'
+    else:
+        status = '待触发'
+
+    baseline = float(state.get('baseline') or 0.0)
+    distance = float(state.get('grid_distance') or 0.0)
+    lots = []
+    for item in state.get('lots') or []:
+        try:
+            level = int(item.get('level') or 0)
+            entry = float(item.get('entry') or 0.0)
+            qty = float(item.get('qty') or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if level < 1 or qty <= 0:
+            continue
+        tp = round(baseline - (level - 1) * distance, 2) if baseline and distance else None
+        lots.append({'level': level, 'entry': entry, 'qty': qty, 'tp': tp})
+    lots.sort(key=lambda row: row['level'])
+    inventory = round(sum(row['qty'] for row in lots), 12)
+
+    price = _grid_price()
+    unrealized = None
+    if price and lots:
+        unrealized = round(sum((price - row['entry']) * row['qty'] for row in lots), 4)
+
+    last_fill = state.get('last_buy_fill_ts') or 0
+    last_fill_text = ''
+    if last_fill:
+        try:
+            last_fill_text = datetime.fromtimestamp(
+                float(last_fill), timezone.utc).astimezone(
+                timezone(timedelta(hours=8))).strftime('%m-%d %H:%M')
+        except (TypeError, ValueError, OSError):
+            last_fill_text = ''
+
+    return {
+        'available': True, 'status': status, 'symbol': str(state.get('symbol') or GRIDBOT_SYMBOL),
+        'baseline': baseline, 'distance': distance,
+        'order_qty': float(state.get('order_qty') or 0.0),
+        'max_levels': int(state.get('max_levels') or 0),
+        'paused': bool(state.get('paused')), 'lots': lots,
+        'inventory': inventory, 'lot_count': len(lots), 'tp_count': len(lots),
+        'next_buy': state.get('active_buy') or None,
+        'price': price, 'unrealized': unrealized,
+        'last_fill': last_fill_text, 'age_seconds': age_seconds, 'updated_at': updated_raw,
     }
 
 

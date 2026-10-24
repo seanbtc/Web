@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections import Counter
 
 SCHEMA_VERSION = 1
-UPDATED_AT = '2026-10-22'
+UPDATED_AT = '2026-10-24'
 
 STATUS_LABELS = {
     'live': '已上线',
@@ -57,6 +57,9 @@ LAYERS = [
             {'id': 'ops_xdigest', 'name': 'xdigest', 'status': 'live', 'launchd': 'com.bot.xdigest',
              'desc': '每日 21:00 X 前沿情报精选（数据/技术/可学习）→ 钉钉',
              'caps': ['17 账号池（试用制）', 'AI 精选（API+本地降级）']},
+            {'id': 'ops_klines_watch', 'name': 'klines-watch', 'status': 'live', 'launchd': 'com.bot.klines-watch',
+             'desc': '每月 1 日 09:15 观察池月更（主流币 + TradFi 永续）→ 清单/状态 + 钉钉',
+             'caps': ['幂等', '自动扩容']},
             {'id': 'ops_aiservice', 'name': 'aiservice (Mac)', 'status': 'live', 'launchd': 'com.bot.aiservice',
              'desc': 'Mac 本机 AI 网关（DeepSeek；xdigest 等本机消费者）',
              'caps': ['Key 集中', 'JSON 修复', '用量日志']},
@@ -126,6 +129,9 @@ LAYERS = [
         'nodes': [
             {'id': 'bstrategy', 'name': 'BStrategy', 'status': 'live', 'service': 'bstrategy',
              'desc': '4H 多策略（策略模块 · 实盘）', 'caps': ['止损闭环', '仓位对齐']},
+            {'id': 'gridbot', 'name': 'GridBot（网格策略）', 'status': 'live',
+             'desc': 'BTCUSDC 只做多网格（500 间距 / 5 层）；看板「网格策略」区块只读展示（10s 轮询）',
+             'caps': ['单活跃买单', '止盈后回收档位', 'systemd 守护']},
             {'id': 'tradesync', 'name': 'TradeSync', 'status': 'live', 'service': 'tradesync',
              'desc': '下单网关 / 账号路由', 'caps': ['Binance/Bybit/OKX/Bitget']},
             {'id': 'autodca', 'name': 'AutoDCA', 'status': 'idle', 'service': 'autodca',

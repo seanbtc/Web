@@ -554,8 +554,9 @@
             #performance-switcher-section { order: 2; }
             #triangle-section { order: 4; display: none; }
             #lead-section { order: 5; }
-            #top-section { order: 6; }
-            #bottom-section { order: 7; }
+            #grid-section { order: 6; }
+            #top-section { order: 7; }
+            #bottom-section { order: 8; }
             #top-bottom-section { order: 6; display: none; }
             #report-section { order: 8; }
 
@@ -833,10 +834,18 @@
 
             #lead-section {
                 grid-column: 1;
-                grid-row: 1 / 5;
+                grid-row: 1 / 3;
                 display: flex;
                 flex-direction: column;
                 overflow: hidden;
+            }
+
+            #grid-section {
+                grid-column: 1;
+                grid-row: 3 / 5;
+                display: flex;
+                flex-direction: column;
+                overflow-y: auto;
             }
 
             #top-section {
@@ -1586,6 +1595,49 @@
             color: #9ca3af;
         }
 
+        @media (min-width: 1200px) and (min-aspect-ratio: 5/4) {
+            #lead-section #lead-module-view {
+                overflow-y: auto;
+            }
+            #lead-section .compact-table-container {
+                min-height: 120px;
+            }
+        }
+
+        /* ========== 网格策略模块（GridBot 只读） ========== */
+        #grid-section {
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(139, 92, 246, 0.15) !important;
+            box-shadow: var(--panel-shadow);
+            backdrop-filter: saturate(180%) blur(28px);
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(59, 130, 246, 0.06) 100%) !important;
+        }
+        #grid-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, rgba(139, 92, 246, 0.5), rgba(59, 130, 246, 0.1));
+        }
+        #grid-section::after {
+            content: '';
+            position: absolute;
+            inset: 12px;
+            border-radius: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.64);
+            pointer-events: none;
+        }
+        #grid-section .bg-white {
+            background: rgba(255, 255, 255, 0.9) !important;
+            border: 1px solid rgba(0, 0, 0, 0.04) !important;
+        }
+        #grid-section .bg-gray-50 {
+            background: linear-gradient(180deg, rgba(245, 245, 247, 0.88) 0%, rgba(255, 255, 255, 0.74) 100%);
+        }
+
         /* ========== 渐变背景 ========== */
         #lead-section {
             background: linear-gradient(135deg, rgba(6,182,212,0.08) 0%, rgba(59,130,246,0.06) 100%) !important;
@@ -1907,6 +1959,142 @@
 {% include '_strategy_health_view.html' %}
             </div>
         </section>
+
+        <!-- 网格策略模块（GridBot 只读展示）-->
+        <section id="grid-section" class="mb-12 bg-gray-100 rounded-xl p-6 panel-section">
+            <div class="mb-2">
+                <div class="flex items-center mb-1">
+                    <div class="w-7 h-7 bg-purple-100 rounded-full flex items-center justify-center mr-2">
+                        <i class="fa fa-th text-purple-600 text-sm"></i>
+                    </div>
+                    <h3 class="text-sm font-semibold text-dark">网格策略</h3>
+                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 ml-2" id="grid-status">{{ grid.status or '—' }}</span>
+                    <span class="text-xs text-gray-500 ml-auto" id="grid-age">{% if grid.age_seconds is not none %}{{ grid.age_seconds|round(0)|int }}s 前{% else %}—{% endif %}</span>
+                </div>
+                <div class="text-xs text-gray-500" id="grid-subtitle">
+                    {{ grid.symbol or 'BTCUSDC' }} · 只做多 · 间距 {{ '%.0f'|format(grid.distance or 0) }} · 基准 {{ '%.0f'|format(grid.baseline or 0) }}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">库存</div>
+                    <div class="text-lg font-semibold text-dark" id="grid-inventory">{{ '%.4f'|format(grid.inventory or 0) }}</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">浮动盈亏</div>
+                    <div class="text-lg font-semibold {% if grid.unrealized is not none and grid.unrealized < 0 %}text-red-600{% elif grid.unrealized is not none %}text-green-600{% else %}text-dark{% endif %}" id="grid-unrealized">{% if grid.unrealized is not none %}{{ '%+.2f'|format(grid.unrealized) }}{% else %}—{% endif %}</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">现价</div>
+                    <div class="text-lg font-semibold text-dark" id="grid-price">{% if grid.price %}{{ '%.1f'|format(grid.price) }}{% else %}—{% endif %}</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">层数</div>
+                    <div class="text-lg font-semibold text-dark" id="grid-lots-count">{{ grid.lot_count or 0 }}/{{ grid.max_levels or 0 }}</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">下一档买单</div>
+                    <div class="text-sm font-semibold text-dark" id="grid-next-buy">{% if grid.next_buy %}L{{ grid.next_buy.level }} @{{ '%.0f'|format(grid.next_buy.price or 0) }}{% else %}—{% endif %}</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">止盈挂单</div>
+                    <div class="text-sm font-semibold text-dark" id="grid-tp-count">{{ grid.tp_count or 0 }}</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">最近买入成交</div>
+                    <div class="text-sm font-semibold text-dark" id="grid-last-fill">{{ grid.last_fill or '—' }}</div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-md p-3">
+                <h4 class="text-sm font-semibold text-dark mb-2">持仓层</h4>
+                <div class="overflow-y-auto" style="max-height: 12rem;">
+                    <table class="min-w-full divide-y divide-gray-200 text-xs">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-600">层</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-600">买入价</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-600">数量</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-600">止盈价</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-600">浮盈</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="grid-lots-body">
+                            {% for lot in grid.lots %}
+                            {% set pnl = (grid.price - lot.entry) * lot.qty if grid.price else none %}
+                            <tr>
+                                <td class="px-3 py-1.5">L{{ lot.level }}</td>
+                                <td class="px-3 py-1.5">{{ '%.1f'|format(lot.entry) }}</td>
+                                <td class="px-3 py-1.5">{{ '%.4f'|format(lot.qty) }}</td>
+                                <td class="px-3 py-1.5">{{ '%.1f'|format(lot.tp) if lot.tp else '—' }}</td>
+                                <td class="px-3 py-1.5 {% if pnl is not none and pnl < 0 %}text-red-600{% elif pnl is not none %}text-green-600{% endif %}">{% if pnl is not none %}{{ '%+.2f'|format(pnl) }}{% else %}—{% endif %}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="px-3 py-4 text-center text-gray-500">
+                                    <i class="fa fa-info-circle text-lg mb-1"></i>
+                                    <p>暂无持仓层</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="text-xs text-gray-500 mt-2">
+                <i class="fa fa-eye mr-1"></i>只读展示（数据源 runtime/live_state.json，10s 刷新）；启动/停止/平仓请走服务器 systemctl / flatten。
+            </div>
+        </section>
+
+        <script>
+        (function () {
+            const fmt = (v, d) => (v === null || v === undefined || Number.isNaN(Number(v))) ? '—' : Number(v).toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d});
+            async function refreshGrid() {
+                try {
+                    const res = await fetch('/api/grid_status', {headers: {'Accept': 'application/json'}});
+                    if (!res.ok) return;
+                    const g = await res.json();
+                    const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+                    set('grid-status', g.status || '—');
+                    set('grid-subtitle', (g.symbol || 'BTCUSDC') + ' · 只做多 · 间距 ' + fmt(g.distance, 0) + ' · 基准 ' + fmt(g.baseline, 0));
+                    set('grid-inventory', fmt(g.inventory, 4));
+                    set('grid-unrealized', (g.unrealized === null || g.unrealized === undefined) ? '—' : (g.unrealized >= 0 ? '+' : '') + fmt(g.unrealized, 2));
+                    set('grid-price', g.price ? fmt(g.price, 1) : '—');
+                    set('grid-lots-count', (g.lot_count || 0) + '/' + (g.max_levels || 0));
+                    set('grid-next-buy', g.next_buy ? 'L' + g.next_buy.level + ' @' + fmt(g.next_buy.price, 0) : '—');
+                    set('grid-tp-count', String(g.tp_count === null || g.tp_count === undefined ? 0 : g.tp_count));
+                    set('grid-last-fill', g.last_fill || '—');
+                    set('grid-age', (g.age_seconds === null || g.age_seconds === undefined) ? '—' : Math.round(g.age_seconds) + 's 前');
+                    const body = document.getElementById('grid-lots-body');
+                    if (body) {
+                        if (!g.lots || !g.lots.length) {
+                            body.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-center text-gray-500">暂无持仓层</td></tr>';
+                        } else {
+                            body.innerHTML = g.lots.map(function (l) {
+                                const pnl = (g.price && l.entry) ? (g.price - l.entry) * l.qty : null;
+                                const cls = pnl === null ? '' : (pnl < 0 ? 'text-red-600' : 'text-green-600');
+                                const pnlText = pnl === null ? '—' : ((pnl >= 0 ? '+' : '') + fmt(pnl, 2));
+                                return '<tr>' +
+                                    '<td class="px-3 py-1.5">L' + l.level + '</td>' +
+                                    '<td class="px-3 py-1.5">' + fmt(l.entry, 1) + '</td>' +
+                                    '<td class="px-3 py-1.5">' + fmt(l.qty, 4) + '</td>' +
+                                    '<td class="px-3 py-1.5">' + (l.tp ? fmt(l.tp, 1) : '—') + '</td>' +
+                                    '<td class="px-3 py-1.5 ' + cls + '">' + pnlText + '</td>' +
+                                    '</tr>';
+                            }).join('');
+                        }
+                    }
+                } catch (e) { /* 只读轮询失败静默，保留上次值 */ }
+            }
+            refreshGrid();
+            setInterval(refreshGrid, 10000);
+        })();
+        </script>
 
         <!-- 套利策略模块 -->
         <section id="arbitrage-section" class="mb-12 bg-gray-100 rounded-xl p-6 panel-section strategy-hidden" aria-hidden="true">
