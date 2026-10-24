@@ -21,6 +21,7 @@ import hashlib
 import secrets
 import re
 import mimetypes
+import subprocess
 import requests
 import logging
 import sys
@@ -565,6 +566,51 @@ def require_api_token(view):
             return jsonify({'status': 'error', 'message': 'unauthorized'}), 401
         return view(*args, **kwargs)
     return wrapper
+
+
+# ---------------------------------------------------------------------------
+# whatif 热更新：POST /api/update_whatif
+# 服务器上执行 git pull --ff-only；/whatif/ 刷新即可看到新内容。
+# 必须配置 WEB_API_TOKEN；未配置时拒绝，避免开放部署接口。
+# ---------------------------------------------------------------------------
+@app.route('/api/update_whatif', methods=['POST'])
+@require_api_token
+def update_whatif():
+    if not str(os.getenv('WEB_API_TOKEN', '') or '').strip():
+        return jsonify({'status': 'error', 'message': 'WEB_API_TOKEN not configured'}), 403
+    workspace = os.path.dirname(os.path.abspath(_WHATIF_DASHBOARD))
+    if not os.path.isdir(os.path.join(workspace, '.git')):
+        return jsonify({'status': 'error', 'message': 'whatif workspace is not a git repo'}), 400
+    try:
+        before = subprocess.check_output(
+            ['git', '-C', workspace, 'rev-parse', 'HEAD'],
+            text=True, stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return jsonify({'status': 'error', 'message': 'git not available'}), 500
+    try:
+        result = subprocess.run(
+            ['git', '-C', workspace, 'pull', '--ff-only'],
+            capture_output=True, text=True, timeout=60,
+        )
+    except subprocess.TimeoutExpired:
+        return jsonify({'status': 'error', 'message': 'git pull timed out'}), 504
+    if result.returncode != 0:
+        return jsonify({
+            'status': 'error',
+            'message': 'git pull failed',
+            'stderr': (result.stderr or '').strip()[:500],
+        }), 500
+    after = subprocess.check_output(
+        ['git', '-C', workspace, 'rev-parse', 'HEAD'],
+        text=True, stderr=subprocess.DEVNULL,
+    ).strip()
+    return jsonify({
+        'status': 'ok',
+        'before': before,
+        'after': after,
+        'changed': before != after,
+    })
 
 
 # ---------------------------------------------------------------------------
