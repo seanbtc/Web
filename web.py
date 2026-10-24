@@ -602,6 +602,17 @@ def _whatif_pull():
         ['git', '-C', workspace, 'rev-parse', 'HEAD'],
         text=True, stderr=subprocess.DEVNULL,
     ).strip()
+    # Web 以 root 运行时，git pull 产生的新文件会归 root；chown 回工作区属主，
+    # 避免 ubuntu 后续无法编辑/拉取。
+    if hasattr(os, 'geteuid') and os.geteuid() == 0:
+        try:
+            st = os.stat(workspace)
+            subprocess.run(
+                ['chown', '-R', f'{st.st_uid}:{st.st_gid}', workspace],
+                check=False, capture_output=True,
+            )
+        except OSError:
+            pass
     return jsonify({
         'status': 'ok',
         'before': before,
