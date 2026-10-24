@@ -569,15 +569,12 @@ def require_api_token(view):
 
 
 # ---------------------------------------------------------------------------
-# whatif 热更新：POST /api/update_whatif
+# whatif 热更新：
+#   POST /api/update_whatif        本地/agent 调用（Bearer WEB_API_TOKEN）
+#   POST /api/update_whatif_github GitHub webhook（X-Hub-Signature-256）
 # 服务器上执行 git pull --ff-only；/whatif/ 刷新即可看到新内容。
-# 必须配置 WEB_API_TOKEN；未配置时拒绝，避免开放部署接口。
 # ---------------------------------------------------------------------------
-@app.route('/api/update_whatif', methods=['POST'])
-@require_api_token
-def update_whatif():
-    if not str(os.getenv('WEB_API_TOKEN', '') or '').strip():
-        return jsonify({'status': 'error', 'message': 'WEB_API_TOKEN not configured'}), 403
+def _whatif_pull():
     workspace = os.path.dirname(os.path.abspath(_WHATIF_DASHBOARD))
     if not os.path.isdir(os.path.join(workspace, '.git')):
         return jsonify({'status': 'error', 'message': 'whatif workspace is not a git repo'}), 400
@@ -611,6 +608,35 @@ def update_whatif():
         'after': after,
         'changed': before != after,
     })
+
+
+@app.route('/api/update_whatif', methods=['POST'])
+@require_api_token
+def update_whatif():
+    if not str(os.getenv('WEB_API_TOKEN', '') or '').strip():
+        return jsonify({'status': 'error', 'message': 'WEB_API_TOKEN not configured'}), 403
+    return _whatif_pull()
+
+
+@app.route('/api/update_whatif_github', methods=['POST'])
+def update_whatif_github():
+    secret = str(os.getenv('WHATIF_WEBHOOK_SECRET', '') or '').strip()
+    if not secret:
+        return jsonify({'status': 'error', 'message': 'WHATIF_WEBHOOK_SECRET not configured'}), 403
+    signature = request.headers.get('X-Hub-Signature-256', '')
+    body = request.get_data()
+    expected = 'sha256=' + hmac.new(secret.encode('utf-8'), body, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(signature, expected):
+        return jsonify({'status': 'error', 'message': 'invalid signature'}), 401
+    event = request.headers.get('X-GitHub-Event', '')
+    if event == 'ping':
+        return jsonify({'status': 'ok', 'message': 'pong'})
+    if event != 'push':
+        return jsonify({'status': 'ignored', 'event': event}), 202
+    payload = request.get_json(silent=True) or {}
+    if payload.get('ref') != 'refs/heads/main':
+        return jsonify({'status': 'ignored', 'ref': payload.get('ref')}), 202
+    return _whatif_pull()
 
 
 # ---------------------------------------------------------------------------
