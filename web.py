@@ -3815,6 +3815,30 @@ def network_page():
     return render_template('network.html')
 
 
+@app.route('/api/update_network', methods=['POST'])
+@require_api_token
+def update_network():
+    """接收 relationships bot 推送的网络图 JSON（原子写入，无需重启 Web）。
+
+    bot 侧 RELATIONS_WEB_API_URL + RELATIONS_WEB_API_TOKEN 配置后，
+    数据每次变更直接 POST 到本接口，/network 下次请求即读到新文件。
+    """
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or not isinstance(payload.get('nodes'), list):
+        return jsonify({'status': 'error', 'message': 'invalid payload'}), 400
+    path = os.getenv('NETWORK_GRAPH_FILE') or os.path.join(data_dir, 'network.json')
+    tmp = path + '.tmp'
+    try:
+        os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
+        with open(tmp, 'w', encoding='utf-8') as fh:
+            json.dump(payload, fh, ensure_ascii=False, indent=2)
+        os.replace(tmp, path)
+    except OSError as exc:
+        return jsonify({'status': 'error', 'message': f'write failed: {exc}'}), 500
+    return jsonify({'status': 'success', 'nodes': len(payload.get('nodes') or []),
+                    'edges': len(payload.get('edges') or [])})
+
+
 @app.route('/network/data.json')
 def network_data():
     """读取 relationships bot 导出的网络图数据（data/network.json）。"""

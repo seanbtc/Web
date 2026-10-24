@@ -1,5 +1,11 @@
 # web
 
+## 人际关系网络热更新（`/api/update_network`，2026-10-24）
+
+relationships bot 可直接把网络图 JSON POST 到 `/api/update_network`（`Authorization: Bearer <WEB_API_TOKEN>`），
+服务端原子写入 `data/network.json`；`/network` 每次请求实时读文件，**无需重启 Web、无需 git pull**。
+请求体需包含 `nodes` 数组（缺省/非法返回 400）。bot 侧配置 `RELATIONS_WEB_API_URL` + `RELATIONS_WEB_API_TOKEN`。
+
 ## 登录门禁配置
 
 面板默认需要登录：配置 `WEB_LOGIN_PASSWORD`（明文）或 `WEB_LOGIN_PASSWORD_SHA256`（64 位十六进制，优先）后生效；
