@@ -15,11 +15,12 @@ if not _disable_eventlet:
     except ImportError:
         pass
 
-from flask import Flask, render_template, jsonify, request, send_from_directory, redirect, session, url_for, abort
+from flask import Flask, render_template, jsonify, request, send_from_directory, send_file, Blueprint, redirect, session, url_for, abort
 import json
 import hashlib
 import secrets
 import re
+import mimetypes
 import requests
 import logging
 import sys
@@ -444,6 +445,78 @@ def after_request(response):
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     return response
 socketio = SocketIO(app, cors_allowed_origins='*', async_mode=SOCKETIO_ASYNC_MODE)
+
+
+# ---------------------------------------------------------------------------
+# whatif 推演面板（挂载到 /whatif/）
+# 复用 whatif/dashboard/parser.py（只读 Markdown → JSON），支持热更新：
+# 修改 whatif 项目里的 Markdown 后，无需重启此服务即可生效。
+# 环境变量 WHATIF_WORKSPACE 可指定 whatif 工作区根目录，
+# 默认 /Users/xy/Developer/whatif。
+# ---------------------------------------------------------------------------
+_WHATIF_DASHBOARD = os.getenv(
+    'WHATIF_DASHBOARD',
+    '/Users/xy/Developer/whatif/dashboard',
+).strip()
+os.environ.setdefault('WHATIF_DASHBOARD', _WHATIF_DASHBOARD)
+_WHATIF_STATIC = os.path.join(_WHATIF_DASHBOARD, 'static')
+if _WHATIF_DASHBOARD and _WHATIF_DASHBOARD not in sys.path:
+    sys.path.insert(0, _WHATIF_DASHBOARD)
+
+try:  # 可选依赖：缺 whatif 目录时不拖垮主应用
+    import parser as whatif_parser  # noqa: E402
+    from werkzeug.utils import secure_filename
+
+    whatif_bp = Blueprint('whatif', __name__, url_prefix='/whatif')
+
+    @whatif_bp.route('/')
+    def whatif_index():
+        return open(os.path.join(_WHATIF_STATIC, 'index.html'), encoding='utf-8').read()
+
+    @whatif_bp.route('/static/<path:filename>')
+    def whatif_static(filename):
+        return send_from_directory(_WHATIF_STATIC, secure_filename(filename))
+
+    @whatif_bp.route('/api/workspace')
+    def whatif_workspace():
+        return jsonify(whatif_parser.list_projects())
+
+    @whatif_bp.route('/api/project/<slug>')
+    def whatif_project(slug):
+        try:
+            return jsonify(whatif_parser.parse_project(slug))
+        except FileNotFoundError:
+            return jsonify({'error': 'project not found'}), 404
+        except ValueError:
+            return jsonify({'error': 'invalid project'}), 400
+
+    @whatif_bp.route('/api/project/<slug>/file')
+    def whatif_file(slug):
+        rel = request.args.get('path', '')
+        try:
+            content = whatif_parser.read_project_file(slug, rel)
+        except ValueError:
+            return jsonify({'error': 'invalid file'}), 400
+        except FileNotFoundError:
+            return jsonify({'error': 'file not found'}), 404
+        return jsonify({'path': rel, 'content': content})
+
+    @whatif_bp.route('/api/project/<slug>/asset')
+    def whatif_asset(slug):
+        rel = request.args.get('path', '')
+        try:
+            target = whatif_parser.resolve_project_asset(slug, rel)
+        except ValueError:
+            return jsonify({'error': 'invalid asset'}), 400
+        except FileNotFoundError:
+            return jsonify({'error': 'asset not found'}), 404
+        ctype = mimetypes.guess_type(str(target))[0] or 'application/octet-stream'
+        return send_file(str(target), mimetype=ctype)
+
+    app.register_blueprint(whatif_bp)
+    print('[Web] whatif 推演面板已挂载到 /whatif/ (WHATIF_DASHBOARD=%s)' % _WHATIF_DASHBOARD)
+except Exception as exc:  # noqa: BLE001
+    print('[Web] whatif 推演面板挂载失败: %s' % exc)
 
 
 # ---------------------------------------------------------------------------
