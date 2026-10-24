@@ -113,6 +113,29 @@ def test_load_grid_state_without_price_has_no_unrealized(tmp_path, monkeypatch):
     assert view['unrealized'] is None
 
 
+def test_load_grid_state_realized_profit(tmp_path, monkeypatch):
+    """已套利盈利：GridBot 平仓累加的 realized_pnl / 轮数透出。"""
+    _write_state(tmp_path, monkeypatch, realized_pnl=1.9139, realized_cycles=1)
+    monkeypatch.setattr(web, '_grid_price', lambda timeout=5.0: 80000.0)
+    view = web.load_grid_state()
+    assert view['realized'] == pytest.approx(1.9139)
+    assert view['cycles'] == 1
+
+
+def test_load_grid_state_realized_missing_is_none(tmp_path, monkeypatch):
+    """旧 state 没有 realized 字段 → None（页面显示 —，不谎报 0）；损坏值也按 None 处理。"""
+    _write_state(tmp_path, monkeypatch)
+    monkeypatch.setattr(web, '_grid_price', lambda timeout=5.0: 80000.0)
+    view = web.load_grid_state()
+    assert view['realized'] is None
+    assert view['cycles'] == 0
+
+    _write_state(tmp_path, monkeypatch, realized_pnl='not-a-number', realized_cycles='x')
+    view = web.load_grid_state()
+    assert view['realized'] is None
+    assert view['cycles'] == 0
+
+
 def test_grid_api_requires_login(client):
     response = client.get('/api/grid_status')
     assert response.status_code == 401
@@ -141,4 +164,6 @@ def test_index_contains_grid_section(client, tmp_path, monkeypatch):
     assert 'id="grid-section"' in html
     assert '网格策略' in html
     assert 'id="grid-lots-body"' in html
+    assert 'id="grid-realized"' in html
+    assert '已套利盈利' in html
     assert '/api/grid_status' in html

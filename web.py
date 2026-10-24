@@ -3543,6 +3543,7 @@ def load_grid_state():
         return {'available': False, 'status': '未启用', 'reason': 'state 文件缺失',
                 'lots': [], 'inventory': 0.0, 'lot_count': 0, 'tp_count': 0,
                 'next_buy': None, 'price': None, 'unrealized': None,
+                'realized': None, 'cycles': 0,
                 'last_fill': '', 'age_seconds': None, 'symbol': GRIDBOT_SYMBOL,
                 'baseline': 0.0, 'distance': 0.0, 'order_qty': 0.0, 'max_levels': 0,
                 'paused': False, 'updated_at': ''}
@@ -3598,6 +3599,17 @@ def load_grid_state():
         except (TypeError, ValueError, OSError):
             last_fill_text = ''
 
+    # 已套利盈利（GridBot 平仓时累加，网格口径 exit−entry；旧 state 无此键 → None 不显示 0）
+    realized = state.get('realized_pnl')
+    try:
+        realized = round(float(realized), 4) if realized is not None else None
+    except (TypeError, ValueError):
+        realized = None
+    try:
+        cycles = int(state.get('realized_cycles') or 0)
+    except (TypeError, ValueError):
+        cycles = 0
+
     return {
         'available': True, 'status': status, 'symbol': str(state.get('symbol') or GRIDBOT_SYMBOL),
         'baseline': baseline, 'distance': distance,
@@ -3607,6 +3619,7 @@ def load_grid_state():
         'inventory': inventory, 'lot_count': len(lots), 'tp_count': len(lots),
         'next_buy': state.get('active_buy') or None,
         'price': price, 'unrealized': unrealized,
+        'realized': realized, 'cycles': cycles,
         'last_fill': last_fill_text, 'age_seconds': age_seconds, 'updated_at': updated_raw,
     }
 

@@ -1976,7 +1976,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
                 <div class="bg-white rounded-xl shadow-md p-3">
                     <div class="text-xs text-gray-500 mb-1">库存</div>
                     <div class="text-lg font-semibold text-dark" id="grid-inventory">{{ '%.4f'|format(grid.inventory or 0) }}</div>
@@ -1984,6 +1984,11 @@
                 <div class="bg-white rounded-xl shadow-md p-3">
                     <div class="text-xs text-gray-500 mb-1">浮动盈亏</div>
                     <div class="text-lg font-semibold {% if grid.unrealized is not none and grid.unrealized < 0 %}text-red-600{% elif grid.unrealized is not none %}text-green-600{% else %}text-dark{% endif %}" id="grid-unrealized">{% if grid.unrealized is not none %}{{ '%+.2f'|format(grid.unrealized) }}{% else %}—{% endif %}</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">已套利盈利</div>
+                    <div class="text-lg font-semibold {% if grid.realized is not none and grid.realized < 0 %}text-red-600{% elif grid.realized is not none %}text-green-600{% else %}text-dark{% endif %}" id="grid-realized">{% if grid.realized is not none %}{{ '%+.2f'|format(grid.realized) }}{% else %}—{% endif %}</div>
+                    <div class="text-xs text-gray-400" id="grid-realized-sub">{% if grid.realized is not none and grid.cycles %}{{ grid.cycles }} 轮{% endif %}</div>
                 </div>
                 <div class="bg-white rounded-xl shadow-md p-3">
                     <div class="text-xs text-gray-500 mb-1">现价</div>
@@ -2064,6 +2069,8 @@
                     set('grid-subtitle', (g.symbol || 'BTCUSDC') + ' · 只做多 · 间距 ' + fmt(g.distance, 0) + ' · 基准 ' + fmt(g.baseline, 0));
                     set('grid-inventory', fmt(g.inventory, 4));
                     set('grid-unrealized', (g.unrealized === null || g.unrealized === undefined) ? '—' : (g.unrealized >= 0 ? '+' : '') + fmt(g.unrealized, 2));
+                    set('grid-realized', (g.realized === null || g.realized === undefined) ? '—' : (g.realized >= 0 ? '+' : '') + fmt(g.realized, 2));
+                    set('grid-realized-sub', (g.realized === null || g.realized === undefined || !g.cycles) ? '' : g.cycles + ' 轮');
                     set('grid-price', g.price ? fmt(g.price, 1) : '—');
                     set('grid-lots-count', (g.lot_count || 0) + '/' + (g.max_levels || 0));
                     set('grid-next-buy', g.next_buy ? 'L' + g.next_buy.level + ' @' + fmt(g.next_buy.price, 0) : '—');

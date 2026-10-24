@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections import Counter
 
 SCHEMA_VERSION = 1
-UPDATED_AT = '2026-10-24'
+UPDATED_AT = '2026-10-25'
 
 STATUS_LABELS = {
     'live': '已上线',
@@ -130,8 +130,8 @@ LAYERS = [
             {'id': 'bstrategy', 'name': 'BStrategy', 'status': 'live', 'service': 'bstrategy',
              'desc': '4H 多策略（策略模块 · 实盘）', 'caps': ['止损闭环', '仓位对齐']},
             {'id': 'gridbot', 'name': 'GridBot（网格策略）', 'status': 'live',
-             'desc': 'BTCUSDC 只做多网格（500 间距 / 5 层）；看板「网格策略」区块只读展示（10s 轮询）',
-             'caps': ['单活跃买单', '止盈后回收档位', 'systemd 守护']},
+             'desc': 'BTCUSDC 只做多网格（500 间距 / 5 层）；看板「网格策略」区块只读展示（10s 轮询，含已套利盈利）',
+             'caps': ['单活跃买单', '止盈后回收档位', '已实现利润台账', 'systemd 守护']},
             {'id': 'tradesync', 'name': 'TradeSync', 'status': 'live', 'service': 'tradesync',
              'desc': '下单网关 / 账号路由', 'caps': ['Binance/Bybit/OKX/Bitget']},
             {'id': 'autodca', 'name': 'AutoDCA', 'status': 'idle', 'service': 'autodca',
