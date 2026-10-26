@@ -3534,6 +3534,47 @@ def _grid_price(timeout=5.0):
     return cached
 
 
+def _grid_last_realized():
+    """读 GridBot realized.jsonl 最后一行（只读；缺失/坏行返回 None）。"""
+    ledger = os.path.join(os.path.dirname(GRIDBOT_STATE_FILE), 'realized.jsonl')
+    try:
+        with open(ledger, 'r', encoding='utf-8') as handle:
+            lines = handle.readlines()[-20:]
+    except OSError:
+        return None
+    for line in reversed(lines):
+        try:
+            row = json.loads(line)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(row, dict):
+            continue
+        try:
+            level = int(row.get('level') or 0)
+            entry = float(row.get('entry') or 0.0)
+            exit_price = float(row.get('exit') or 0.0)
+            qty = float(row.get('qty') or 0.0)
+            net = float(row.get('net') or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if level <= 0 or qty <= 0:
+            continue
+        ts_text = ''
+        try:
+            stamp = datetime.fromisoformat(str(row.get('ts') or '').replace('Z', '+00:00'))
+            if stamp.tzinfo is None:
+                stamp = stamp.replace(tzinfo=timezone.utc)
+            ts_text = stamp.astimezone(timezone(timedelta(hours=8))).strftime('%m-%d %H:%M')
+        except (TypeError, ValueError):
+            ts_text = str(row.get('ts') or '')
+        return {
+            'level': level, 'entry': round(entry, 4), 'exit': round(exit_price, 4),
+            'qty': round(qty, 6), 'net': round(net, 4),
+            'closes': bool(row.get('closes')), 'ts': ts_text,
+        }
+    return None
+
+
 def load_grid_state():
     """读取 GridBot live 状态（只读）：库存/lots/TP/下一档/浮盈/数据新鲜度。"""
     try:
@@ -3543,7 +3584,8 @@ def load_grid_state():
         return {'available': False, 'status': '未启用', 'reason': 'state 文件缺失',
                 'lots': [], 'inventory': 0.0, 'lot_count': 0, 'tp_count': 0,
                 'next_buy': None, 'price': None, 'unrealized': None,
-                'realized': None, 'cycles': 0,
+                'realized': None, 'cycles': 0, 'realized_gross': None,
+                'realized_fees': None, 'last_realized': None, 'warning': '',
                 'last_fill': '', 'age_seconds': None, 'symbol': GRIDBOT_SYMBOL,
                 'baseline': 0.0, 'distance': 0.0, 'order_qty': 0.0, 'max_levels': 0,
                 'paused': False, 'updated_at': ''}
@@ -3580,7 +3622,10 @@ def load_grid_state():
         if level < 1 or qty <= 0:
             continue
         tp = round(baseline - (level - 1) * distance, 2) if baseline and distance else None
-        lots.append({'level': level, 'entry': entry, 'qty': qty, 'tp': tp})
+        sell_order_id = item.get('sell_order_id')
+        lots.append({'level': level, 'entry': entry, 'qty': qty, 'tp': tp,
+                     'sell_order_id': sell_order_id,
+                     'sell_order_id_short': str(sell_order_id)[-8:] if sell_order_id else ''})
     lots.sort(key=lambda row: row['level'])
     inventory = round(sum(row['qty'] for row in lots), 12)
 
@@ -3610,16 +3655,50 @@ def load_grid_state():
     except (TypeError, ValueError):
         cycles = 0
 
+    def _optional_float(key):
+        value = state.get(key)
+        try:
+            return round(float(value), 4) if value is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    realized_gross = _optional_float('realized_gross')
+    realized_fees = _optional_float('realized_fees')
+    try:
+        rearm_pending = bool(state.get('rearm_pending'))
+    except (TypeError, ValueError):
+        rearm_pending = False
+    try:
+        position_shortfall = int(state.get('position_shortfall') or 0)
+    except (TypeError, ValueError):
+        position_shortfall = 0
+
+    warning_parts = []
+    if status == '数据过期':
+        warning_parts.append('state 超过 60s 未更新（检查 systemd gridbot）')
+    if state.get('paused'):
+        warning_parts.append('已暂停')
+    if rearm_pending:
+        warning_parts.append('待补挂 TP/买单')
+    if position_shortfall > 0:
+        warning_parts.append(f'成交未覆盖持仓 ×{position_shortfall}')
+    warning = '；'.join(warning_parts)
+
     return {
         'available': True, 'status': status, 'symbol': str(state.get('symbol') or GRIDBOT_SYMBOL),
         'baseline': baseline, 'distance': distance,
         'order_qty': float(state.get('order_qty') or 0.0),
         'max_levels': int(state.get('max_levels') or 0),
-        'paused': bool(state.get('paused')), 'lots': lots,
+        'paused': bool(state.get('paused')), 'started': bool(state.get('started')),
+        'lots': lots,
         'inventory': inventory, 'lot_count': len(lots), 'tp_count': len(lots),
         'next_buy': state.get('active_buy') or None,
         'price': price, 'unrealized': unrealized,
         'realized': realized, 'cycles': cycles,
+        'realized_gross': realized_gross, 'realized_fees': realized_fees,
+        'last_realized': _grid_last_realized(),
+        'rearm_pending': rearm_pending, 'position_shortfall': position_shortfall,
+        'warning': warning,
         'last_fill': last_fill_text, 'age_seconds': age_seconds, 'updated_at': updated_raw,
     }
 

@@ -1969,10 +1969,11 @@
                     </div>
                     <h3 class="text-sm font-semibold text-dark">网格策略</h3>
                     <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 ml-2" id="grid-status">{{ grid.status or '—' }}</span>
+                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 ml-2 {% if not grid.warning %}hidden{% endif %}" id="grid-warning">{{ grid.warning or '' }}</span>
                     <span class="text-xs text-gray-500 ml-auto" id="grid-age">{% if grid.age_seconds is not none %}{{ grid.age_seconds|round(0)|int }}s 前{% else %}—{% endif %}</span>
                 </div>
                 <div class="text-xs text-gray-500" id="grid-subtitle">
-                    {{ grid.symbol or 'BTCUSDC' }} · 只做多 · 间距 {{ '%.0f'|format(grid.distance or 0) }} · 基准 {{ '%.0f'|format(grid.baseline or 0) }}
+                    {{ grid.symbol or 'BTCUSDC' }} · 只做多 · 间距 {{ '%.0f'|format(grid.distance or 0) }} · 基准 {{ '%.0f'|format(grid.baseline or 0) }}{% if grid.updated_at %} · 更新 {{ grid.updated_at }}{% endif %}
                 </div>
             </div>
 
@@ -1988,7 +1989,7 @@
                 <div class="bg-white rounded-xl shadow-md p-3">
                     <div class="text-xs text-gray-500 mb-1">已套利盈利</div>
                     <div class="text-lg font-semibold {% if grid.realized is not none and grid.realized < 0 %}text-red-600{% elif grid.realized is not none %}text-green-600{% else %}text-dark{% endif %}" id="grid-realized">{% if grid.realized is not none %}{{ '%+.2f'|format(grid.realized) }}{% else %}—{% endif %}</div>
-                    <div class="text-xs text-gray-400" id="grid-realized-sub">{% if grid.realized is not none and grid.cycles %}{{ grid.cycles }} 轮{% endif %}</div>
+                    <div class="text-xs text-gray-400" id="grid-realized-sub">{% if grid.realized is not none and grid.cycles %}{{ grid.cycles }} 轮{% endif %}{% if grid.realized_gross is not none %} · 毛 {{ '%+.2f'|format(grid.realized_gross) }}{% endif %}{% if grid.realized_fees is not none %} / 费 {{ '%.2f'|format(grid.realized_fees) }}{% endif %}</div>
                 </div>
                 <div class="bg-white rounded-xl shadow-md p-3">
                     <div class="text-xs text-gray-500 mb-1">现价</div>
@@ -2000,10 +2001,11 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
                 <div class="bg-white rounded-xl shadow-md p-3">
                     <div class="text-xs text-gray-500 mb-1">下一档买单</div>
                     <div class="text-sm font-semibold text-dark" id="grid-next-buy">{% if grid.next_buy %}L{{ grid.next_buy.level }} @{{ '%.0f'|format(grid.next_buy.price or 0) }}{% else %}—{% endif %}</div>
+                    <div class="text-xs text-gray-400" id="grid-next-buy-id">{% if grid.next_buy and grid.next_buy.order_id %}#{{ grid.next_buy.order_id }}{% endif %}</div>
                 </div>
                 <div class="bg-white rounded-xl shadow-md p-3">
                     <div class="text-xs text-gray-500 mb-1">止盈挂单</div>
@@ -2012,6 +2014,11 @@
                 <div class="bg-white rounded-xl shadow-md p-3">
                     <div class="text-xs text-gray-500 mb-1">最近买入成交</div>
                     <div class="text-sm font-semibold text-dark" id="grid-last-fill">{{ grid.last_fill or '—' }}</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">最近止盈成交</div>
+                    <div class="text-sm font-semibold text-dark" id="grid-last-realized">{% if grid.last_realized %}L{{ grid.last_realized.level }} @{{ '%.1f'|format(grid.last_realized.exit) }} · {{ '%+.2f'|format(grid.last_realized.net) }}{% else %}—{% endif %}</div>
+                    <div class="text-xs text-gray-400" id="grid-last-realized-sub">{% if grid.last_realized %}{{ grid.last_realized.ts }} · {{ '%.4f'|format(grid.last_realized.qty) }}{% endif %}</div>
                 </div>
             </div>
 
@@ -2025,6 +2032,7 @@
                                 <th class="px-3 py-2 text-left font-semibold text-gray-600">买入价</th>
                                 <th class="px-3 py-2 text-left font-semibold text-gray-600">数量</th>
                                 <th class="px-3 py-2 text-left font-semibold text-gray-600">止盈价</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-600">TP 单号</th>
                                 <th class="px-3 py-2 text-left font-semibold text-gray-600">浮盈</th>
                             </tr>
                         </thead>
@@ -2036,11 +2044,12 @@
                                 <td class="px-3 py-1.5">{{ '%.1f'|format(lot.entry) }}</td>
                                 <td class="px-3 py-1.5">{{ '%.4f'|format(lot.qty) }}</td>
                                 <td class="px-3 py-1.5">{{ '%.1f'|format(lot.tp) if lot.tp else '—' }}</td>
+                                <td class="px-3 py-1.5 text-gray-500" title="{{ lot.sell_order_id or '' }}">{{ lot.sell_order_id_short or '—' }}</td>
                                 <td class="px-3 py-1.5 {% if pnl is not none and pnl < 0 %}text-red-600{% elif pnl is not none %}text-green-600{% endif %}">{% if pnl is not none %}{{ '%+.2f'|format(pnl) }}{% else %}—{% endif %}</td>
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="5" class="px-3 py-4 text-center text-gray-500">
+                                <td colspan="6" class="px-3 py-4 text-center text-gray-500">
                                     <i class="fa fa-info-circle text-lg mb-1"></i>
                                     <p>暂无持仓层</p>
                                 </td>
@@ -2066,31 +2075,44 @@
                     const g = await res.json();
                     const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
                     set('grid-status', g.status || '—');
-                    set('grid-subtitle', (g.symbol || 'BTCUSDC') + ' · 只做多 · 间距 ' + fmt(g.distance, 0) + ' · 基准 ' + fmt(g.baseline, 0));
+                    const warning = document.getElementById('grid-warning');
+                    if (warning) {
+                        warning.textContent = g.warning || '';
+                        warning.classList.toggle('hidden', !g.warning);
+                    }
+                    set('grid-subtitle', (g.symbol || 'BTCUSDC') + ' · 只做多 · 间距 ' + fmt(g.distance, 0) + ' · 基准 ' + fmt(g.baseline, 0) + (g.updated_at ? ' · 更新 ' + g.updated_at : ''));
                     set('grid-inventory', fmt(g.inventory, 4));
                     set('grid-unrealized', (g.unrealized === null || g.unrealized === undefined) ? '—' : (g.unrealized >= 0 ? '+' : '') + fmt(g.unrealized, 2));
                     set('grid-realized', (g.realized === null || g.realized === undefined) ? '—' : (g.realized >= 0 ? '+' : '') + fmt(g.realized, 2));
-                    set('grid-realized-sub', (g.realized === null || g.realized === undefined || !g.cycles) ? '' : g.cycles + ' 轮');
+                    let realizedSub = (g.cycles ? g.cycles + ' 轮' : '');
+                    if (g.realized_gross !== null && g.realized_gross !== undefined) realizedSub += (realizedSub ? ' · ' : '') + '毛 ' + (g.realized_gross >= 0 ? '+' : '') + fmt(g.realized_gross, 2);
+                    if (g.realized_fees !== null && g.realized_fees !== undefined) realizedSub += ' / 费 ' + fmt(g.realized_fees, 2);
+                    set('grid-realized-sub', realizedSub);
                     set('grid-price', g.price ? fmt(g.price, 1) : '—');
                     set('grid-lots-count', (g.lot_count || 0) + '/' + (g.max_levels || 0));
                     set('grid-next-buy', g.next_buy ? 'L' + g.next_buy.level + ' @' + fmt(g.next_buy.price, 0) : '—');
+                    set('grid-next-buy-id', (g.next_buy && g.next_buy.order_id) ? '#' + g.next_buy.order_id : '');
                     set('grid-tp-count', String(g.tp_count === null || g.tp_count === undefined ? 0 : g.tp_count));
                     set('grid-last-fill', g.last_fill || '—');
+                    set('grid-last-realized', g.last_realized ? 'L' + g.last_realized.level + ' @' + fmt(g.last_realized.exit, 1) + ' · ' + (g.last_realized.net >= 0 ? '+' : '') + fmt(g.last_realized.net, 2) : '—');
+                    set('grid-last-realized-sub', g.last_realized ? (g.last_realized.ts || '') + ' · ' + fmt(g.last_realized.qty, 4) : '');
                     set('grid-age', (g.age_seconds === null || g.age_seconds === undefined) ? '—' : Math.round(g.age_seconds) + 's 前');
                     const body = document.getElementById('grid-lots-body');
                     if (body) {
                         if (!g.lots || !g.lots.length) {
-                            body.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-center text-gray-500">暂无持仓层</td></tr>';
+                            body.innerHTML = '<tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">暂无持仓层</td></tr>';
                         } else {
                             body.innerHTML = g.lots.map(function (l) {
                                 const pnl = (g.price && l.entry) ? (g.price - l.entry) * l.qty : null;
                                 const cls = pnl === null ? '' : (pnl < 0 ? 'text-red-600' : 'text-green-600');
                                 const pnlText = pnl === null ? '—' : ((pnl >= 0 ? '+' : '') + fmt(pnl, 2));
+                                const orderId = l.sell_order_id ? String(l.sell_order_id).slice(-8) : '—';
                                 return '<tr>' +
                                     '<td class="px-3 py-1.5">L' + l.level + '</td>' +
                                     '<td class="px-3 py-1.5">' + fmt(l.entry, 1) + '</td>' +
                                     '<td class="px-3 py-1.5">' + fmt(l.qty, 4) + '</td>' +
                                     '<td class="px-3 py-1.5">' + (l.tp ? fmt(l.tp, 1) : '—') + '</td>' +
+                                    '<td class="px-3 py-1.5 text-gray-500">' + orderId + '</td>' +
                                     '<td class="px-3 py-1.5 ' + cls + '">' + pnlText + '</td>' +
                                     '</tr>';
                             }).join('');

@@ -114,12 +114,42 @@ def test_load_grid_state_without_price_has_no_unrealized(tmp_path, monkeypatch):
 
 
 def test_load_grid_state_realized_profit(tmp_path, monkeypatch):
-    """已套利盈利：GridBot 平仓累加的 realized_pnl / 轮数透出。"""
-    _write_state(tmp_path, monkeypatch, realized_pnl=1.9139, realized_cycles=1)
+    """已套利盈利：GridBot 平仓累加的 realized_pnl / 轮数 / 毛费透出。"""
+    _write_state(tmp_path, monkeypatch, realized_pnl=1.9139, realized_cycles=1,
+                 realized_gross=2.0, realized_fees=0.0861)
     monkeypatch.setattr(web, '_grid_price', lambda timeout=5.0: 80000.0)
     view = web.load_grid_state()
     assert view['realized'] == pytest.approx(1.9139)
     assert view['cycles'] == 1
+    assert view['realized_gross'] == pytest.approx(2.0)
+    assert view['realized_fees'] == pytest.approx(0.0861)
+
+
+def test_load_grid_state_last_realized_from_ledger(tmp_path, monkeypatch):
+    _write_state(tmp_path, monkeypatch, realized_pnl=10.0, realized_cycles=5)
+    ledger = tmp_path / 'realized.jsonl'
+    ledger.write_text(json.dumps({
+        'ts': '2026-10-26T14:19:30Z', 'level': 3, 'entry': 79500.0,
+        'exit': 80000.0, 'qty': 0.004, 'gross': 2.0, 'fee': 0.0,
+        'net': 2.0, 'closes': True, 'realized_total': 10.0,
+    }) + '\n', encoding='utf-8')
+    view = web.load_grid_state()
+    assert view['last_realized']['level'] == 3
+    assert view['last_realized']['exit'] == pytest.approx(80000.0)
+    assert view['last_realized']['net'] == pytest.approx(2.0)
+    assert view['last_realized']['ts'] == '10-26 22:19'
+
+
+def test_load_grid_state_warning_fields(tmp_path, monkeypatch):
+    _write_state(tmp_path, monkeypatch, paused=True, rearm_pending=True,
+                 position_shortfall=2)
+    view = web.load_grid_state()
+    assert view['paused'] is True
+    assert view['rearm_pending'] is True
+    assert view['position_shortfall'] == 2
+    assert '已暂停' in view['warning']
+    assert '待补挂' in view['warning']
+    assert '成交未覆盖持仓' in view['warning']
 
 
 def test_load_grid_state_realized_missing_is_none(tmp_path, monkeypatch):
@@ -165,5 +195,8 @@ def test_index_contains_grid_section(client, tmp_path, monkeypatch):
     assert '网格策略' in html
     assert 'id="grid-lots-body"' in html
     assert 'id="grid-realized"' in html
+    assert 'id="grid-warning"' in html
+    assert 'id="grid-last-realized"' in html
+    assert 'id="grid-next-buy-id"' in html
     assert '已套利盈利' in html
     assert '/api/grid_status' in html
