@@ -1819,7 +1819,7 @@
                             <section class="asset-card" id="asset-composition-card">
                                 <div class="flex items-center justify-between mb-2">
                                     <h3 class="text-base font-semibold text-dark"><i class="fa fa-pie-chart text-primary mr-2"></i>资产构成</h3>
-                                    <span class="text-xs text-gray-400">抄底现货（市值）· 策略模块（累计盈亏）· 摸顶策略（仓位成本+累计盈亏）</span>
+                                    <span class="text-xs text-gray-400">抄底现货（市值）· 策略模块（累计盈亏）· 摸顶摸底策略（仓位成本+累计盈亏）</span>
                                 </div>
                                 <div class="flex flex-col md:flex-row items-center gap-5">
                                     <div class="relative" style="width:220px;height:220px;flex:0 0 auto;">
@@ -1864,7 +1864,7 @@
 
                             <section class="asset-card" id="asset-top-card">
                                 <div class="flex items-center justify-between mb-2">
-                                    <h3 class="text-base font-semibold text-dark"><i class="fa fa-flag-checkered text-accent mr-2"></i>摸顶策略资产</h3>
+                                    <h3 class="text-base font-semibold text-dark"><i class="fa fa-flag-checkered text-accent mr-2"></i>摸顶摸底策略资产</h3>
                                     <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600" id="asset-top-status">-</span>
                                 </div>
                                 <div class="asset-stat-grid mb-3">
@@ -2305,11 +2305,11 @@
                     <div class="w-7 h-7 bg-yellow-100 rounded-full flex items-center justify-center mr-2">
                         <i class="fa fa-line-chart text-accent text-sm"></i>
                     </div>
-                    <h3 class="text-sm font-semibold text-dark">摸顶策略</h3>
+                    <h3 class="text-sm font-semibold text-dark">摸顶摸底策略</h3>
                 </div>
                 <div class="flex items-center mb-2">
                     <span class="text-xs font-medium text-gray-500 mr-2">状态:</span>
-                    <span class="px-2 py-1 rounded-full text-xs font-semibold" id="top-status">摸顶做空</span>
+                    <span class="px-2 py-1 rounded-full text-xs font-semibold" id="top-status">空仓</span>
                 </div>
             </div>
 
@@ -2325,7 +2325,10 @@
                 </div>
 
                 <div class="bg-white rounded-xl shadow-md p-6 md:col-span-3">
-                    <h4 class="text-lg font-semibold text-dark mb-3">当前持仓</h4>
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-lg font-semibold text-dark">当前持仓</h4>
+                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600" id="top-position-side">空仓</span>
+                    </div>
                     <div class="grid grid-cols-3 gap-3">
                         <div class="bg-gray-50 rounded-lg p-3 dashboard-stat-card">
                             <div class="text-xs text-gray-500 mb-1 dashboard-metric-label">当前仓位数量</div>
@@ -3727,19 +3730,66 @@
             return Number.isFinite(displayedPrice) && displayedPrice > 0 ? displayedPrice : null;
         }
 
+        function resolvePositionDirection(positionData, fallback = '') {
+            const explicit = String(
+                positionData?.position_side || positionData?.side || positionData?.direction || ''
+            ).trim().toLowerCase();
+            if (explicit.includes('long') || explicit.includes('buy') || explicit.includes('做多')) return 'long';
+            if (explicit.includes('short') || explicit.includes('sell') || explicit.includes('做空')) return 'short';
+
+            const status = String(positionData?.position_status || positionData?.status || '');
+            if (status.includes('做空') || status.includes('摸顶')) return 'short';
+            if (status.includes('做多') || status.includes('抄底') || status.includes('现货')) return 'long';
+
+            // 空仓/平仓时回退到最近一笔未平仓记录的模式（兼容旧 top/bottom JSON）。
+            const records = (positionData?.trade_records || []).filter(record => record && typeof record === 'object');
+            const open = records.slice().reverse().find(record => !record.is_closed);
+            if (open) {
+                const mode = String(open.mode || '');
+                if (mode.includes('做空')) return 'short';
+                if (mode.includes('做多') || mode.includes('现货')) return 'long';
+            }
+            return fallback || '';
+        }
+
+        function resolveTradeDirection(trade) {
+            const explicit = String(
+                trade?.position_side || trade?.side || trade?.direction || ''
+            ).trim().toLowerCase();
+            if (explicit.includes('short') || explicit.includes('sell') || explicit.includes('做空')) return 'short';
+            if (explicit.includes('long') || explicit.includes('buy') || explicit.includes('做多')) return 'long';
+            const mode = String(trade?.mode || '');
+            if (mode.includes('做空') || mode.includes('卖出')) return 'short';
+            if (mode.includes('做多') || mode.includes('现货') || mode.includes('买入')) return 'long';
+            return '';
+        }
+
+        function calculateRecordProfit(trade) {
+            const explicit = Number(trade?.profit);
+            if (Number.isFinite(explicit)) return explicit;
+            const quantity = Number(trade?.quantity);
+            const entry = Number(trade?.avg_price ?? trade?.entry_price ?? trade?.open_price);
+            const rawExit = trade?.close_avg_price ?? trade?.exit_price ?? trade?.close_price;
+            const exit = Number(rawExit);
+            if (!Number.isFinite(quantity) || !Number.isFinite(entry) || !Number.isFinite(exit)) return 0;
+            return resolveTradeDirection(trade) === 'short'
+                ? (entry - exit) * quantity
+                : (exit - entry) * quantity;
+        }
+
         function calculateFloatingProfit(positionData, defaultDirection = '') {
             const currentPrice = getCurrentBtcPrice();
             const quantity = Number(positionData?.position_quantity);
             const averagePrice = Number(positionData?.position_avg_price);
-            const positionStatus = String(positionData?.position_status || positionData?.status || '');
+            const direction = resolvePositionDirection(positionData, defaultDirection);
 
             if (!Number.isFinite(currentPrice) || !Number.isFinite(quantity) || !Number.isFinite(averagePrice)) {
                 return null;
             }
-            if (positionStatus.includes('做空') || defaultDirection === 'short') {
+            if (direction === 'short') {
                 return (averagePrice - currentPrice) * quantity;
             }
-            if (positionStatus.includes('做多') || positionStatus.includes('现货') || defaultDirection === 'long') {
+            if (direction === 'long') {
                 return (currentPrice - averagePrice) * quantity;
             }
             return 0;
@@ -3761,7 +3811,7 @@
         }
 
         function refreshTopBottomFloatingProfits() {
-            updateFloatingProfit('top-float-profit', latestTopPositionData, 'short');
+            updateFloatingProfit('top-float-profit', latestTopPositionData, '');
             updateFloatingProfit('bottom-float-profit', latestBottomPositionData, 'long');
             updateSpotAssetCard();
             updateTopAssetCard();
@@ -3801,7 +3851,7 @@
             const averagePrice = Number(topData.position_avg_price) || 0;
             const currentPrice = getCurrentBtcPrice();
             const records = (topData.trade_records || []).filter(record => record && typeof record === 'object');
-            const cumulativePnl = records.reduce((total, record) => total + (Number(record.profit) || 0), 0);
+            const cumulativePnl = records.reduce((total, record) => total + calculateRecordProfit(record), 0);
             const statusEl = document.getElementById('asset-top-status');
             if (statusEl) updateStatusBadge(statusEl, topData.status || '清仓');
 
@@ -3810,7 +3860,7 @@
             setAssetText('asset-top-price', currentPrice ? formatMoney(currentPrice, 1) : '-');
             const cost = hasPosition ? averagePrice * quantity : null;
             setAssetText('asset-top-cost', cost !== null ? formatMoney(cost, 2) : '-');
-            const floating = calculateFloatingProfit(topData, 'short');
+            const floating = calculateFloatingProfit(topData, '');
             setAssetText('asset-top-float', floating !== null ? formatSignedMoney(floating, 2) : '-', floating);
             setAssetText('asset-top-realized', formatSignedMoney(cumulativePnl, 2), cumulativePnl);
             // 摸顶资产 = 当前仓位均价 × 数量 + 累计盈亏；无仓位不显示资产
@@ -3838,11 +3888,11 @@
             const topQuantity = Math.abs(Number(topData.position_quantity) || 0);
             const topAverage = Number(topData.position_avg_price) || 0;
             const topPnl = (topData.trade_records || [])
-                .reduce((sum, record) => sum + (Number(record && record.profit) || 0), 0);
+                .reduce((sum, record) => sum + calculateRecordProfit(record), 0);
             if (topQuantity > 0 && topAverage > 0) {
                 const value = topAverage * topQuantity + topPnl;
                 if (value > 0) {
-                    slices.push({ label: '摸顶策略', value: value, color: '#f59e0b' });
+                    slices.push({ label: '摸顶摸底策略', value: value, color: '#f59e0b' });
                 }
             }
             const leadSummary = (((window.latestDashboardData || {}).lead) || {}).summary || {};
@@ -3962,14 +4012,32 @@
             updateStatusBadge(topStatusEl, topData.status || '持仓');
             setupStatusClick(topStatusEl, 'top');
 
-            // 计算总收益
-            const totalProfit = records.reduce((sum, t) => sum + (parseFloat(t.profit) || 0), 0);
+            // 计算总收益（profit 缺失时按 mode/方向 + 开平仓价差回算）
+            const totalProfit = records.reduce((sum, t) => sum + calculateRecordProfit(t), 0);
 
             // 更新策略总盈亏
             const totalProfitEl = document.getElementById('top-total-profit');
             if (totalProfitEl) {
                 totalProfitEl.textContent = formatMoney(totalProfit);
                 totalProfitEl.className = 'text-lg font-bold ' + (totalProfit >= 0 ? 'text-green-600' : 'text-red-600');
+            }
+
+            // 当前持仓方向标志：做多/做空/空仓
+            const sideEl = document.getElementById('top-position-side');
+            const positionQty = Math.abs(Number(topData.position_quantity) || 0);
+            const direction = resolvePositionDirection(topData);
+            if (sideEl) {
+                let label = '空仓';
+                let classes = 'bg-gray-100 text-gray-600';
+                if (positionQty > 0 && direction === 'short') {
+                    label = '做空';
+                    classes = 'bg-red-100 text-red-700';
+                } else if (positionQty > 0 && direction === 'long') {
+                    label = '做多';
+                    classes = 'bg-green-100 text-green-700';
+                }
+                sideEl.textContent = label;
+                sideEl.className = `px-2 py-0.5 rounded-full text-xs font-semibold ${classes}`;
             }
 
             // 更新当前持仓
@@ -3982,8 +4050,8 @@
                 avgPriceEl.textContent = formatMoney(parseFloat(topData.position_avg_price) || 0);
             }
 
-            // 浮盈 = 当前 BTC 价格与持仓均价的价差 × 持仓数量
-            updateFloatingProfit('top-float-profit', topData, 'short');
+            // 浮盈按 position_side/position_status/最近未平仓记录自动识别做多/做空
+            updateFloatingProfit('top-float-profit', topData, '');
 
             // 渲染表格
             renderTopBottomTable('top-tbody', records);
@@ -4000,7 +4068,7 @@
             updateStatusBadge(bottomStatusEl, bottomData.status || '清仓');
             setupStatusClick(bottomStatusEl, 'bottom');
 
-            const totalProfit = records.reduce((sum, t) => sum + (parseFloat(t.profit) || 0), 0);
+            const totalProfit = records.reduce((sum, t) => sum + calculateRecordProfit(t), 0);
 
             const totalProfitEl = document.getElementById('bottom-total-profit');
             if (totalProfitEl) {
@@ -4035,7 +4103,9 @@
             records.forEach(trade => {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-gray-50';
-                const isShort = (trade.mode || '').includes('做空');
+                const tradeDirection = resolveTradeDirection(trade);
+                const isShort = tradeDirection === 'short';
+                const modeLabel = trade.mode || (tradeDirection === 'short' ? '做空' : (tradeDirection === 'long' ? '做多' : '-'));
                 const isClosed = !!trade.is_closed;
                 const statusClass = isClosed ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800';
                 const statusText = isClosed ? '已平仓' : '未平仓';
@@ -4043,7 +4113,7 @@
                 const entryPrice = parseFloat(trade.avg_price ?? trade.entry_price ?? trade.open_price);
                 const rawExitPrice = trade.close_avg_price ?? trade.exit_price ?? trade.close_price;
                 const exitPrice = (rawExitPrice === undefined || rawExitPrice === null || rawExitPrice === '') ? NaN : parseFloat(rawExitPrice);
-                const profitVal = parseFloat(trade.profit) || 0;
+                const profitVal = calculateRecordProfit(trade);
                 const profitClass = profitVal >= 0 ? 'text-green-600' : 'text-red-600';
                 const entryText = Number.isFinite(entryPrice) ? formatMoney(entryPrice) : '-';
                 let exitText = Number.isFinite(exitPrice) ? formatMoney(exitPrice) : '-';
@@ -4056,7 +4126,7 @@
                 tr.innerHTML = `
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${trade.duration || '-'}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm">
-                        <span class="px-1.5 inline-flex text-xs leading-4 font-semibold rounded-full ${isShort ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">${trade.mode || '-'}</span>
+                        <span class="px-1.5 inline-flex text-xs leading-4 font-semibold rounded-full ${isShort ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">${modeLabel}</span>
                     </td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${formatQuantity(quantity)} BTC</td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${entryText}</td>

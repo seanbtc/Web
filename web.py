@@ -2054,7 +2054,7 @@ def load_top_data(strict=False):
             print(f"读取摸顶策略数据失败: {e}")
             if strict:
                 return None
-    return {'position_status': '摸顶做空', 'position_quantity': 0.0, 'position_avg_price': 0.0, 'position_symbol': 'BTCUSDT', 'trade_records': []}
+    return {'position_status': '空仓', 'position_side': '', 'position_quantity': 0.0, 'position_avg_price': 0.0, 'position_symbol': 'BTCUSDT', 'trade_records': []}
 
 
 def save_top_data(data):
@@ -3036,7 +3036,8 @@ class DataStorage:
         return True
     
     def update_top_data(self, data):
-        for key in ('position_status', 'position_quantity', 'position_avg_price', 'position_symbol', 'trade_records', 'status'):
+        for key in ('position_status', 'position_side', 'direction', 'position_quantity',
+                    'position_avg_price', 'position_symbol', 'trade_records', 'status'):
             if key in data:
                 self.top_data[key] = data[key]
         self.strategy_status['top'] = self.top_data.get('status', '持仓')
