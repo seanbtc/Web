@@ -23,7 +23,27 @@ jobs:
         # 3.10 = 生产服务器版本（eventlet/pandas 差异必须在此暴露）；3.12 = 本地/CI 现行版本
         python-version: ["3.10", "3.12"]
     steps:
-      - uses: actions/checkout@v4
+      # 生产布局是 workspace/{Web,commons} 兄弟目录；web.py 以
+      # Path(__file__).parent.parent 推工作区根并从同级导入 commons。
+      - name: Checkout Web
+        uses: actions/checkout@v4
+        with:
+          path: Web
+
+      - name: Checkout commons (sibling, private)
+        uses: actions/checkout@v4
+        with:
+          repository: seanbtc/commons
+          path: commons
+          token: ${{ secrets.COMMONS_PAT }}
+
+      - name: Require COMMONS_PAT
+        if: ${{ env.COMMONS_PAT == '' }}
+        env:
+          COMMONS_PAT: ${{ secrets.COMMONS_PAT }}
+        run: |
+          echo "缺少 secrets.COMMONS_PAT：fine-grained token，仅选 seanbtc/commons，权限 Contents: Read-only" >&2
+          exit 1
 
       - uses: actions/setup-python@v5
         with:
@@ -35,8 +55,8 @@ jobs:
           pip install pytest flask flask-socketio requests markdown pygments
 
       - name: Run tests
+        working-directory: Web
         env:
           WEB_DISABLE_EVENTLET: "1"
           WEB_SESSION_SECRET: "ci-session-secret"
-
         run: python -m pytest tests -q

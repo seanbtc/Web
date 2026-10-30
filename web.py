@@ -32,7 +32,11 @@ import threading
 import time
 from flask_socketio import SocketIO
 
-from ahr999 import compute_ahr999
+_WORKSPACE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _WORKSPACE_ROOT not in sys.path:
+    sys.path.insert(0, _WORKSPACE_ROOT)
+
+from commons.ahr999 import fetch_ahr999, fetch_daily_klines
 
 # 确保数据目录存在
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
@@ -65,15 +69,10 @@ else:
     ))
 
 # AHR999 独立估值指数：仅展示，不参与 AlphaEngine / 交易决策。
-# 日线只需每天更新一次；以 Binance 现货为主源，DataFeed/合约作为兜底。
+# 日线只需每天更新一次；计算与取数实现统一在 commons/ahr999.py（AutoDCA 共用）。
 AHR999_REFRESH_SECONDS = 24 * 60 * 60
 AHR999_RETRY_SECONDS = 900
-AHR999_KLINE_LIMIT = 260
 AHR999_DAILY_REFRESH_UTC_MINUTE = 5
-AHR999_HTTP_TIMEOUT_SECONDS = 10
-AHR999_SPOT_KLINES_URL = 'https://api.binance.com/api/v3/klines'
-AHR999_FUTURES_KLINES_URL = 'https://fapi.binance.com/fapi/v1/klines'
-_ahr999_datafeed_url = os.getenv('WEB_DATAFEED_URL', 'http://127.0.0.1:9550').rstrip('/')
 _ahr999_last_good = None
 
 
@@ -178,60 +177,10 @@ def alpha_engine_update_changed(market_data, new_regime, new_alpha, new_ma):
 def _fetch_ahr999_bars():
     """取 BTCUSDT 日线：Binance 现货优先 → DataFeed → Binance 合约回退。
 
+    实现已统一到 ``commons.ahr999.fetch_daily_klines``（AutoDCA 共用）。
     返回 (bars, source, source_stale)；失败返回 ([], '', False)。
-    AHR999 是日频指标，调用方每天只在 UTC 日线收盘后刷新一次。
     """
-    # 1. Binance 现货日线（主源，AHR999 常规口径）
-    try:
-        response = requests.get(
-            AHR999_SPOT_KLINES_URL,
-            params={'symbol': 'BTCUSDT', 'interval': '1d', 'limit': AHR999_KLINE_LIMIT},
-            timeout=AHR999_HTTP_TIMEOUT_SECONDS,
-        )
-        if response.status_code == 200:
-            bars = response.json()
-            if isinstance(bars, list) and bars:
-                return bars, 'binance_spot', False
-    except Exception as exc:
-        print(f'[Web] AHR999 Binance 现货取数失败: {type(exc).__name__}: {exc}')
-
-    # 2. 本机 DataFeed（本地 archive；stale 时先留作最终兜底）
-    datafeed_candidate = None
-    try:
-        response = requests.get(
-            f'{_ahr999_datafeed_url}/klines',
-            params={'symbol': 'BTCUSDT', 'interval': '1d', 'limit': AHR999_KLINE_LIMIT},
-            timeout=AHR999_HTTP_TIMEOUT_SECONDS,
-        )
-        if response.status_code == 200:
-            payload = response.json()
-            if isinstance(payload, dict):
-                bars = payload.get('bars')
-                if payload.get('ok') and isinstance(bars, list) and bars:
-                    source_stale = bool(payload.get('stale'))
-                    if not source_stale:
-                        return bars, 'datafeed', False
-                    datafeed_candidate = (bars, 'datafeed', True)
-    except Exception as exc:
-        print(f'[Web] AHR999 DataFeed 取数失败: {type(exc).__name__}: {exc}')
-
-    # 3. Binance U 本位合约日线（现货/DataFeed 都不可用时）
-    try:
-        response = requests.get(
-            AHR999_FUTURES_KLINES_URL,
-            params={'symbol': 'BTCUSDT', 'interval': '1d', 'limit': AHR999_KLINE_LIMIT},
-            timeout=AHR999_HTTP_TIMEOUT_SECONDS,
-        )
-        if response.status_code == 200:
-            bars = response.json()
-            if isinstance(bars, list) and bars:
-                return bars, 'binance_futures', False
-    except Exception as exc:
-        print(f'[Web] AHR999 Binance 合约取数失败: {type(exc).__name__}: {exc}')
-
-    if datafeed_candidate is not None:
-        return datafeed_candidate
-    return [], '', False
+    return fetch_daily_klines()
 
 
 def _seconds_until_next_ahr999_refresh(now: datetime | None = None) -> float:
@@ -252,16 +201,15 @@ def refresh_ahr999():
     """刷新 AHR999；失败时保留上次成功值并标记 stale。"""
     global _ahr999_last_good
     now_iso = datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + 'Z'
-    bars, source, source_stale = _fetch_ahr999_bars()
-    if bars:
-        result = compute_ahr999(bars)
-        result['source'] = source
-        result['source_stale'] = bool(source_stale)
-        result['updated_at'] = now_iso
-        if result.get('available'):
-            _ahr999_last_good = result
-            return result
-        print(f"[Web] AHR999 计算不可用: {result.get('error')}")
+    try:
+        result = fetch_ahr999()
+    except Exception as exc:  # 公共实现已捕获网络异常，这里兜底避免拖垮看板线程
+        result = {'available': False, 'error': f'{type(exc).__name__}: {exc}'}
+    result['updated_at'] = now_iso
+    if result.get('available'):
+        _ahr999_last_good = result
+        return result
+    print(f"[Web] AHR999 不可用: {result.get('error')}")
 
     if _ahr999_last_good:
         fallback = dict(_ahr999_last_good)
@@ -272,7 +220,7 @@ def refresh_ahr999():
     return {
         'available': False,
         'error': 'AHR999 数据不可用',
-        'source': source or '',
+        'source': result.get('source') or '',
         'updated_at': now_iso,
     }
 

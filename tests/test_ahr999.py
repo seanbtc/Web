@@ -94,3 +94,10 @@ def test_invalid_and_duplicate_bars_are_ignored():
     result = compute_ahr999(bars, now=datetime(2026, 10, 20, tzinfo=timezone.utc))
     assert result['available'] is True
     assert result['samples'] == 200
+
+
+def test_web_shim_uses_common_implementation():
+    import ahr999 as shim
+    from commons.ahr999 import compute_ahr999 as common_compute
+
+    assert shim.compute_ahr999 is common_compute
