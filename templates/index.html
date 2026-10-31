@@ -2074,6 +2074,14 @@
                     if (!res.ok) return;
                     const g = await res.json();
                     const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+                    // 10s 轮询里大部分字段都没变：只刷新「Xs 前」，其余内容不变就不重写 DOM（避免整表重建）
+                    const { age_seconds: gridAgeSeconds, ...gridStable } = g;
+                    const gridFingerprint = JSON.stringify(gridStable);
+                    if (gridFingerprint === _lastGridFingerprint) {
+                        set('grid-age', (gridAgeSeconds === null || gridAgeSeconds === undefined) ? '—' : Math.round(gridAgeSeconds) + 's 前');
+                        return;
+                    }
+                    _lastGridFingerprint = gridFingerprint;
                     set('grid-status', g.status || '—');
                     const warning = document.getElementById('grid-warning');
                     if (warning) {
@@ -2575,9 +2583,9 @@
             // 构建运行时长字符串
             const runtimeString = `已运行: ${totalDays.toFixed(1)}天`;
             
-            // 更新页面显示
+            // 更新页面显示（只有字符串真的变了才写 DOM：0.1 天约 2.4 小时才变一次）
             const runtimeElement = document.getElementById('runtime');
-            if (runtimeElement) {
+            if (runtimeElement && runtimeElement.textContent !== runtimeString) {
                 runtimeElement.textContent = runtimeString;
             }
         }
@@ -2594,6 +2602,12 @@
         let _lastProfitFingerprint = '';
         let _lastYearlyFingerprint = '';
         let currentBtcPrice = null;
+        // 渲染去重：避免每秒的行情推送把 header/图表整块重写（移动端会一直闪+掉帧）
+        const _marketRenderMemo = { cycle: '', price: '', alpha: '', ahr: '', ma: '' };
+        let _lastRuntimeText = '';
+        let _lastAssetCompositionFingerprint = '';
+        let _lastAssetCompositionAt = 0;
+        let _lastGridFingerprint = '';
         let latestTopPositionData = {};
         let latestBottomPositionData = {};
         const MAX_DISPLAY_RECORDS = 100;
@@ -3563,8 +3577,9 @@
 
         function updateStatusBadge(el, status) {
             if (!el) return;
-            el.textContent = status;
-            el.className = 'px-2 py-1 rounded-full text-xs font-semibold cursor-pointer select-none ' + getStatusClass(status);
+            const nextClass = 'px-2 py-1 rounded-full text-xs font-semibold cursor-pointer select-none ' + getStatusClass(status);
+            if (el.textContent !== status) el.textContent = status;
+            if (el.className !== nextClass) el.className = nextClass;
         }
 
         // 点击切换状态
@@ -3611,16 +3626,19 @@
             
             const marketData = data.market_data;
             
-            // 更新市场周期
+            // 更新市场周期（内容不变时跳过，避免每秒重置 class/innerHTML）
             const cycleElement = document.getElementById('market-cycle');
-            if (cycleElement) {
+            const cycleLabel = String(marketData.cycle || '未知');
+            const regimeKey = String(marketData.alpha_engine_regime || '').toUpperCase();
+            const cycleKey = `${cycleLabel}|${regimeKey}`;
+            if (cycleElement && cycleKey !== _marketRenderMemo.cycle) {
+                _marketRenderMemo.cycle = cycleKey;
                 cycleElement.className = 'px-3 py-1 rounded-full text-sm font-semibold flex items-center';
                 cycleElement.classList.remove(
                     'bull', 'bear', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800',
                     'cycle-bear-bottom', 'cycle-recovery', 'cycle-bull', 'cycle-deep-bull',
                     'cycle-bull-cooling', 'cycle-bear', 'cycle-bear-deep'
                 );
-                const cycleLabel = String(marketData.cycle || '未知');
                 const regimeClassMap = {
                     'BEAR_BOTTOM': 'cycle-bear-bottom',
                     'RECOVERY': 'cycle-recovery',
@@ -3630,7 +3648,7 @@
                     'BEAR': 'cycle-bear',
                     'BEAR_DEEP': 'cycle-bear-deep'
                 };
-                const regimeClass = regimeClassMap[String(marketData.alpha_engine_regime || '').toUpperCase()];
+                const regimeClass = regimeClassMap[regimeKey];
                 if (regimeClass) {
                     cycleElement.classList.add(regimeClass);
                 }
@@ -3648,8 +3666,10 @@
             if (Number.isFinite(nextBtcPrice) && nextBtcPrice > 0) {
                 currentBtcPrice = nextBtcPrice;
                 const priceElement = document.getElementById('btc-price');
-                if (priceElement) {
-                    priceElement.textContent = formatMoney(currentBtcPrice);
+                const priceText = formatMoney(currentBtcPrice);
+                if (priceElement && priceText !== _marketRenderMemo.price) {
+                    _marketRenderMemo.price = priceText;
+                    priceElement.textContent = priceText;
                 }
             }
 
@@ -3659,8 +3679,14 @@
                 const alphaElement = document.getElementById('alpha-value');
                 if (alphaElement) {
                     const sign = alphaVal >= 0 ? '+' : '';
-                    alphaElement.textContent = `${sign}${alphaVal.toFixed(2)}`;
-                    alphaElement.className = `text-sm font-bold ${alphaVal > 0 ? 'text-green-600' : alphaVal < 0 ? 'text-red-600' : 'text-gray-500'}`;
+                    const alphaText = `${sign}${alphaVal.toFixed(2)}`;
+                    const alphaClass = `text-sm font-bold ${alphaVal > 0 ? 'text-green-600' : alphaVal < 0 ? 'text-red-600' : 'text-gray-500'}`;
+                    const alphaKey = `${alphaText}|${alphaClass}`;
+                    if (alphaKey !== _marketRenderMemo.alpha) {
+                        _marketRenderMemo.alpha = alphaKey;
+                        alphaElement.textContent = alphaText;
+                        alphaElement.className = alphaClass;
+                    }
                 }
             }
 
@@ -3670,27 +3696,33 @@
                 const ahrData = marketData.ahr999;
                 const hasAhr = !!(ahrData && typeof ahrData === 'object' && ahrData.available);
                 const ahrVal = hasAhr ? Number(ahrData.value) : NaN;
-                ahrElement.classList.remove('ahr-bottom', 'ahr-dca', 'ahr-caution', 'ahr-bubble', 'ahr-flat');
-                if (hasAhr && Number.isFinite(ahrVal)) {
-                    const ahrZone = String(ahrData.zone || '').trim();
-                    const ahrZoneKey = String(ahrData.zone_key || '').trim();
-                    const allowedZones = ['bottom', 'dca', 'caution', 'bubble'];
-                    ahrElement.classList.add(allowedZones.includes(ahrZoneKey) ? `ahr-${ahrZoneKey}` : 'ahr-flat');
-                    ahrElement.textContent = `${ahrVal.toFixed(3)}${ahrZone ? ' ' + ahrZone : ''}`;
-                    const parts = [`AHR999 独立估值指数`, `值 ${ahrVal.toFixed(3)}`];
-                    if (ahrZone) parts.push(ahrZone);
-                    const ratioCost = Number(ahrData.ratio_cost);
-                    const ratioFit = Number(ahrData.ratio_fit);
-                    if (Number.isFinite(ratioCost)) parts.push(`200日成本比 ${ratioCost.toFixed(2)}`);
-                    if (Number.isFinite(ratioFit)) parts.push(`幂律估值比 ${ratioFit.toFixed(2)}`);
-                    if (ahrData.as_of) parts.push(`截至 ${ahrData.as_of}`);
-                    if (ahrData.stale) parts.push('数据可能过期');
-                    parts.push('不参与 alpha 决策');
-                    ahrElement.title = parts.join(' · ');
-                } else {
-                    ahrElement.classList.add('ahr-flat');
-                    ahrElement.textContent = '—';
-                    ahrElement.title = 'AHR999 独立估值指数 · 数据不可用';
+                const ahrAsyncKey = hasAhr
+                    ? [ahrVal, ahrData.zone, ahrData.zone_key, ahrData.as_of, ahrData.stale, ahrData.ratio_cost, ahrData.ratio_fit].join('|')
+                    : 'unavailable';
+                if (ahrAsyncKey !== _marketRenderMemo.ahr) {
+                    _marketRenderMemo.ahr = ahrAsyncKey;
+                    ahrElement.classList.remove('ahr-bottom', 'ahr-dca', 'ahr-caution', 'ahr-bubble', 'ahr-flat');
+                    if (hasAhr && Number.isFinite(ahrVal)) {
+                        const ahrZone = String(ahrData.zone || '').trim();
+                        const ahrZoneKey = String(ahrData.zone_key || '').trim();
+                        const allowedZones = ['bottom', 'dca', 'caution', 'bubble'];
+                        ahrElement.classList.add(allowedZones.includes(ahrZoneKey) ? `ahr-${ahrZoneKey}` : 'ahr-flat');
+                        ahrElement.textContent = `${ahrVal.toFixed(3)}${ahrZone ? ' ' + ahrZone : ''}`;
+                        const parts = [`AHR999 独立估值指数`, `值 ${ahrVal.toFixed(3)}`];
+                        if (ahrZone) parts.push(ahrZone);
+                        const ratioCost = Number(ahrData.ratio_cost);
+                        const ratioFit = Number(ahrData.ratio_fit);
+                        if (Number.isFinite(ratioCost)) parts.push(`200日成本比 ${ratioCost.toFixed(2)}`);
+                        if (Number.isFinite(ratioFit)) parts.push(`幂律估值比 ${ratioFit.toFixed(2)}`);
+                        if (ahrData.as_of) parts.push(`截至 ${ahrData.as_of}`);
+                        if (ahrData.stale) parts.push('数据可能过期');
+                        parts.push('不参与 alpha 决策');
+                        ahrElement.title = parts.join(' · ');
+                    } else {
+                        ahrElement.classList.add('ahr-flat');
+                        ahrElement.textContent = '—';
+                        ahrElement.title = 'AHR999 独立估值指数 · 数据不可用';
+                    }
                 }
             }
 
@@ -3701,18 +3733,22 @@
                 const hasMa = !!(maData && typeof maData === 'object' && maData.available);
                 const maZone = hasMa ? String(maData.zone || '').trim() : '';
                 const maAsOf = hasMa ? String(maData.as_of || '').trim() : '';
-                maElement.classList.remove('ma-bull', 'ma-bear', 'ma-flat');
-                if (hasMa && maZone.includes('多头')) {
-                    maElement.classList.add('ma-bull');
-                } else if (hasMa && maZone.includes('空头')) {
-                    maElement.classList.add('ma-bear');
-                } else {
-                    maElement.classList.add('ma-flat');
+                const maKey = `${hasMa}|${maZone}|${maAsOf}`;
+                if (maKey !== _marketRenderMemo.ma) {
+                    _marketRenderMemo.ma = maKey;
+                    maElement.classList.remove('ma-bull', 'ma-bear', 'ma-flat');
+                    if (hasMa && maZone.includes('多头')) {
+                        maElement.classList.add('ma-bull');
+                    } else if (hasMa && maZone.includes('空头')) {
+                        maElement.classList.add('ma-bear');
+                    } else {
+                        maElement.classList.add('ma-flat');
+                    }
+                    maElement.textContent = hasMa && maZone ? maZone : '—';
+                    maElement.title = maAsOf
+                        ? `AlphaEngine K线趋势 · 截至 ${maAsOf}`
+                        : 'AlphaEngine K线趋势 · 数据不可用';
                 }
-                maElement.textContent = hasMa && maZone ? maZone : '—';
-                maElement.title = maAsOf
-                    ? `AlphaEngine K线趋势 · 截至 ${maAsOf}`
-                    : 'AlphaEngine K线趋势 · 数据不可用';
             }
 
             // 轻量行情更新也要同步刷新两个策略的浮盈
@@ -3801,13 +3837,16 @@
 
             const floatingProfit = calculateFloatingProfit(positionData, defaultDirection);
             if (floatingProfit === null) {
-                floatElement.textContent = '-';
-                floatElement.className = 'text-md font-bold text-gray-500';
+                if (floatElement.textContent !== '-') floatElement.textContent = '-';
+                const dashClass = 'text-md font-bold text-gray-500';
+                if (floatElement.className !== dashClass) floatElement.className = dashClass;
                 return;
             }
 
-            floatElement.textContent = formatMoney(floatingProfit);
-            floatElement.className = 'text-md font-bold ' + (floatingProfit >= 0 ? 'text-green-600' : 'text-red-600');
+            const profitText = formatMoney(floatingProfit);
+            const profitClass = 'text-md font-bold ' + (floatingProfit >= 0 ? 'text-green-600' : 'text-red-600');
+            if (floatElement.textContent !== profitText) floatElement.textContent = profitText;
+            if (floatElement.className !== profitClass) floatElement.className = profitClass;
         }
 
         function refreshTopBottomFloatingProfits() {
@@ -3821,14 +3860,19 @@
         function setAssetText(elementId, text, signValue = null) {
             const el = document.getElementById(elementId);
             if (!el) return;
-            el.textContent = text;
-            const numeric = Number(signValue);
-            if (signValue === null || signValue === undefined || !Number.isFinite(numeric)) {
-                el.classList.remove('text-green-600', 'text-red-600');
-                return;
+            if (el.textContent !== text) {
+                el.textContent = text;
             }
-            el.classList.toggle('text-green-600', numeric >= 0);
-            el.classList.toggle('text-red-600', numeric < 0);
+            const numeric = Number(signValue);
+            const hasSign = signValue !== null && signValue !== undefined && Number.isFinite(numeric);
+            const wantGreen = hasSign && numeric >= 0;
+            const wantRed = hasSign && numeric < 0;
+            if (el.classList.contains('text-green-600') !== wantGreen) {
+                el.classList.toggle('text-green-600', wantGreen);
+            }
+            if (el.classList.contains('text-red-600') !== wantRed) {
+                el.classList.toggle('text-red-600', wantRed);
+            }
         }
 
         function updateSpotAssetCard() {
@@ -3868,9 +3912,10 @@
             setAssetText('asset-top-asset', assetValue !== null ? formatMoney(assetValue, 2) : '—', assetValue);
             const noteEl = document.getElementById('asset-top-note');
             if (noteEl) {
-                noteEl.textContent = hasPosition
+                const noteText = hasPosition
                     ? '资产 = 仓位成本 + 累计盈亏（已了结）'
                     : '当前无持仓，不显示策略资产';
+                if (noteEl.textContent !== noteText) noteEl.textContent = noteText;
             }
         }
 
@@ -3911,6 +3956,17 @@
             const legendEl = document.getElementById('asset-composition-legend');
             const slices = computeAssetSlices();
             const total = slices.reduce((sum, item) => sum + item.value, 0);
+
+            // 去重 + 节流：行情每秒推送会带着价格变化触发这里，圆环/图例没必要每秒重建
+            const compositionFingerprint = slices
+                .map(item => `${item.label}:${Number(item.value).toFixed(2)}`)
+                .join(',') + `|${total.toFixed(2)}`;
+            const compositionNow = Date.now();
+            if (compositionFingerprint === _lastAssetCompositionFingerprint) return;
+            if (compositionNow - _lastAssetCompositionAt < 1500) return;
+            _lastAssetCompositionFingerprint = compositionFingerprint;
+            _lastAssetCompositionAt = compositionNow;
+
             if (totalEl) totalEl.textContent = total > 0 ? formatMoney(total, 2) : '-';
             if (legendEl) {
                 legendEl.innerHTML = slices.length ? slices.map(item => {
@@ -4434,27 +4490,48 @@
             const pnlView = document.getElementById('performance-pnl-view');
             if (!viewer || !pnlView) return;
 
-            const previousHeight = viewer.style.height;
             if (!portraitPerformanceQuery.matches) {
-                if (previousHeight) viewer.style.height = '';
+                if (viewer.style.height) viewer.style.height = '';
                 return;
             }
 
-            // 竖屏：以盈亏视图自然高度作为两个视图的统一高度，帖子列表在内部滚动
-            // 测量时 viewer 瞬时展开会钳制帖子列表滚动位置，测量前后保存/恢复
+            // 竖屏：以盈亏视图自然高度作为两个视图的统一高度，帖子列表在内部滚动。
+            // 注意：只临时放开「内部视图」的高度来测量，viewer 本身始终保持固定高度 + overflow:hidden，
+            // 否则测量瞬间帖子列表会把整页撑高几千像素，移动端浏览器会因滚动锚定/回弹而跳到底部。
             const feed = document.getElementById('post-feed-container');
-            const feedScrollTop = feed ? feed.scrollTop : 0;
-            viewer.style.height = 'auto';
             const assetsView = document.getElementById('performance-assets-view');
+            const feedScrollTop = feed ? feed.scrollTop : 0;
+
+            const prevPnlHeight = pnlView.style.height;
+            const prevPnlAlign = pnlView.style.alignSelf;
+            const prevAssetsHeight = assetsView ? assetsView.style.height : '';
+            const prevAssetsAlign = assetsView ? assetsView.style.alignSelf : '';
+            // align-self: flex-start 防止自身被 flex 轨道拉伸，否则量到的是当前 viewer 高度而不是内容高度
+            pnlView.style.height = 'auto';
+            pnlView.style.alignSelf = 'flex-start';
+            if (assetsView) {
+                assetsView.style.height = 'auto';
+                assetsView.style.alignSelf = 'flex-start';
+            }
             const measuredPnl = pnlView.getBoundingClientRect().height;
             const measuredAssets = assetsView ? assetsView.getBoundingClientRect().height : 0;
+            pnlView.style.height = prevPnlHeight;
+            pnlView.style.alignSelf = prevPnlAlign;
+            if (assetsView) {
+                assetsView.style.height = prevAssetsHeight;
+                assetsView.style.alignSelf = prevAssetsAlign;
+            }
+
             const measured = Math.max(measuredPnl || 0, measuredAssets || 0);
             if (!Number.isFinite(measured) || measured <= 0) {
-                viewer.style.height = previousHeight;
                 if (feed && feed.scrollTop !== feedScrollTop) feed.scrollTop = feedScrollTop;
                 return;
             }
-            viewer.style.height = `${Math.ceil(measured)}px`;
+            const nextHeight = `${Math.ceil(measured)}px`;
+            const currentHeight = parseFloat(viewer.style.height) || 0;
+            if (Math.abs(currentHeight - Math.ceil(measured)) > 2) {
+                viewer.style.height = nextHeight;
+            }
             if (feed && feed.scrollTop !== feedScrollTop) feed.scrollTop = feedScrollTop;
         }
 
