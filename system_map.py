@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections import Counter
 
 SCHEMA_VERSION = 1
-UPDATED_AT = '2026-10-25'
+UPDATED_AT = '2026-11-02'
 
 STATUS_LABELS = {
     'live': '已上线',
@@ -134,11 +134,12 @@ LAYERS = [
              'caps': ['单活跃买单', '止盈后回收档位', '已实现利润台账', 'systemd 守护']},
             {'id': 'tradesync', 'name': 'TradeSync', 'status': 'live', 'service': 'tradesync',
              'desc': '下单网关 / 账号路由', 'caps': ['Binance/Bybit/OKX/Bitget']},
-            {'id': 'autodca', 'name': 'AutoDCA', 'status': 'idle', 'service': 'autodca',
-             'desc': '定投执行（计划已到期，有意停用）', 'caps': ['需手动恢复']},
+            {'id': 'autodca', 'name': 'AutoDCA', 'status': 'live', 'service': 'autodca',
+             'desc': 'AHR999 抄底定投实盘（AHR999<0.45 每日检查，按 UM 账户 BTC 余额的 2%/次加仓；目标每日动态读取）',
+             'caps': ['AHR999 条件定投', '动态目标', '旧计划停用']},
             {'id': 'web', 'name': 'Web 面板', 'status': 'live', 'service': 'web',
-             'desc': '本页所在：交易/帖子/盈亏/系统骨架/博客；头部展示 AHR999 独立估值指数',
-             'caps': ['登录门禁', 'AHR999 估值']},
+             'desc': '本页所在：交易/帖子/盈亏/系统骨架/博客；头部 AHR999 + 200MA 牛熊分界线；策略健康 long/short 合并对照',
+             'caps': ['登录门禁', 'AHR999 估值', '200MA 牛熊线', '摸顶摸底盈亏']},
             {'id': 'blog', 'name': '博客（公开页）', 'status': 'live',
              'desc': 'Hexo 全量迁移（2026-10-19）：公开 /blog + 看板入口；Python 渲染（Markdown/Pygments），独立于交易链路',
              'caps': ['公开访问', '91 篇文章']},
@@ -188,8 +189,8 @@ LAYERS = [
              'service': 'sentinel-um-short',
              'desc': 'um short 腿实例（独立 data_dir；watchdog 关闭防双份巡检推送）', 'caps': ['钉钉 fact-only', 'AI 告警复核（降噪）']},
             {'id': 'strategy_health', 'name': '策略健康页', 'status': 'live',
-             'desc': 'Sentinel M1–M5：参数一致性 / 开仓对齐 / 分布健康 / 维护建议（只读；看板「策略模块」区块内切换，独立页保留）',
-             'caps': ['登录门禁', '策略模块区切换']},
+             'desc': 'Sentinel M1–M5：参数一致性 / 开仓对齐 / 分布健康 / 维护建议（只读；long/short 合并为一张对照表；看板「策略模块」区块内切换，独立页保留）',
+             'caps': ['登录门禁', '策略模块区切换', 'L/S 合并对照']},
             {'id': 'login_guard', 'name': '登录门禁', 'status': 'live',
              'desc': 'Web 默认必须登录（本页亦受保护）', 'caps': []},
             {'id': 'secrets', 'name': '密钥轮换 / 收口', 'status': 'paused',
@@ -235,7 +236,7 @@ EDGES = [
     {'from': 'stage_b', 'to': 'stage_c'},
     {'from': 'stage_c', 'to': 'ext_review', 'label': '绝不自动上线', 'style': 'dashed'},
     {'from': 'bstrategy', 'to': 'tradesync'},
-    {'from': 'autodca', 'to': 'tradesync', 'label': '计划停用', 'style': 'dashed'},
+    {'from': 'autodca', 'to': 'tradesync', 'label': 'AHR999 定投'},
     {'from': 'tradesync', 'to': 'ext_exchange'},
     {'from': 'bstrategy', 'to': 'promo', 'label': '交易事件'},
     {'from': 'alphaengine', 'to': 'promo', 'label': '分析帖'},

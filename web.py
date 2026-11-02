@@ -3666,6 +3666,37 @@ def load_strategy_health():
         directions = [_health_direction_display(name, branch)
                       for name, branch in (snapshot.get('directions') or {}).items()
                       if isinstance(branch, dict)]
+        # 合并视图用：闸门矩阵按 key 并集对齐（缺该闸门的方向显示 disabled）
+        gate_keys: list[str] = []
+        for direction in directions:
+            for gate in direction.get('gates') or []:
+                if gate['key'] not in gate_keys:
+                    gate_keys.append(gate['key'])
+        gate_matrix = []
+        for key in sorted(gate_keys):
+            row = {'key': key, 'label': _HEALTH_GATE_LABELS.get(key, key), 'statuses': []}
+            for direction in directions:
+                match = next((g for g in direction.get('gates') or [] if g['key'] == key), None)
+                row['statuses'].append({
+                    'status': (match or {}).get('status', 'disabled'),
+                    'status_label': (match or {}).get('status_label', '未配置'),
+                })
+            gate_matrix.append(row)
+        # 合并视图用：把各方向闸门统计汇总成一个总环（避免 L/S 两个方向各画一个）
+        agg = {'total': 0, 'ok': 0, 'observe': 0, 'yellow': 0, 'red': 0}
+        for direction in directions:
+            stats = direction.get('gate_stats') or {}
+            for key in agg:
+                agg[key] += int(stats.get(key) or 0)
+        if agg['total']:
+            agg.update({
+                'ok_pct': round(agg['ok'] / agg['total'] * 100, 1),
+                'observe_pct': round(agg['observe'] / agg['total'] * 100, 1),
+                'yellow_pct': round(agg['yellow'] / agg['total'] * 100, 1),
+                'red_pct': round(agg['red'] / agg['total'] * 100, 1),
+            })
+        else:
+            agg.update({'ok_pct': 0.0, 'observe_pct': 0.0, 'yellow_pct': 0.0, 'red_pct': 0.0})
         portfolio = snapshot.get('portfolio')
         portfolio_model = _portfolio_view_model(portfolio)
         health_model = dict(snapshot.get('health') or {})
@@ -3677,6 +3708,8 @@ def load_strategy_health():
                 snapshot.get('generated_at') or (snapshot.get('heartbeat') or {}).get('ts')),
             'health': health_model,
             'directions': directions,
+            'gate_stats': agg,
+            'gate_matrix': gate_matrix,
             'portfolio': portfolio_model,
         })
     return {'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 'entries': entries}

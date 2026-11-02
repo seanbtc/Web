@@ -117,3 +117,33 @@
         .health-footer { font-size:0.64rem; color:#64748b; display:flex; flex-wrap:wrap; align-items:center; gap:0.25rem; }
         .health-evidence, .health-commands { font-size:0.64rem; color:#64748b; }
         .health-evidence summary, .health-commands summary { cursor:pointer; color:#94a3b8; }
+
+        /* 多方向（long/short）合并对照：一行一个指标，左右两列 */
+        .health-directions { font-size:0.62rem; color:#94a3b8; letter-spacing:0.02em; }
+        .health-merged { display:flex; flex-direction:column; gap:0.35rem; }
+        .health-merged-row { display:grid; grid-template-columns:5.2rem minmax(0,1fr) minmax(0,1fr); gap:0.45rem; align-items:start; }
+        .health-merged-head { font-size:0.62rem; color:#94a3b8; padding-bottom:0.1rem; border-bottom:1px dashed #e5e7eb; }
+        .health-merged-side { font-weight:650; color:#475569; }
+        .health-merged-label { font-size:0.68rem; font-weight:650; color:#334155; display:flex; align-items:center; gap:0.3rem; padding-top:0.15rem; }
+        .health-merged-label i { color:#94a3b8; font-size:0.7rem; }
+        .health-merged-cell { background:#f8fafc; border:1px solid #eef0f3; border-radius:0.55rem; padding:0.35rem 0.5rem; min-width:0; display:flex; flex-direction:column; gap:0.15rem; }
+        .health-merged-cell-dist { position:relative; padding-right:3.4rem; }
+        .health-merged-cell-dist .health-ring-sm { position:absolute; right:0.45rem; top:50%; transform:translateY(-50%); }
+        .health-ring-sm, .health-ring-sm .health-ring-hole { width:2.1rem; height:2.1rem; }
+        .health-ring-sm .health-ring-hole { font-size:0.58rem; }
+        .health-gate-matrix-merged { grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); }
+        .gate-cell-head { background:transparent; border:0; padding:0 0.4rem; }
+        .gate-direction { font-size:0.58rem; color:#94a3b8; flex:0 0 auto; width:2.2rem; text-align:center; }
+        .gate-cell-merged { gap:0.35rem; }
+        .health-gate-caption { font-size:0.6rem; color:#94a3b8; }
+        .health-gate-caption b { color:#475569; font-weight:650; }
+        .gate-dot-slot { width:2.2rem; display:inline-flex; justify-content:center; flex:0 0 auto; margin-left:auto; }
+        .gate-dot-slot + .gate-dot-slot { margin-left:0; }
+        .health-footer-merged { gap:0.35rem 0.9rem; }
+        .health-footer-side { display:inline-flex; flex-wrap:wrap; align-items:center; gap:0.25rem; }
+        .health-footer-side b { color:#475569; font-weight:650; }
+        @media (max-width: 640px) {
+            .health-merged-row { grid-template-columns:4.2rem minmax(0,1fr) minmax(0,1fr); gap:0.3rem; }
+            .health-merged-cell-dist { padding-right:2.7rem; }
+            .health-ring-sm, .health-ring-sm .health-ring-hole { width:1.7rem; height:1.7rem; }
+        }

@@ -179,6 +179,29 @@ def test_strategy_health_requires_login(client):
     assert resp.status_code in (301, 302)
 
 
+def test_strategy_health_merges_long_short_directions(tmp_path, monkeypatch, client):
+    """两个方向（long/short）合并为一张对照表：指标只出现一次，闸门点按方向并排。"""
+    snap_data = _snapshot()
+    long_branch = json.loads(json.dumps(snap_data['directions']['long']))
+    short_branch = json.loads(json.dumps(long_branch))
+    short_branch['params_guard']['status'] = 'ok'
+    snap_data['directions'] = {'long': long_branch, 'short': short_branch}
+    snap = tmp_path / 'snap.json'
+    snap.write_text(json.dumps(snap_data, ensure_ascii=False), encoding='utf-8')
+    monkeypatch.setenv('SENTINEL_SNAPSHOT_PATHS', str(snap))
+    _login(client)
+    html = client.get('/strategy_health').get_data(as_text=True)
+
+    assert 'health-merged' in html
+    assert html.count('class="health-merged-row') == 4      # 表头 + 参数/对齐/分布 三行
+    assert html.count('class="health-merged-cell') == 6     # 3 行 × 2 个方向
+    # 闸门点：每个闸门每个方向一个（这里每方向 4 个闸门）
+    gates_n = len(long_branch['gates'])
+    assert html.count('class="gate-dot-slot"') == gates_n * 2
+    assert 'class="align-bars' not in html  # 合并视图不再重复三行条形图
+    assert 'None' not in html
+
+
 def test_index_has_health_in_lead_section(tmp_path, monkeypatch, client):
     """策略健康并入「策略模块」区块（同区切换；中央切换器保持 帖子/盈亏/资产 三标签）。"""
     snap = tmp_path / 'snap.json'

@@ -6,12 +6,16 @@
 
 {% for entry in health.entries %}
 {% set hs = entry.health or {} %}
-{% set stats = entry.directions[0].gate_stats if entry.directions else None %}
+{% set dirs = entry.directions or [] %}
+{% set stats = entry.gate_stats or (dirs[0].gate_stats if dirs else None) %}
 <section class="health-panel">
     <div class="health-panel-head">
         <div class="health-panel-title">
             <h2>{{ entry.pair }}</h2>
             <span class="gate-chip status-{{ hs.status or 'observe' }}">{{ hs.status_label or '观察' }}</span>
+            {% if dirs | length > 1 %}
+            <span class="health-directions">{% for d in dirs %}{{ d.name }}{% if not loop.last %} / {% endif %}{% endfor %}</span>
+            {% endif %}
             {% if entry.generated_at %}<span class="health-snapshot">快照 {{ entry.generated_at }}</span>{% endif %}
         </div>
         {% if stats and stats.total %}
@@ -36,10 +40,105 @@
     </ul>
     {% endif %}
 
-    {% for direction in entry.directions %}
-    {% if entry.directions | length > 1 %}
-    <div class="health-direction-label">{{ direction.name }}</div>
+    {% if dirs | length > 1 %}
+    {# ===== 多方向（long/short）合并视图：同一指标一行，L/S 两列对照，去重表头与装饰 ===== #}
+    <div class="health-merged">
+        <div class="health-merged-row health-merged-head">
+            <span class="health-merged-label">指标</span>
+            {% for d in dirs %}<span class="health-merged-side">{{ d.name }}</span>{% endfor %}
+        </div>
+
+        <div class="health-merged-row">
+            <span class="health-merged-label"><i class="fa fa-anchor"></i> 参数一致性</span>
+            {% for d in dirs %}
+            <div class="health-merged-cell">
+                <span class="gate-chip status-{{ d.guard.status }}">{{ d.guard.label }}</span>
+                <div class="health-tile-detail">{{ d.guard.detail }}</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="health-merged-row">
+            <span class="health-merged-label"><i class="fa fa-crosshairs"></i> 开仓对齐</span>
+            {% for d in dirs %}
+            <div class="health-merged-cell">
+                <span class="gate-chip status-{{ d.align.status }}">{{ d.align.label }}</span>
+                {% if d.align.has_pairs %}
+                <div class="health-tile-detail">配对 {{ d.align.pairs_n }} ・ 漏单 {{ d.align.missing }} ・ 多单 {{ d.align.extra }}</div>
+                <div class="health-tile-detail">延迟 p90 {{ d.align.p90 }} ・ 偏差 p95 {{ d.align.p95 }}</div>
+                {% else %}
+                <div class="health-tile-detail">暂无配对样本（等首笔开平仓配对）</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="health-merged-row">
+            <span class="health-merged-label"><i class="fa fa-chart-pie"></i> 分布健康</span>
+            {% for d in dirs %}
+            <div class="health-merged-cell health-merged-cell-dist">
+                <span class="gate-chip status-{{ d.dist.status }}">{{ d.dist.label }}</span>
+                <div class="health-tile-detail">{{ d.dist.sample_text }}{% if not d.dist.adequate %} ・ 样本积累中{% endif %}</div>
+                {% if d.dist.metrics %}
+                <div class="health-metric-chips">
+                    {% for item in d.dist.metrics %}<span>{{ item.label }} {{ item.value }}</span>{% endfor %}
+                </div>
+                {% endif %}
+                <div class="health-ring health-ring-sm" style="--progress: {{ d.dist.progress }};"><div class="health-ring-hole">{{ d.dist.progress | round(0) | int }}%</div></div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="health-gate-caption">闸门矩阵：每个闸门从左到右依次为
+        {% for d in dirs %}<b>{{ d.name }}</b>{% if not loop.last %} / {% endif %}{% endfor %} 的状态点</div>
+    <div class="health-gate-matrix health-gate-matrix-merged">
+        {% for row in entry.gate_matrix %}
+        <div class="gate-cell gate-cell-merged">
+            <span class="gate-name">{{ row.label }}</span>
+            {% for st in row.statuses %}
+            <span class="gate-dot-slot"><span class="gate-dot status-{{ st.status }}" title="{{ st.status_label }}"></span></span>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="health-footer health-footer-merged">
+        <span>其他闸门：</span>
+        {% for d in dirs %}
+        <span class="health-footer-side">
+            <b>{{ d.name }}</b>
+            {% if d.other_problems %}
+            {% for gate in d.other_problems %}<span class="gate-chip status-{{ gate.status }}">{{ gate.label }} {{ gate.status_label }}</span>{% endfor %}
+            {% if d.other_ok_n %}<span>正常 {{ d.other_ok_n }} 项</span>{% endif %}
+            {% if d.other_pending_n %}<span>未判定 {{ d.other_pending_n }} 项</span>{% endif %}
+            {% elif d.other_pending_n and d.other_ok_n %}
+            <span>正常 {{ d.other_ok_n }} 项 ・ 未判定 {{ d.other_pending_n }} 项（暂无实盘数据，不作判定）</span>
+            {% elif d.other_pending_n %}
+            <span>未判定 {{ d.other_pending_n }} 项（暂无实盘数据，不作判定）</span>
+            {% elif d.other_ok_n %}
+            <span>全部正常 ✓（{{ d.other_ok_n }} 项）</span>
+            {% else %}
+            <span>—</span>
+            {% endif %}
+        </span>
+        {% endfor %}
+    </div>
+
+    {% if dirs | selectattr('evidence') | list %}
+    <details class="health-evidence">
+        <summary>证据（{% for d in dirs %}{{ d.name }} {{ d.evidence | length }}{% if not loop.last %} / {% endif %}{% endfor %}）</summary>
+        <div class="space-y-1">
+            {% for d in dirs %}{% for item in d.evidence %}
+            <div class="text-xs {{ 'text-red-600' if item.status == 'red' else 'text-amber-700' }}">〔{{ d.name }}·{{ item.gate }}〕{{ item.line }}</div>
+            {% endfor %}{% endfor %}
+        </div>
+    </details>
     {% endif %}
+
+    {% else %}
+    {# ===== 单方向：保留原有详细视图 ===== #}
+    {% for direction in dirs %}
     <div class="health-panel-body">
         <div class="health-modules">
             <div class="health-tile">
@@ -145,6 +244,7 @@
     </details>
     {% endif %}
     {% endfor %}
+    {% endif %}
 
     {% if entry.portfolio %}
     {% set pf = entry.portfolio %}

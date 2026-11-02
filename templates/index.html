@@ -213,6 +213,28 @@
             color: #334155 !important;
             border-color: rgba(71, 85, 105, 0.38) !important;
         }
+        #ma200-value {
+            background: rgba(255, 255, 255, 0.82);
+            color: var(--text-primary) !important;
+            border: 1px solid rgba(17, 17, 17, 0.08);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+            white-space: nowrap;
+        }
+        #ma200-value.ma200-bull {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(16, 185, 129, 0.26)) !important;
+            color: #166534 !important;
+            border-color: rgba(34, 197, 94, 0.38) !important;
+        }
+        #ma200-value.ma200-bear {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(220, 38, 38, 0.24)) !important;
+            color: #991b1b !important;
+            border-color: rgba(239, 68, 68, 0.38) !important;
+        }
+        #ma200-value.ma200-flat {
+            background: linear-gradient(135deg, rgba(100, 116, 139, 0.18), rgba(71, 85, 105, 0.24)) !important;
+            color: #334155 !important;
+            border-color: rgba(71, 85, 105, 0.38) !important;
+        }
         #market-cycle.bull {
             background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(16, 185, 129, 0.26)) !important;
             color: #166534 !important;
@@ -1706,6 +1728,10 @@
                     <span class="px-3 py-1 rounded-full text-sm font-semibold ahr-flat" id="ahr999-value" title="AHR999 独立估值指数 · 数据不可用">—</span>
                 </div>
                 <div class="flex items-center ml-4">
+                    <span class="text-sm font-semibold text-gray-700 mr-2">200MA:</span>
+                    <span class="px-3 py-1 rounded-full text-sm font-semibold ma200-flat" id="ma200-value" title="BTC 200 日均线（牛熊分界线）· 数据不可用">—</span>
+                </div>
+                <div class="flex items-center ml-4">
                     <span class="text-sm font-semibold text-gray-700 mr-2">K线趋势:</span>
                     <span class="px-3 py-1 rounded-full text-sm font-semibold flex items-center ma-flat" id="alpha-ma-zone" title="AlphaEngine K线趋势 · 数据不可用">—</span>
                 </div>
@@ -2603,7 +2629,7 @@
         let _lastYearlyFingerprint = '';
         let currentBtcPrice = null;
         // 渲染去重：避免每秒的行情推送把 header/图表整块重写（移动端会一直闪+掉帧）
-        const _marketRenderMemo = { cycle: '', price: '', alpha: '', ahr: '', ma: '' };
+        const _marketRenderMemo = { cycle: '', price: '', alpha: '', ahr: '', ma: '', ma200: '' };
         let _lastRuntimeText = '';
         let _lastAssetCompositionFingerprint = '';
         let _lastAssetCompositionAt = 0;
@@ -3726,6 +3752,35 @@
                 }
             }
 
+            // 更新 200 日均线（牛熊分界线）：与 AHR999 同一次日线计算（cost_200_sma = 200 日简单均线）
+            const ma200Element = document.getElementById('ma200-value');
+            if (ma200Element) {
+                const ahrForMa = marketData.ahr999;
+                const ma200 = Number(ahrForMa && ahrForMa.cost_200_sma);
+                const refPrice = (Number.isFinite(nextBtcPrice) && nextBtcPrice > 0)
+                    ? nextBtcPrice
+                    : Number(ahrForMa && ahrForMa.price);
+                if (Number.isFinite(ma200) && ma200 > 0 && Number.isFinite(refPrice) && refPrice > 0) {
+                    const above = refPrice >= ma200;
+                    const ma200Key = `${ma200}|${above}`;
+                    if (ma200Key !== _marketRenderMemo.ma200) {
+                        _marketRenderMemo.ma200 = ma200Key;
+                        ma200Element.classList.remove('ma200-bull', 'ma200-bear', 'ma200-flat');
+                        ma200Element.classList.add(above ? 'ma200-bull' : 'ma200-bear');
+                        ma200Element.textContent = `${above ? '牛' : '熊'} ${formatMoney(ma200, 0)}`;
+                        ma200Element.title = `BTC 200 日均线 ${formatMoney(ma200, 0)} · 现价 ${formatMoney(refPrice, 0)}`
+                            + ` · 价格在均线${above ? '上方（牛）' : '下方（熊）'}`
+                            + (ahrForMa && ahrForMa.as_of ? ` · 截至 ${ahrForMa.as_of}` : '');
+                    }
+                } else if (_marketRenderMemo.ma200 !== 'unavailable') {
+                    _marketRenderMemo.ma200 = 'unavailable';
+                    ma200Element.classList.remove('ma200-bull', 'ma200-bear');
+                    ma200Element.classList.add('ma200-flat');
+                    ma200Element.textContent = '—';
+                    ma200Element.title = 'BTC 200 日均线（牛熊分界线）· 数据不可用';
+                }
+            }
+
             // 更新 AlphaEngine K线趋势 (均线区间)
             const maElement = document.getElementById('alpha-ma-zone');
             if (maElement) {
@@ -3773,6 +3828,10 @@
             if (explicit.includes('long') || explicit.includes('buy') || explicit.includes('做多')) return 'long';
             if (explicit.includes('short') || explicit.includes('sell') || explicit.includes('做空')) return 'short';
 
+            // 合约空头常以负数数量存储：符号优先于文案判断
+            const rawQuantity = Number(positionData?.position_quantity);
+            if (Number.isFinite(rawQuantity) && rawQuantity < 0) return 'short';
+
             const status = String(positionData?.position_status || positionData?.status || '');
             if (status.includes('做空') || status.includes('摸顶')) return 'short';
             if (status.includes('做多') || status.includes('抄底') || status.includes('现货')) return 'long';
@@ -3780,10 +3839,12 @@
             // 空仓/平仓时回退到最近一笔未平仓记录的模式（兼容旧 top/bottom JSON）。
             const records = (positionData?.trade_records || []).filter(record => record && typeof record === 'object');
             const open = records.slice().reverse().find(record => !record.is_closed);
-            if (open) {
-                const mode = String(open.mode || '');
-                if (mode.includes('做空')) return 'short';
-                if (mode.includes('做多') || mode.includes('现货')) return 'long';
+            // 没有未平仓记录时，退一步用最近一笔记录的模式（同一策略连续同向的概率最高）
+            const latest = open || records[records.length - 1];
+            if (latest) {
+                const mode = String(latest.mode || latest.direction || latest.position_direction || '');
+                if (mode.includes('做空') || mode.includes('short') || mode.includes('sell')) return 'short';
+                if (mode.includes('做多') || mode.includes('long') || mode.includes('buy') || mode.includes('现货')) return 'long';
             }
             return fallback || '';
         }
@@ -3815,20 +3876,23 @@
 
         function calculateFloatingProfit(positionData, defaultDirection = '') {
             const currentPrice = getCurrentBtcPrice();
-            const quantity = Number(positionData?.position_quantity);
+            const rawQuantity = Number(positionData?.position_quantity);
             const averagePrice = Number(positionData?.position_avg_price);
             const direction = resolvePositionDirection(positionData, defaultDirection);
 
-            if (!Number.isFinite(currentPrice) || !Number.isFinite(quantity) || !Number.isFinite(averagePrice)) {
+            if (!Number.isFinite(currentPrice) || !Number.isFinite(rawQuantity) || !Number.isFinite(averagePrice)) {
                 return null;
             }
+            // 空头数量可能为负：盈亏用绝对值，方向由 resolvePositionDirection 判定
+            const quantity = Math.abs(rawQuantity);
+            if (quantity === 0) return 0;
             if (direction === 'short') {
                 return (averagePrice - currentPrice) * quantity;
             }
             if (direction === 'long') {
                 return (currentPrice - averagePrice) * quantity;
             }
-            return 0;
+            return null;  // 方向未知：显示「—」而不是误导性的 0
         }
 
         function updateFloatingProfit(elementId, positionData, defaultDirection = '') {
