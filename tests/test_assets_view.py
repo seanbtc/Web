@@ -44,7 +44,7 @@ def test_index_has_assets_view_markup(client):
     html = resp.get_data(as_text=True)
     for marker in ('data-performance-view="assets"', 'performance-assets-view',
                    'asset-spot-value', 'asset-lead-fee', 'asset-lead-realized',
-                   '抄底现货资产', '策略模块资产',
+                   '现货资产', '策略模块资产',
                    'asset-top-asset', '摸顶摸底策略资产',
                    'updateTopAssetCard',
                    'assetCompositionChart', 'asset-composition-legend',

@@ -3694,6 +3694,70 @@ def _sum_gate_stats(directions):
     return agg
 
 
+def _merge_portfolios(items):
+    """同一基础 pair 的多份快照：按方向合并组合敞口。
+
+    long / short 由两个独立实例各自落快照（long 实例只会有多头腿、short 实例只会有空头腿），
+    因此 long 腿取 ``*.long`` 快照、short 腿取 ``*.short`` 快照，避免同一账户被重复计算两次。
+    """
+    def _raw(value):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _legs(item):
+        raw = item.get('portfolio_raw') or {}
+        return raw.get('legs') if isinstance(raw.get('legs'), dict) else {}
+
+    raws = [item.get('portfolio_raw') for item in items if isinstance(item.get('portfolio_raw'), dict)]
+    if not raws:
+        return None
+
+    long_src = next((it for it in items if str(it.get('pair') or '').endswith('.long')), items[0])
+    short_src = next((it for it in items if str(it.get('pair') or '').endswith('.short')), items[0])
+    long_num = _raw((_legs(long_src).get('long') or {}).get('exchange_size'))
+    short_num = _raw((_legs(short_src).get('short') or {}).get('exchange_size'))
+
+    mark_price = 0.0
+    for raw in raws:
+        mark_price = _raw(raw.get('mark_price')) or mark_price
+    equity = max((_raw(raw.get('combined_equity')) for raw in raws), default=0.0)
+    net_num = long_num + short_num
+    gross_num = abs(long_num) + abs(short_num)
+    net_notional = net_num * mark_price
+    gross_notional = gross_num * mark_price
+
+    worst_rank = -1
+    status = 'observe'
+    reasons: list[str] = []
+    for raw in raws:
+        raw_status = str(raw.get('status') or 'observe')
+        rank = _HEALTH_STATUS_RANK.get(raw_status, 1)
+        if rank > worst_rank:
+            worst_rank = rank
+            status = raw_status
+        for reason in raw.get('reasons') or []:
+            if reason not in reasons:
+                reasons.append(reason)
+
+    return {
+        'status': status,
+        'mode': raws[0].get('mode') or '',
+        'symbol': raws[0].get('symbol') or '',
+        'mark_price': mark_price,
+        'net_size': net_num,
+        'gross_size': gross_num,
+        'net_notional': net_notional,
+        'gross_notional': gross_notional,
+        'combined_equity': equity,
+        'net_ratio': (net_notional / equity) if equity else None,
+        'gross_ratio': (gross_notional / equity) if equity else None,
+        'legs': {'long': {'exchange_size': long_num}, 'short': {'exchange_size': short_num}},
+        'reasons': reasons[:4],
+    }
+
+
 def load_strategy_health():
     """读取 Sentinel 快照（只读；缺失/损坏跳过），返回策略健康视图模型。
 
@@ -3723,6 +3787,7 @@ def load_strategy_health():
             'health': health_model,
             'directions': directions,
             'portfolio': _portfolio_view_model(snapshot.get('portfolio')),
+            'portfolio_raw': snapshot.get('portfolio'),
         })
 
     # 按基础 pair 分组（btc.um.long + btc.um.short → btc.um）
@@ -3740,13 +3805,8 @@ def load_strategy_health():
     for base in order:
         items = groups[base]
         directions = [d for item in items for d in item.get('directions') or []]
-        portfolios = []
-        for item in items:
-            if not item.get('portfolio'):
-                continue
-            model = dict(item['portfolio'])
-            model['pair'] = item.get('pair')
-            portfolios.append(model)
+        merged_portfolio = _portfolio_view_model(_merge_portfolios(items))
+        portfolios = [dict(merged_portfolio, pair=base)] if merged_portfolio else []
         if len(items) == 1:
             entry = dict(items[0])
             entry['gate_stats'] = _sum_gate_stats(directions)

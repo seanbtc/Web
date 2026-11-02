@@ -218,8 +218,10 @@ def test_strategy_health_groups_long_short_snapshots(tmp_path, monkeypatch, clie
     assert 'btc.um.long + btc.um.short' in html
     assert html.count('class="health-merged-row') == 4
     assert html.count('class="health-merged-cell') == 6
-    # 两个组合净敞口分别带 pair 标注
-    assert html.count('组合净敞口 ·') == 2
+    # 组合敞口也合并成一块：long 取 .long 快照、short 取 .short 快照
+    assert html.count('text-gray-800 font-medium">组合净敞口') == 1
+    assert '组合净敞口 ·' not in html
+    assert 'L +0.020000 / S -0.030000' in html
     assert 'None' not in html
 
 
