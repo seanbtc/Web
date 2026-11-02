@@ -13,7 +13,10 @@
         <div class="health-panel-title">
             <h2>{{ entry.pair }}</h2>
             <span class="gate-chip status-{{ hs.status or 'observe' }}">{{ hs.status_label or '观察' }}</span>
-            {% if dirs | length > 1 %}
+            {% if entry.pair_members %}
+            <span class="health-snapshot">{{ entry.pair_members | join(' + ') }}</span>
+            {% endif %}
+            {% if dirs | length > 1 and not entry.pair_members %}
             <span class="health-directions">{% for d in dirs %}{{ d.name }}{% if not loop.last %} / {% endif %}{% endfor %}</span>
             {% endif %}
             {% if entry.generated_at %}<span class="health-snapshot">快照 {{ entry.generated_at }}</span>{% endif %}
@@ -246,11 +249,11 @@
     {% endfor %}
     {% endif %}
 
-    {% if entry.portfolio %}
-    {% set pf = entry.portfolio %}
+    {% set entry_portfolios = entry.portfolios or ([entry.portfolio] if entry.portfolio else []) %}
+    {% for pf in entry_portfolios %}
     <div class="health-exposure">
         <div class="health-exposure-head">
-            <span class="text-gray-800 font-medium">组合净敞口</span>
+            <span class="text-gray-800 font-medium">组合净敞口{% if entry_portfolios | length > 1 %} · {{ pf.pair or '' }}{% endif %}</span>
             <span class="gate-chip status-{{ pf.status }}">{{ pf.status_label }}</span>
             <span>净敞口 <b>{{ pf.net_size }}</b> BTC（L {{ pf.long_size }} / S {{ pf.short_size }}）</span>
         </div>
@@ -268,7 +271,7 @@
             {% if pf.mode == 'observe' %}<span>仅记录</span>{% endif %}
         </div>
     </div>
-    {% endif %}
+    {% endfor %}
 
     {% if hs.suggested_commands %}
     <details class="health-commands">

@@ -202,6 +202,27 @@ def test_strategy_health_merges_long_short_directions(tmp_path, monkeypatch, cli
     assert 'None' not in html
 
 
+def test_strategy_health_groups_long_short_snapshots(tmp_path, monkeypatch, client):
+    """生产形态：btc.um.long 与 btc.um.short 两份快照合并成一个面板。"""
+    long_snap = _snapshot(pair='btc.um.long', direction='long')
+    short_snap = _snapshot(pair='btc.um.short', direction='short')
+    p1 = tmp_path / 'long.json'
+    p2 = tmp_path / 'short.json'
+    p1.write_text(json.dumps(long_snap, ensure_ascii=False), encoding='utf-8')
+    p2.write_text(json.dumps(short_snap, ensure_ascii=False), encoding='utf-8')
+    monkeypatch.setenv('SENTINEL_SNAPSHOT_PATHS', f'{p1},{p2}')
+    _login(client)
+    html = client.get('/strategy_health').get_data(as_text=True)
+
+    assert 'health-merged' in html
+    assert 'btc.um.long + btc.um.short' in html
+    assert html.count('class="health-merged-row') == 4
+    assert html.count('class="health-merged-cell') == 6
+    # 两个组合净敞口分别带 pair 标注
+    assert html.count('组合净敞口 ·') == 2
+    assert 'None' not in html
+
+
 def test_index_has_health_in_lead_section(tmp_path, monkeypatch, client):
     """策略健康并入「策略模块」区块（同区切换；中央切换器保持 帖子/盈亏/资产 三标签）。"""
     snap = tmp_path / 'snap.json'

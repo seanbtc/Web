@@ -3652,9 +3652,55 @@ def load_grid_state():
     }
 
 
+_HEALTH_STATUS_RANK = {'ok': 0, 'observe': 1, 'disabled': 1, 'yellow': 2, 'red': 3}
+
+
+def _merge_gate_matrix(directions):
+    """按 key 并集对齐各方向闸门（缺项显示 disabled），供合并视图渲染。"""
+    gate_keys: list[str] = []
+    for direction in directions:
+        for gate in direction.get('gates') or []:
+            if gate['key'] not in gate_keys:
+                gate_keys.append(gate['key'])
+    matrix = []
+    for key in sorted(gate_keys):
+        row = {'key': key, 'label': _HEALTH_GATE_LABELS.get(key, key), 'statuses': []}
+        for direction in directions:
+            match = next((g for g in direction.get('gates') or [] if g['key'] == key), None)
+            row['statuses'].append({
+                'status': (match or {}).get('status', 'disabled'),
+                'status_label': (match or {}).get('status_label', '未配置'),
+            })
+        matrix.append(row)
+    return matrix
+
+
+def _sum_gate_stats(directions):
+    """把多个方向的闸门统计汇总成一个总环。"""
+    agg = {'total': 0, 'ok': 0, 'observe': 0, 'yellow': 0, 'red': 0}
+    for direction in directions:
+        stats = direction.get('gate_stats') or {}
+        for key in agg:
+            agg[key] += int(stats.get(key) or 0)
+    if agg['total']:
+        agg.update({
+            'ok_pct': round(agg['ok'] / agg['total'] * 100, 1),
+            'observe_pct': round(agg['observe'] / agg['total'] * 100, 1),
+            'yellow_pct': round(agg['yellow'] / agg['total'] * 100, 1),
+            'red_pct': round(agg['red'] / agg['total'] * 100, 1),
+        })
+    else:
+        agg.update({'ok_pct': 0.0, 'observe_pct': 0.0, 'yellow_pct': 0.0, 'red_pct': 0.0})
+    return agg
+
+
 def load_strategy_health():
-    """读取 Sentinel 快照（只读；缺失/损坏跳过），返回策略健康视图模型。"""
-    entries = []
+    """读取 Sentinel 快照（只读；缺失/损坏跳过），返回策略健康视图模型。
+
+    long / short 常由两个实例各落一份快照（例如 btc.um.long 与 btc.um.short）：
+    同一基础 pair 的多份快照合并为一个面板，方向并排对照；单份快照保持原样。
+    """
+    raw_entries: list[dict] = []
     for path in _sentinel_snapshot_paths():
         try:
             with open(path, 'r', encoding='utf-8') as handle:
@@ -3666,51 +3712,70 @@ def load_strategy_health():
         directions = [_health_direction_display(name, branch)
                       for name, branch in (snapshot.get('directions') or {}).items()
                       if isinstance(branch, dict)]
-        # 合并视图用：闸门矩阵按 key 并集对齐（缺该闸门的方向显示 disabled）
-        gate_keys: list[str] = []
-        for direction in directions:
-            for gate in direction.get('gates') or []:
-                if gate['key'] not in gate_keys:
-                    gate_keys.append(gate['key'])
-        gate_matrix = []
-        for key in sorted(gate_keys):
-            row = {'key': key, 'label': _HEALTH_GATE_LABELS.get(key, key), 'statuses': []}
-            for direction in directions:
-                match = next((g for g in direction.get('gates') or [] if g['key'] == key), None)
-                row['statuses'].append({
-                    'status': (match or {}).get('status', 'disabled'),
-                    'status_label': (match or {}).get('status_label', '未配置'),
-                })
-            gate_matrix.append(row)
-        # 合并视图用：把各方向闸门统计汇总成一个总环（避免 L/S 两个方向各画一个）
-        agg = {'total': 0, 'ok': 0, 'observe': 0, 'yellow': 0, 'red': 0}
-        for direction in directions:
-            stats = direction.get('gate_stats') or {}
-            for key in agg:
-                agg[key] += int(stats.get(key) or 0)
-        if agg['total']:
-            agg.update({
-                'ok_pct': round(agg['ok'] / agg['total'] * 100, 1),
-                'observe_pct': round(agg['observe'] / agg['total'] * 100, 1),
-                'yellow_pct': round(agg['yellow'] / agg['total'] * 100, 1),
-                'red_pct': round(agg['red'] / agg['total'] * 100, 1),
-            })
-        else:
-            agg.update({'ok_pct': 0.0, 'observe_pct': 0.0, 'yellow_pct': 0.0, 'red_pct': 0.0})
-        portfolio = snapshot.get('portfolio')
-        portfolio_model = _portfolio_view_model(portfolio)
         health_model = dict(snapshot.get('health') or {})
         health_model['status_label'] = _health_status_label(health_model.get('status') or 'observe')
-        entries.append({
+        generated_raw = snapshot.get('generated_at') or (snapshot.get('heartbeat') or {}).get('ts')
+        raw_entries.append({
             'pair': snapshot.get('pair'),
             'mode': snapshot.get('mode'),
-            'generated_at': _format_snapshot_time(
-                snapshot.get('generated_at') or (snapshot.get('heartbeat') or {}).get('ts')),
+            'generated_at': _format_snapshot_time(generated_raw),
+            'generated_raw': str(generated_raw or ''),
             'health': health_model,
             'directions': directions,
-            'gate_stats': agg,
-            'gate_matrix': gate_matrix,
-            'portfolio': portfolio_model,
+            'portfolio': _portfolio_view_model(snapshot.get('portfolio')),
+        })
+
+    # 按基础 pair 分组（btc.um.long + btc.um.short → btc.um）
+    groups: dict[str, list[dict]] = {}
+    order: list[str] = []
+    for entry in raw_entries:
+        pair = str(entry.get('pair') or '')
+        base = pair.rsplit('.', 1)[0] if pair.endswith(('.long', '.short')) else pair
+        if base not in groups:
+            groups[base] = []
+            order.append(base)
+        groups[base].append(entry)
+
+    entries = []
+    for base in order:
+        items = groups[base]
+        directions = [d for item in items for d in item.get('directions') or []]
+        portfolios = []
+        for item in items:
+            if not item.get('portfolio'):
+                continue
+            model = dict(item['portfolio'])
+            model['pair'] = item.get('pair')
+            portfolios.append(model)
+        if len(items) == 1:
+            entry = dict(items[0])
+            entry['gate_stats'] = _sum_gate_stats(directions)
+            entry['gate_matrix'] = _merge_gate_matrix(directions)
+            entry['portfolios'] = portfolios
+            entry.pop('generated_raw', None)
+            entries.append(entry)
+            continue
+
+        worst = max(items, key=lambda it: _HEALTH_STATUS_RANK.get(
+            str((it.get('health') or {}).get('status') or 'observe'), 1))
+        health_model = dict(worst.get('health') or {})
+        reasons: list[str] = []
+        for item in items:
+            for reason in (item.get('health') or {}).get('reasons') or []:
+                if reason not in reasons:
+                    reasons.append(reason)
+        health_model['reasons'] = reasons[:4]
+        entries.append({
+            'pair': base,
+            'pair_members': [item.get('pair') for item in items],
+            'mode': worst.get('mode'),
+            'generated_at': max(items, key=lambda it: it.get('generated_raw') or '').get('generated_at'),
+            'health': health_model,
+            'directions': directions,
+            'gate_stats': _sum_gate_stats(directions),
+            'gate_matrix': _merge_gate_matrix(directions),
+            'portfolio': portfolios[0] if portfolios else None,
+            'portfolios': portfolios,
         })
     return {'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 'entries': entries}
 
