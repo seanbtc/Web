@@ -44,3 +44,28 @@ def test_top_js_supports_long_short_direction_and_profit_fallback(client):
     for marker in ('resolvePositionDirection', 'resolveTradeDirection',
                    'calculateRecordProfit', 'position_side'):
         assert marker in html, f'缺少 JS 标记: {marker}'
+
+
+def test_add_top_bottom_trade_appends_and_dedupes(client, monkeypatch):
+    """AutoDCA 同步记录：append-only，按 source+plan_id+cycle 去重。"""
+    import copy
+    original = copy.deepcopy(web.data_storage.bottom_data)
+    saved = []
+    monkeypatch.setattr(web, 'save_bottom_data', lambda data: saved.append(True))
+    monkeypatch.setattr(web.data_storage, 'update_global_data', lambda: None)
+    try:
+        payload = {
+            'source': 'ahr999_dca', 'plan_id': 'ahr999_bottom_btcusd1', 'cycle_id': 3,
+            'symbol': 'BTCUSD1', 'side': 'BUY', 'mode': '定投开仓',
+            'quantity': 0.024, 'avg_price': 80000, 'is_closed': False, 'profit': 0,
+        }
+        resp = client.post('/api/add_top_bottom_trade', json=payload)
+        assert resp.status_code == 200
+        assert resp.get_json()['added'] is True
+        records = web.data_storage.bottom_data['trade_records']
+        assert any(r.get('source') == 'ahr999_dca' and r.get('cycle_id') == 3 for r in records)
+
+        resp2 = client.post('/api/add_top_bottom_trade', json=payload)
+        assert resp2.get_json()['added'] is False       # 去重
+    finally:
+        web.data_storage.bottom_data = original

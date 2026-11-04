@@ -2993,6 +2993,28 @@ class DataStorage:
         save_top_data(self.top_data)
         return True
 
+    def add_top_bottom_trade(self, record):
+        """追加一条摸顶摸底记录（AutoDCA 定投/止盈同步用；按 source+plan_id+cycle 去重）。"""
+        if not isinstance(record, dict):
+            return False
+        source = str(record.get('source') or '').strip()
+        plan_id = str(record.get('plan_id') or '').strip()
+        cycle = str(record.get('cycle_id') or record.get('slot') or '').strip()
+        records = self.bottom_data.setdefault('trade_records', [])
+        if source and plan_id:
+            for item in records:
+                if (str(item.get('source') or '') == source
+                        and str(item.get('plan_id') or '') == plan_id
+                        and str(item.get('cycle_id') or item.get('slot') or '') == cycle
+                        and bool(item.get('is_closed')) == bool(record.get('is_closed'))):
+                    return False
+        payload = dict(record)
+        payload.setdefault('id', max([int(item.get('id') or 0) for item in records] + [0]) + 1)
+        records.append(payload)
+        save_bottom_data(self.bottom_data)
+        self.update_global_data()
+        return True
+
     def update_bottom_data(self, data):
         for key in ('position_status', 'position_quantity', 'position_avg_price', 'position_symbol', 'trade_records', 'status'):
             if key in data:
@@ -3172,6 +3194,26 @@ def update_top_data():
             socketio.emit('all_data', data_storage.get_all_data())
             return jsonify({'status': 'success'})
     return jsonify({'status': 'error'}), 400
+
+@app.route('/api/add_top_bottom_trade', methods=['POST'])
+@require_api_token
+def add_top_bottom_trade():
+    """AutoDCA 定投/止盈记录 → Web 摸顶摸底模块（append-only，去重）。"""
+    data = request.json
+    if not isinstance(data, dict):
+        return jsonify({'status': 'error', 'message': 'JSON 对象必填'}), 400
+    added = data_storage.add_top_bottom_trade(data)
+    if added:
+        socketio.emit('all_data', data_storage.get_all_data())
+    return jsonify({'status': 'success', 'added': bool(added)})
+
+
+@app.route('/api/update_top_bottom', methods=['POST'])
+@require_api_token
+def update_top_bottom():
+    """计划摘要同步占位：不改动手工维护的持仓字段，仅返回成功（兼容 AutoDCA 调用）。"""
+    return jsonify({'status': 'success', 'updated': 0})
+
 
 @app.route('/api/update_bottom', methods=['POST'])
 @require_api_token
