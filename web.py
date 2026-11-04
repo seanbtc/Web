@@ -714,7 +714,7 @@ def enforce_login_guard():
     if path == '/blog' or path.startswith('/blog/'):
         return None
     # 写接口保持各自 @require_api_token 原有鉴权, 不受登录门禁影响
-    if path.startswith('/api/update_'):
+    if path.startswith('/api/update_') or path == '/api/add_top_bottom_trade':
         return None
     if not _login_enabled():
         return None

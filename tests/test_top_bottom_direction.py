@@ -69,3 +69,20 @@ def test_add_top_bottom_trade_appends_and_dedupes(client, monkeypatch):
         assert resp2.get_json()['added'] is False       # 去重
     finally:
         web.data_storage.bottom_data = original
+
+
+def test_add_top_bottom_trade_allowed_without_login(client, monkeypatch):
+    """AutoDCA 无登录态：写接口走 token 鉴权，不被登录门禁拦（2026-11-05）。"""
+    import copy
+    original = copy.deepcopy(web.data_storage.bottom_data)
+    monkeypatch.setattr(web, 'save_bottom_data', lambda data: None)
+    monkeypatch.setattr(web.data_storage, 'update_global_data', lambda: None)
+    try:
+        resp = client.post('/api/add_top_bottom_trade', json={
+            'source': 'ahr999_dca', 'plan_id': 'p1', 'cycle_id': 1,
+            'quantity': 0.01, 'avg_price': 80000, 'is_closed': False,
+        })
+        assert resp.status_code == 200
+        assert resp.get_json()['status'] == 'success'
+    finally:
+        web.data_storage.bottom_data = original
