@@ -113,15 +113,24 @@ def test_summary_rejects_non_object(client, isolated_data_dir):
     assert 'ahr999' not in web.data_storage.bottom_data
 
 
-def test_template_exposes_ahr999_position_block(client):
+def test_template_places_ahr999_block_in_top_module(client):
     html = client.get('/').get_data(as_text=True)
+    top_start = html.index('id="top-section"')
+    bottom_start = html.index('id="bottom-section"')
+    top_slice = html[top_start:bottom_start]
+    legacy_start = html.index('id="top-bottom-section"')
+    bottom_slice = html[bottom_start:legacy_start]
+
+    assert '摸底策略 · AHR999 定投仓位' in top_slice
+    assert 'bottom-ahr999-block' in top_slice
     for marker in (
-        'bottom-ahr999-block',
         'bottom-ahr999-quantity',
         'bottom-ahr999-avg-price',
         'bottom-ahr999-float-profit',
         'bottom-ahr999-status',
         'bottom-ahr999-detail',
-        'function updateAhr999Position',
     ):
-        assert marker in html
+        assert marker in top_slice
+    # 现货模块不再展示 AHR999 仓位
+    assert 'bottom-ahr999-block' not in bottom_slice
+    assert 'function updateAhr999Position' in html
