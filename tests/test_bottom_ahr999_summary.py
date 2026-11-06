@@ -134,3 +134,12 @@ def test_template_places_ahr999_block_in_top_module(client):
     # 现货模块不再展示 AHR999 仓位
     assert 'bottom-ahr999-block' not in bottom_slice
     assert 'function updateAhr999Position' in html
+
+
+def test_template_moves_ahr999_records_to_top_table(client):
+    """AHR999 记录在摸顶摸底模块表格渲染，现货表格过滤掉。"""
+    html = client.get('/').get_data(as_text=True)
+    assert 'function isAhr999Record' in html
+    assert "((data.bottom || {}).trade_records || []).filter(isAhr999Record)" in html
+    assert ".filter(record => !isAhr999Record(record))" in html
+    assert "source === 'ahr999_dca' || planId.startsWith('ahr999_')" in html

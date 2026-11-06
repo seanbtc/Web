@@ -3913,6 +3913,14 @@
             return '';
         }
 
+        // AHR999 定投（摸底策略）记录：按 source/plan_id 判定，包含开仓与止盈平仓
+        function isAhr999Record(record) {
+            if (!record) return false;
+            const source = String(record.source || '').trim().toLowerCase();
+            const planId = String(record.plan_id || '').trim().toLowerCase();
+            return source === 'ahr999_dca' || planId.startsWith('ahr999_');
+        }
+
         function calculateRecordProfit(trade) {
             const explicit = Number(trade?.profit);
             if (Number.isFinite(explicit)) return explicit;
@@ -4124,7 +4132,9 @@
             const bottomData = (data && data.bottom) || latestBottomPositionData || {};
             updateSpotAssetCard();
 
-            const records = (bottomData.trade_records || []).filter(record => record && typeof record === 'object');
+            const records = (bottomData.trade_records || []).filter(
+                record => record && typeof record === 'object' && !isAhr999Record(record)
+            );
             const closedRecords = records.filter(record => record.is_closed);
             const realized = closedRecords.reduce((total, record) => total + (Number(record.profit) || 0), 0);
             setAssetText('asset-spot-realized', closedRecords.length ? formatSignedMoney(realized, 2) : '$0.00',
@@ -4162,7 +4172,9 @@
         // 更新摸顶策略数据
         function updateTopData(data) {
             const topData = data.top || {};
-            const records = topData.trade_records || [];
+            // AHR999 定投（摸底）记录归入本模块；现货记录仍留在「现货」模块
+            const ahr999Records = ((data.bottom || {}).trade_records || []).filter(isAhr999Record);
+            const records = (topData.trade_records || []).concat(ahr999Records);
             latestTopPositionData = topData;
 
             // 更新状态徽章
@@ -4218,7 +4230,8 @@
         // 更新抄底策略数据
         function updateBottomData(data) {
             const bottomData = data.bottom || {};
-            const records = bottomData.trade_records || [];
+            // 现货模块只展示现货记录；AHR999 定投记录在「摸顶摸底策略」模块展示
+            const records = (bottomData.trade_records || []).filter(record => !isAhr999Record(record));
             latestBottomPositionData = bottomData;
 
             // 更新状态徽章
