@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections import Counter
 
 SCHEMA_VERSION = 1
-UPDATED_AT = '2026-11-02'
+UPDATED_AT = '2026-11-06'
 
 STATUS_LABELS = {
     'live': '已上线',
@@ -138,8 +138,8 @@ LAYERS = [
              'desc': 'AHR999 抄底定投实盘（AHR999<0.45 每日检查，按 UM 账户 BTC 余额的 2%/次加仓；目标每日动态读取）',
              'caps': ['AHR999 条件定投', '动态目标', '旧计划停用']},
             {'id': 'web', 'name': 'Web 面板', 'status': 'live', 'service': 'web',
-             'desc': '本页所在：交易/帖子/盈亏/系统骨架/博客；头部 AHR999 + 200MA 牛熊分界线；策略健康 long/short 合并对照',
-             'caps': ['登录门禁', 'AHR999 估值', '200MA 牛熊线', '摸顶摸底盈亏']},
+             'desc': '本页所在：交易/帖子/盈亏/系统骨架/博客；头部 AHR999 + 200MA 牛熊分界线；策略健康 long/short 合并对照；摸顶摸底模块展示 AHR999 定投仓位',
+             'caps': ['登录门禁', 'AHR999 估值', '200MA 牛熊线', '摸顶摸底盈亏', 'AHR999 定投仓位']},
             {'id': 'blog', 'name': '博客（公开页）', 'status': 'live',
              'desc': 'Hexo 全量迁移（2026-10-19）：公开 /blog + 看板入口；Python 渲染（Markdown/Pygments），独立于交易链路',
              'caps': ['公开访问', '91 篇文章']},

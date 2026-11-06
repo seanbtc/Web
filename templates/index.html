@@ -2478,6 +2478,27 @@
                             <div class="text-md font-bold dashboard-metric-value" id="bottom-float-profit">$0.00</div>
                         </div>
                     </div>
+                    <div class="mt-3 rounded-lg p-3 dashboard-stat-card" id="bottom-ahr999-block" style="display: none; background-color: #fffbeb; border: 1px solid #fde68a;">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="text-xs font-semibold text-dark">AHR999 定投仓位 <span class="text-gray-500 font-normal">BTCUSD1 合约</span></div>
+                            <span class="px-2 py-0.5 rounded-full text-xs font-semibold" id="bottom-ahr999-status" style="background-color: #fef3c7; color: #92400e;">-</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-3">
+                            <div class="bg-white rounded-lg p-2">
+                                <div class="text-xs text-gray-500 mb-1">定投数量</div>
+                                <div class="text-md font-bold text-dark" id="bottom-ahr999-quantity"></div>
+                            </div>
+                            <div class="bg-white rounded-lg p-2">
+                                <div class="text-xs text-gray-500 mb-1">定投均价</div>
+                                <div class="text-md font-bold text-dark" id="bottom-ahr999-avg-price">$</div>
+                            </div>
+                            <div class="bg-white rounded-lg p-2">
+                                <div class="text-xs text-gray-500 mb-1">浮盈</div>
+                                <div class="text-md font-bold" id="bottom-ahr999-float-profit">$0.00</div>
+                            </div>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-2" id="bottom-ahr999-detail"></div>
+                    </div>
                 </div>
             </div>
 
@@ -3947,6 +3968,7 @@
         function refreshTopBottomFloatingProfits() {
             updateFloatingProfit('top-float-profit', latestTopPositionData, '');
             updateFloatingProfit('bottom-float-profit', latestBottomPositionData, 'long');
+            updateAhr999Position(latestBottomPositionData);
             updateSpotAssetCard();
             updateTopAssetCard();
             updateAssetCompositionChart();
@@ -4223,8 +4245,34 @@
 
             // 浮盈 = 当前 BTC 价格与持仓均价的价差 × 持仓数量
             updateFloatingProfit('bottom-float-profit', bottomData, 'long');
+            updateAhr999Position(bottomData);
 
             renderTopBottomTable('bottom-tbody', records);
+        }
+
+        // AHR999 定投仓位（独立子块：不并入手工维护的现货持仓）
+        function updateAhr999Position(bottomData) {
+            const block = document.getElementById('bottom-ahr999-block');
+            if (!block) return;
+            const ahr999 = bottomData && bottomData.ahr999;
+            const quantity = Number(ahr999?.position_quantity) || 0;
+            const hasPosition = !!ahr999 && quantity > 0;
+            block.style.display = hasPosition ? '' : 'none';
+            if (!hasPosition) return;
+
+            const quantityEl = document.getElementById('bottom-ahr999-quantity');
+            if (quantityEl) quantityEl.textContent = formatQuantity(quantity) + ' BTC';
+            const avgPriceEl = document.getElementById('bottom-ahr999-avg-price');
+            if (avgPriceEl) avgPriceEl.textContent = formatMoney(Number(ahr999.position_avg_price) || 0);
+            const statusEl = document.getElementById('bottom-ahr999-status');
+            if (statusEl) statusEl.textContent = ahr999.status || '定投中';
+            updateFloatingProfit('bottom-ahr999-float-profit', ahr999, 'long');
+
+            const detailParts = [];
+            if (ahr999.execution_mode_text) detailParts.push(ahr999.execution_mode_text);
+            if (ahr999.next_due_time) detailParts.push('下次检查 ' + ahr999.next_due_time);
+            const detailEl = document.getElementById('bottom-ahr999-detail');
+            if (detailEl) detailEl.textContent = detailParts.join(' · ');
         }
 
         // 通用渲染: 周期 | 模式 | 仓位 | 开仓均价 | 平仓均价 | 状态 | 平仓时间 | 盈亏

@@ -3023,6 +3023,44 @@ class DataStorage:
         self.update_global_data()
         save_bottom_data(self.bottom_data)
         return True
+
+    def update_top_bottom_summary(self, data):
+        """AutoDCA 计划摘要同步：只把 AHR999 定投仓位写入独立子块。
+
+        手工维护的现货持仓字段（position_* / status / trade_records）保持不变；
+        其它定投计划（现货定投等）的摘要直接忽略，避免覆盖现货持仓。
+        """
+        if not isinstance(data, dict):
+            return False
+        plan_id = str(data.get('plan_id') or '').strip()
+        if not plan_id.startswith('ahr999_'):
+            return False
+
+        direction = str(data.get('direction') or '').strip().lower()
+        summary = {
+            'plan_id': plan_id,
+            'symbol': str(data.get('position_symbol') or '').strip(),
+            'status': str(data.get('position_status') or '').strip(),
+            'position_quantity': _to_float(data.get('position_quantity'), 0.0),
+            'position_avg_price': _to_float(data.get('position_avg_price'), 0.0),
+            'position_side': 'long' if direction == 'long' else direction,
+            'execution_mode': str(data.get('execution_mode') or '').strip(),
+            'execution_mode_text': str(data.get('execution_mode_text') or '').strip(),
+            'dca_progress': _to_float(data.get('dca_progress'), 0.0),
+            'remaining_quantity': _to_float(data.get('remaining_quantity'), 0.0),
+            'next_due_time': str(data.get('next_due_time') or '').strip(),
+        }
+
+        current = self.bottom_data.get('ahr999')
+        if isinstance(current, dict):
+            previous = {key: value for key, value in current.items() if key != 'updated_at'}
+            if previous == summary:
+                return False
+        summary['updated_at'] = time.strftime('%Y-%m-%d %H:%M:%S')
+        self.bottom_data['ahr999'] = summary
+        save_bottom_data(self.bottom_data)
+        self.update_global_data()
+        return True
     
     def get_all_data(self):
         return {
@@ -3211,8 +3249,17 @@ def add_top_bottom_trade():
 @app.route('/api/update_top_bottom', methods=['POST'])
 @require_api_token
 def update_top_bottom():
-    """计划摘要同步占位：不改动手工维护的持仓字段，仅返回成功（兼容 AutoDCA 调用）。"""
-    return jsonify({'status': 'success', 'updated': 0})
+    """AutoDCA 计划摘要同步：仅 AHR999 定投仓位落到 bottom_data['ahr999']。
+
+    手工维护的现货持仓字段不动；非 ahr999_ 计划返回 success/updated=0（兼容调用方）。
+    """
+    data = request.json
+    if not isinstance(data, dict):
+        return jsonify({'status': 'error', 'message': 'JSON 对象必填'}), 400
+    updated = data_storage.update_top_bottom_summary(data)
+    if updated:
+        socketio.emit('all_data', data_storage.get_all_data())
+    return jsonify({'status': 'success', 'updated': 1 if updated else 0})
 
 
 @app.route('/api/update_bottom', methods=['POST'])
