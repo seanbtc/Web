@@ -3005,12 +3005,19 @@ class DataStorage:
         return True
 
     def add_top_bottom_trade(self, record):
-        """追加一条摸顶摸底记录（AutoDCA 定投/止盈同步用；按 source+plan_id+cycle 去重）。"""
+        """追加一条摸顶摸底记录（AutoDCA 定投/止盈同步用）。
+
+        去重键：source + plan_id + cycle + quantity + avg_price(+ slot) + is_closed。
+        同一 cycle 内可能多次加仓（数量/均价不同），不能只用 cycle 去重。
+        """
         if not isinstance(record, dict):
             return False
         source = str(record.get('source') or '').strip()
         plan_id = str(record.get('plan_id') or '').strip()
         cycle = str(record.get('cycle_id') or record.get('slot') or '').strip()
+        quantity = str(record.get('quantity') or '').strip()
+        avg_price = str(record.get('avg_price') or record.get('price') or '').strip()
+        slot = str(record.get('slot') or record.get('executed_at') or '').strip()
         bottom = self.bottom_top_data.setdefault('bottom', {})
         records = bottom.setdefault('trade_records', [])
         if source and plan_id:
@@ -3018,6 +3025,9 @@ class DataStorage:
                 if (str(item.get('source') or '') == source
                         and str(item.get('plan_id') or '') == plan_id
                         and str(item.get('cycle_id') or item.get('slot') or '') == cycle
+                        and str(item.get('quantity') or '') == quantity
+                        and str(item.get('avg_price') or item.get('price') or '') == avg_price
+                        and str(item.get('slot') or item.get('executed_at') or '') == slot
                         and bool(item.get('is_closed')) == bool(record.get('is_closed'))):
                     return False
         payload = dict(record)

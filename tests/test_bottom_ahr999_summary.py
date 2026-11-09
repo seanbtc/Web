@@ -129,6 +129,11 @@ def test_add_ahr999_record_writes_bottom_top_only(client, isolated_data_dir):
     assert not (isolated_data_dir / 'spot_trades.json').exists()
     # 重复记录去重
     assert client.post('/api/add_top_bottom_trade', json=record).get_json()['added'] is False
+    # 同一 cycle 的第二次加仓（数量/均价不同）必须单独记录
+    second = dict(record, quantity=0.0237, avg_price=75909.9)
+    assert client.post('/api/add_top_bottom_trade', json=second).get_json()['added'] is True
+    assert len(web.data_storage.bottom_top_data['bottom']['trade_records']) == 2
+    assert client.post('/api/add_top_bottom_trade', json=second).get_json()['added'] is False
 
 
 def test_update_spot_writes_spot_file_only(client, isolated_data_dir):
