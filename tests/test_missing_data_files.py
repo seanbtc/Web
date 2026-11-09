@@ -34,6 +34,8 @@ def test_other_loaders_default_when_missing(empty_data_dir):
     assert web.load_total_profit_data()['trade_records'] == []
     assert web.load_triangle_data()['trade_records'] == []
     assert web.load_arbitrage_data()['trade_records'] == []
-    assert web.load_top_data()['trade_records'] == []
-    assert web.load_bottom_data()['trade_records'] == []
+    bottom_top = web.load_bottom_top_data()
+    assert bottom_top['top']['trade_records'] == []
+    assert bottom_top['bottom']['trade_records'] == []
+    assert web.load_spot_data()['trade_records'] == []
     assert web.load_promo_posts() == []

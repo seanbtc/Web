@@ -67,9 +67,11 @@ def test_get_data_payload_contains_assets_sources(client):
     resp = client.get('/api/get_data')
     assert resp.status_code == 200
     payload = resp.get_json()
-    assert 'bottom' in payload and 'lead' in payload
-    bottom = payload['bottom'] or {}
-    assert 'position_quantity' in bottom and 'trade_records' in bottom
+    assert 'spot' in payload and 'bottom_top' in payload and 'lead' in payload
+    spot = payload['spot'] or {}
+    assert 'position_quantity' in spot and 'trade_records' in spot
+    bottom_top = payload['bottom_top'] or {}
+    assert 'top' in bottom_top and 'bottom' in bottom_top
     lead = payload['lead'] or {}
     assert isinstance(lead.get('summary'), dict)
 
