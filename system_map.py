@@ -158,9 +158,9 @@ LAYERS = [
         'subtitle': '周期判断与知识沉淀',
         'nodes': [
             {'id': 'alphaengine', 'name': 'AlphaEngine', 'status': 'live', 'service': 'alphaengine',
-             'desc': '周期 / alpha 分析（AI + 知识库）',
-             'caps': ['影子账本', '节奏门控（关）', '反馈闭环（命题/成绩单）',
-                      '风险预算（dry-run）']},
+             'desc': '0–1 市场估值评估（AI 直接输出，0=极度低估 1=极度高估）+ 知识库；无仓位/无发单',
+             'caps': ['0–1 估值', '四档口径（极度/轻度 低估·高估）', '反馈闭环（命题/成绩单）',
+                      '估值历史/预测审计']},
             {'id': 'aiservice', 'name': 'AIService', 'status': 'live', 'service': 'aiservice',
              'desc': '统一 AI 网关（模型/Key/用量集中）', 'caps': ['Key 轮换', '用量日志']},
             {'id': 'kb', 'name': 'KnowledgeBase + kbbot', 'status': 'live', 'service': 'kbbot',

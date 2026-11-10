@@ -76,44 +76,56 @@ AHR999_DAILY_REFRESH_UTC_MINUTE = 5
 _ahr999_last_good = None
 
 
-ALPHA_ENGINE_REGIME_LABELS = {
-    'BEAR_BOTTOM': '熊底',
-    'RECOVERY': '牛初',
-    'BULL': '牛中',
-    'DEEP_BULL': '牛顶',
-    'BULL_COOLING': '转熊',
-    'BEAR': '熊中',
-    'BEAR_DEEP': '深熊',
-}
+ALPHA_ENGINE_VALUATION_LABELS = ('极度低估', '轻度低估', '轻度高估', '极度高估')
+ALPHA_ENGINE_VALUATION_UNAVAILABLE = '未评估'
 
 
-def load_alpha_engine_regime():
-    """只读 AlphaEngine 的 regime.current，不修改其项目或状态文件。"""
+def load_alpha_engine_valuation():
+    """只读 AlphaEngine 的 0–1 市场估值 (state.valuation), 不修改其状态文件。
+
+    返回 {value, label, confidence, updated_at} 或 None (未评估/非法/不可读)。
+    估值非法 (非数值/越界) 时返回 None —— 前端显示"未评估"而不是 0。
+    """
     try:
         with open(alpha_engine_state_file, 'r', encoding='utf-8') as state_file:
             state_data = json.load(state_file)
-        regime_data = state_data.get('regime', {}) if isinstance(state_data, dict) else {}
-        current = regime_data.get('current') if isinstance(regime_data, dict) else None
-        if current is None and isinstance(state_data, dict):
-            current = state_data.get('current')
-        current = str(current or '').strip().upper()
-        return current if current in ALPHA_ENGINE_REGIME_LABELS else ''
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
-        return ''
+        return None
+    if not isinstance(state_data, dict):
+        return None
+    valuation = state_data.get('valuation')
+    if not isinstance(valuation, dict):
+        return None
+    current = valuation.get('current')
+    if isinstance(current, bool) or not isinstance(current, (int, float)):
+        return None
+    value = float(current)
+    if not (0.0 <= value <= 1.0):
+        return None
+    label = str(valuation.get('label') or '').strip()
+    if label not in ALPHA_ENGINE_VALUATION_LABELS:
+        label = valuation_band_label(value)
+    return {
+        'value': round(value, 4),
+        'label': label,
+        'confidence': str(valuation.get('confidence') or '').strip(),
+        'updated_at': str(valuation.get('updated_at') or '').strip(),
+    }
 
 
-def load_alpha_engine_alpha():
-    """只读 AlphaEngine 的 alpha.current，不修改其项目或状态文件。"""
+def valuation_band_label(value):
+    """0–1 估值 → 中文档位 (与 AlphaEngine/Web 口径一致, 左闭右开)。"""
     try:
-        with open(alpha_engine_state_file, 'r', encoding='utf-8') as state_file:
-            state_data = json.load(state_file)
-        alpha_data = state_data.get('alpha', {}) if isinstance(state_data, dict) else {}
-        current = alpha_data.get('current') if isinstance(alpha_data, dict) else None
-        if current is None:
-            current = state_data.get('alpha', state_data.get('alpha.current'))
-        return float(current) if current is not None else 0.0
-    except (OSError, json.JSONDecodeError, TypeError, ValueError):
-        return 0.0
+        number = float(value)
+    except (TypeError, ValueError):
+        return ALPHA_ENGINE_VALUATION_UNAVAILABLE
+    if number < 0.2:
+        return '极度低估'
+    if number < 0.5:
+        return '轻度低估'
+    if number < 0.8:
+        return '轻度高估'
+    return '极度高估'
 
 
 def load_alpha_engine_ma():
@@ -145,10 +157,6 @@ def load_alpha_engine_ma():
         return None
 
 
-def alpha_engine_regime_label(regime):
-    return ALPHA_ENGINE_REGIME_LABELS.get(regime, '未知')
-
-
 def alpha_engine_ma_signature(ma):
     """K 线趋势变化指纹 (available/zone/as_of 任一变化即算变化); 非 dict → None。"""
     if not isinstance(ma, dict):
@@ -156,19 +164,20 @@ def alpha_engine_ma_signature(ma):
     return (bool(ma.get('available')), ma.get('zone'), ma.get('as_of'))
 
 
-def alpha_engine_update_changed(market_data, new_regime, new_alpha, new_ma):
-    """regime / alpha / K 线趋势 任一变化 → 需要推送前端。"""
+def alpha_engine_valuation_signature(valuation):
+    """估值变化指纹 (值/档位/置信/更新时间任一变化即算变化); 非 dict → None。"""
+    if not isinstance(valuation, dict):
+        return None
+    return (round(float(valuation.get('value')), 4), valuation.get('label'),
+            valuation.get('confidence'), valuation.get('updated_at'))
+
+
+def alpha_engine_update_changed(market_data, new_valuation, new_ma):
+    """估值 / K 线趋势 任一变化 → 需要推送前端。"""
     if not isinstance(market_data, dict):
         return True
-    if market_data.get('alpha_engine_regime') != new_regime:
-        return True
-    if market_data.get('cycle') != alpha_engine_regime_label(new_regime):
-        return True
-    try:
-        old_alpha = float(market_data.get('alpha_engine_alpha', 0.0))
-    except (TypeError, ValueError):
-        old_alpha = 0.0
-    if abs(old_alpha - new_alpha) > 0.001:
+    if (alpha_engine_valuation_signature(market_data.get('alpha_engine_valuation'))
+            != alpha_engine_valuation_signature(new_valuation)):
         return True
     return (alpha_engine_ma_signature(market_data.get('alpha_engine_ma'))
             != alpha_engine_ma_signature(new_ma))
@@ -2070,29 +2079,28 @@ def check_file_updates():
     
     while True:
         try:
-            # 只读 AlphaEngine 状态，并在其状态变更后推送新的中文阶段和alpha值
+            # 只读 AlphaEngine 状态，并在其状态变更后推送新的估值与 K 线趋势
             if os.path.exists(alpha_engine_state_file):
                 current_modified = os.path.getmtime(alpha_engine_state_file)
                 if current_modified > last_modified_alpha_engine:
-                    new_regime = load_alpha_engine_regime()
-                    new_alpha = load_alpha_engine_alpha()
+                    new_valuation = load_alpha_engine_valuation()
                     new_ma = load_alpha_engine_ma()
-                    if new_regime:
-                        last_modified_alpha_engine = current_modified
-                        new_cycle = alpha_engine_regime_label(new_regime)
-                        if alpha_engine_update_changed(data_storage.market_data,
-                                                       new_regime, new_alpha, new_ma):
-                            data_storage.update_market_data({
-                                'cycle': new_cycle,
-                                'alpha_engine_regime': new_regime,
-                                'alpha_engine_alpha': new_alpha,
-                                'alpha_engine_ma': new_ma,
-                            })
-                            socketio.emit('market_update', {
-                                'market_data': data_storage.market_data,
-                                'strategy_status': data_storage.strategy_status,
-                            })
-                            print(f'AlphaEngine 已更新: {new_regime} -> {new_cycle}, alpha={new_alpha:+.4f}')
+                    last_modified_alpha_engine = current_modified
+                    if alpha_engine_update_changed(data_storage.market_data,
+                                                   new_valuation, new_ma):
+                        data_storage.update_market_data({
+                            'alpha_engine_valuation': new_valuation,
+                            'alpha_engine_ma': new_ma,
+                        })
+                        socketio.emit('market_update', {
+                            'market_data': data_storage.market_data,
+                            'strategy_status': data_storage.strategy_status,
+                        })
+                        if new_valuation:
+                            print(f"AlphaEngine 估值已更新: {new_valuation['value']:.2f} "
+                                  f"{new_valuation['label']}")
+                        else:
+                            print('AlphaEngine 状态已更新: 估值未评估')
 
             # 检查总盈亏数据文件
             if os.path.exists(total_profit_file_path):
@@ -2258,9 +2266,7 @@ triangle_summary = triangle_data.get('summary', {
     'initial_funds': 1000.0
 })
 
-alpha_engine_regime = load_alpha_engine_regime()
-alpha_engine_cycle = alpha_engine_regime_label(alpha_engine_regime)
-alpha_engine_alpha = load_alpha_engine_alpha()
+alpha_engine_valuation = load_alpha_engine_valuation()
 alpha_engine_ma = load_alpha_engine_ma()
 
 # 定期获取 BTC 价格（DataFeed 优先 → Binance API → CoinGecko 回退）
@@ -2435,9 +2441,7 @@ global_data = {
         'spot': spot_file_data.get('status', '清仓'),
     },
 'market_data': {
-        'cycle': alpha_engine_cycle,
-        'alpha_engine_regime': alpha_engine_regime,
-        'alpha_engine_alpha': alpha_engine_alpha,
+        'alpha_engine_valuation': alpha_engine_valuation,
         'alpha_engine_ma': alpha_engine_ma,
         'ahr999': None,
         'btc_price': 58000.0
@@ -2940,12 +2944,8 @@ class DataStorage:
         return False
     
     def update_market_data(self, data):
-        if 'cycle' in data:
-            self.market_data['cycle'] = data['cycle']
-        if 'alpha_engine_regime' in data:
-            self.market_data['alpha_engine_regime'] = data['alpha_engine_regime']
-        if 'alpha_engine_alpha' in data:
-            self.market_data['alpha_engine_alpha'] = data['alpha_engine_alpha']
+        if 'alpha_engine_valuation' in data:
+            self.market_data['alpha_engine_valuation'] = data['alpha_engine_valuation']
         if 'alpha_engine_ma' in data:
             self.market_data['alpha_engine_ma'] = data['alpha_engine_ma']
         if 'ahr999' in data:

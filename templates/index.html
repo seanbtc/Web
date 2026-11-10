@@ -149,13 +149,13 @@
             font-weight: 500;
         }
         #btc-price,
-        #alpha-value,
+        #alpha-valuation,
         #current-time {
             color: var(--text-primary) !important;
             letter-spacing: -0.01em;
             text-shadow: none;
         }
-        #market-cycle,
+        #alpha-valuation,
         #alpha-ma-zone,
         #runtime {
             background: rgba(255, 255, 255, 0.82);
@@ -235,9 +235,9 @@
             color: #334155 !important;
             border-color: rgba(71, 85, 105, 0.38) !important;
         }
-        /* 价格 / α 统一成与 AHR999、200MA 一致的胶囊样式 */
+        /* 价格 / 市场估值统一成与 AHR999、200MA 一致的胶囊样式 */
         #btc-price,
-        #alpha-value {
+        #alpha-valuation {
             color: var(--text-primary) !important;
             border: 1px solid rgba(17, 17, 17, 0.08);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
@@ -247,74 +247,31 @@
         #btc-price.price-pill {
             background: rgba(255, 255, 255, 0.82);
         }
-        #alpha-value.alpha-pos {
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(16, 185, 129, 0.26)) !important;
-            color: #166534 !important;
-            border-color: rgba(34, 197, 94, 0.38) !important;
+        /* 估值档位: 0–0.2 极度低估 / 0.2–0.5 轻度低估 / 0.5–0.8 轻度高估 / 0.8–1 极度高估 */
+        #alpha-valuation.val-deep-low {
+            background: linear-gradient(135deg, rgba(22, 163, 74, 0.22), rgba(16, 185, 129, 0.30)) !important;
+            color: #14532d !important;
+            border-color: rgba(22, 163, 74, 0.42) !important;
         }
-        #alpha-value.alpha-neg {
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(220, 38, 38, 0.24)) !important;
-            color: #991b1b !important;
-            border-color: rgba(239, 68, 68, 0.38) !important;
-        }
-        #alpha-value.alpha-flat {
-            background: linear-gradient(135deg, rgba(100, 116, 139, 0.18), rgba(71, 85, 105, 0.24)) !important;
-            color: #334155 !important;
-            border-color: rgba(71, 85, 105, 0.38) !important;
-        }
-        #market-cycle.bull {
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(16, 185, 129, 0.26)) !important;
-            color: #166534 !important;
-            border-color: rgba(34, 197, 94, 0.38) !important;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 18px rgba(34, 197, 94, 0.12);
-        }
-        #market-cycle.bear {
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(220, 38, 38, 0.23)) !important;
-            color: #991b1b !important;
-            border-color: rgba(239, 68, 68, 0.38) !important;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 18px rgba(239, 68, 68, 0.12);
-        }
-        #market-cycle.cycle-bear-bottom {
-            background: linear-gradient(135deg, rgba(100, 116, 139, 0.18), rgba(71, 85, 105, 0.24)) !important;
-            color: #334155 !important;
-            border-color: rgba(71, 85, 105, 0.38) !important;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 18px rgba(71, 85, 105, 0.12);
-        }
-        #market-cycle.cycle-recovery {
+        #alpha-valuation.val-low {
             background: linear-gradient(135deg, rgba(20, 184, 166, 0.18), rgba(13, 148, 136, 0.24)) !important;
             color: #0f766e !important;
             border-color: rgba(13, 148, 136, 0.38) !important;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 18px rgba(13, 148, 136, 0.12);
         }
-        #market-cycle.cycle-bull {
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(22, 163, 74, 0.24)) !important;
-            color: #166534 !important;
-            border-color: rgba(22, 163, 74, 0.38) !important;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 18px rgba(22, 163, 74, 0.12);
-        }
-        #market-cycle.cycle-deep-bull {
-            background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.28)) !important;
-            color: #92400e !important;
-            border-color: rgba(245, 158, 11, 0.42) !important;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 18px rgba(245, 158, 11, 0.14);
-        }
-        #market-cycle.cycle-bull-cooling {
-            background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(234, 88, 12, 0.28)) !important;
+        #alpha-valuation.val-high {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.18), rgba(234, 88, 12, 0.24)) !important;
             color: #9a3412 !important;
-            border-color: rgba(234, 88, 12, 0.42) !important;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 18px rgba(234, 88, 12, 0.14);
+            border-color: rgba(234, 88, 12, 0.40) !important;
         }
-        #market-cycle.cycle-bear {
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(185, 28, 28, 0.28)) !important;
+        #alpha-valuation.val-deep-high {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.20), rgba(185, 28, 28, 0.28)) !important;
             color: #991b1b !important;
             border-color: rgba(185, 28, 28, 0.42) !important;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 18px rgba(185, 28, 28, 0.14);
         }
-        #market-cycle.cycle-bear-deep {
-            background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(109, 40, 217, 0.28)) !important;
-            color: #5b21b6 !important;
-            border-color: rgba(109, 40, 217, 0.42) !important;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 18px rgba(109, 40, 217, 0.14);
+        #alpha-valuation.val-na {
+            background: linear-gradient(135deg, rgba(100, 116, 139, 0.18), rgba(71, 85, 105, 0.24)) !important;
+            color: #334155 !important;
+            border-color: rgba(71, 85, 105, 0.38) !important;
         }
         h1 {
             font-size: 1.48rem;
@@ -751,7 +708,7 @@
                 margin-right: 0.8rem !important;
             }
 
-            #market-cycle,
+            #alpha-valuation,
             #alpha-ma-zone,
             #ahr999-value,
             #runtime {
@@ -761,7 +718,7 @@
             }
 
             #btc-price,
-            #alpha-value,
+            #alpha-valuation,
             #current-time {
                 font-size: 0.83rem !important;
                 line-height: 1.05rem;
@@ -1737,18 +1694,13 @@
         <div class="container mx-auto px-4 py-3 flex flex-col md:flex-row items-start md:items-center justify-between">
             <div class="flex flex-wrap items-center mb-3 md:mb-0">
                 <div class="flex items-center mr-6">
-                    <span class="text-sm font-semibold text-gray-700 mr-2">比特币周期:</span>
-                    <span class="px-3 py-1 rounded-full text-sm font-semibold flex items-center" id="market-cycle">
-                        <i class="fa fa-question-circle mr-1"></i> 未知
-                    </span>
+                    <span class="text-sm font-semibold text-gray-700 mr-2">市场估值:</span>
+                    <span class="px-3 py-1 rounded-full text-sm font-semibold flex items-center val-na" id="alpha-valuation"
+                          title="AlphaEngine 0–1 市场估值 (0=极度低估, 1=极度高估) · 数据不可用">— 未评估</span>
                 </div>
                 <div class="flex items-center">
                     <span class="text-sm font-semibold text-gray-700 mr-2">价格:</span>
                     <span class="px-3 py-1 rounded-full text-sm font-semibold price-pill" id="btc-price">$68,888.00</span>
-                </div>
-                <div class="flex items-center ml-4">
-                    <span class="text-sm font-semibold text-gray-700 mr-2">α:</span>
-                    <span class="px-3 py-1 rounded-full text-sm font-semibold alpha-flat" id="alpha-value">+0.00</span>
                 </div>
                 <div class="flex items-center ml-4">
                     <span class="text-sm font-semibold text-gray-700 mr-2">AHR999:</span>
@@ -2677,7 +2629,7 @@
         let _lastYearlyFingerprint = '';
         let currentBtcPrice = null;
         // 渲染去重：避免每秒的行情推送把 header/图表整块重写（移动端会一直闪+掉帧）
-        const _marketRenderMemo = { cycle: '', price: '', alpha: '', ahr: '', ma: '', ma200: '' };
+        const _marketRenderMemo = { valuation: '', price: '', ahr: '', ma: '', ma200: '' };
         let _lastRuntimeText = '';
         let _lastAssetCompositionFingerprint = '';
         let _lastAssetCompositionAt = 0;
@@ -3701,41 +3653,48 @@
             
             const marketData = data.market_data;
             
-            // 更新市场周期（内容不变时跳过，避免每秒重置 class/innerHTML）
-            const cycleElement = document.getElementById('market-cycle');
-            const cycleLabel = String(marketData.cycle || '未知');
-            const regimeKey = String(marketData.alpha_engine_regime || '').toUpperCase();
-            const cycleKey = `${cycleLabel}|${regimeKey}`;
-            if (cycleElement && cycleKey !== _marketRenderMemo.cycle) {
-                _marketRenderMemo.cycle = cycleKey;
-                cycleElement.className = 'px-3 py-1 rounded-full text-sm font-semibold flex items-center';
-                cycleElement.classList.remove(
-                    'bull', 'bear', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800',
-                    'cycle-bear-bottom', 'cycle-recovery', 'cycle-bull', 'cycle-deep-bull',
-                    'cycle-bull-cooling', 'cycle-bear', 'cycle-bear-deep'
-                );
-                const regimeClassMap = {
-                    'BEAR_BOTTOM': 'cycle-bear-bottom',
-                    'RECOVERY': 'cycle-recovery',
-                    'BULL': 'cycle-bull',
-                    'DEEP_BULL': 'cycle-deep-bull',
-                    'BULL_COOLING': 'cycle-bull-cooling',
-                    'BEAR': 'cycle-bear',
-                    'BEAR_DEEP': 'cycle-bear-deep'
-                };
-                const regimeClass = regimeClassMap[regimeKey];
-                if (regimeClass) {
-                    cycleElement.classList.add(regimeClass);
-                }
-                if (cycleLabel.startsWith('牛')) {
-                    cycleElement.innerHTML = `<i class="fa fa-arrow-up mr-1"></i> ${cycleLabel}`;
-                } else if (cycleLabel.startsWith('熊') || cycleLabel === '转熊') {
-                    cycleElement.innerHTML = `<i class="fa fa-arrow-down mr-1"></i> ${cycleLabel}`;
-                } else {
-                    cycleElement.innerHTML = `<i class="fa fa-question-circle mr-1"></i> ${cycleLabel}`;
+            // 更新市场估值 (0–1): 无数据 → 未评估, 不显示 0
+            const valuationEl = document.getElementById('alpha-valuation');
+            if (valuationEl) {
+                const valuationData = marketData.alpha_engine_valuation;
+                const hasValuation = !!(valuationData && typeof valuationData === 'object');
+                const valuationValue = hasValuation ? Number(valuationData.value) : NaN;
+                const valuationValid = hasValuation && Number.isFinite(valuationValue)
+                    && valuationValue >= 0 && valuationValue <= 1;
+                const valuationLabel = valuationValid
+                    ? String(valuationData.label || '').trim()
+                    : '未评估';
+                const valuationKey = valuationValid
+                    ? `v|${valuationValue.toFixed(2)}|${valuationLabel}`
+                    : 'unassessed';
+                if (valuationKey !== _marketRenderMemo.valuation) {
+                    _marketRenderMemo.valuation = valuationKey;
+                    const bandClassMap = {
+                        '极度低估': 'val-deep-low',
+                        '轻度低估': 'val-low',
+                        '轻度高估': 'val-high',
+                        '极度高估': 'val-deep-high'
+                    };
+                    const bandClass = valuationValid
+                        ? (bandClassMap[valuationLabel] || 'val-na')
+                        : 'val-na';
+                    valuationEl.className = `px-3 py-1 rounded-full text-sm font-semibold flex items-center ${bandClass}`;
+                    valuationEl.textContent = valuationValid
+                        ? `${valuationValue.toFixed(2)} ${valuationLabel}`
+                        : '— 未评估';
+                    const parts = ['AlphaEngine 市场估值 (0=极度低估, 1=极度高估)'];
+                    if (valuationValid) {
+                        parts.push(`估值 ${valuationValue.toFixed(2)}`);
+                        if (valuationLabel) parts.push(valuationLabel);
+                        if (valuationData.confidence) parts.push(`置信 ${valuationData.confidence}`);
+                        if (valuationData.updated_at) parts.push(`更新于 ${valuationData.updated_at}`);
+                    } else {
+                        parts.push('尚无可用的 AI 估值');
+                    }
+                    valuationEl.title = parts.join(' · ');
                 }
             }
-            
+
             // 更新 BTC 价格
             const nextBtcPrice = Number(marketData.btc_price);
             if (Number.isFinite(nextBtcPrice) && nextBtcPrice > 0) {
@@ -3745,24 +3704,6 @@
                 if (priceElement && priceText !== _marketRenderMemo.price) {
                     _marketRenderMemo.price = priceText;
                     priceElement.textContent = priceText;
-                }
-            }
-
-            // 更新 Alpha 值
-            const alphaVal = Number(marketData.alpha_engine_alpha);
-            if (Number.isFinite(alphaVal)) {
-                const alphaElement = document.getElementById('alpha-value');
-                if (alphaElement) {
-                    const sign = alphaVal >= 0 ? '+' : '';
-                    const alphaText = `${sign}${alphaVal.toFixed(2)}`;
-                    const alphaClass = 'px-3 py-1 rounded-full text-sm font-semibold '
-                        + (alphaVal > 0 ? 'alpha-pos' : alphaVal < 0 ? 'alpha-neg' : 'alpha-flat');
-                    const alphaKey = `${alphaText}|${alphaClass}`;
-                    if (alphaKey !== _marketRenderMemo.alpha) {
-                        _marketRenderMemo.alpha = alphaKey;
-                        alphaElement.textContent = alphaText;
-                        alphaElement.className = alphaClass;
-                    }
                 }
             }
 
