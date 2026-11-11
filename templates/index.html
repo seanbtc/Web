@@ -2093,7 +2093,10 @@
                         warning.textContent = g.warning || '';
                         warning.classList.toggle('hidden', !g.warning);
                     }
-                    set('grid-subtitle', (g.symbol || 'BTCUSDC') + ' · 只做多 · 间距 ' + fmt(g.distance, 0) + ' · 基准 ' + fmt(g.baseline, 0) + (g.updated_at ? ' · 更新 ' + g.updated_at : ''));
+                    const spacingText = (g.distance_pct !== null && g.distance_pct !== undefined)
+                        ? '间距 ' + g.distance_pct + '%'
+                        : '间距 ' + fmt(g.distance, 0);
+                    set('grid-subtitle', (g.symbol || 'BTCUSDC') + ' · 只做多 · ' + spacingText + ' · 基准 ' + fmt(g.baseline, 0) + (g.updated_at ? ' · 更新 ' + g.updated_at : ''));
                     set('grid-inventory', fmt(g.inventory, 4));
                     set('grid-unrealized', (g.unrealized === null || g.unrealized === undefined) ? '—' : (g.unrealized >= 0 ? '+' : '') + fmt(g.unrealized, 2));
                     set('grid-realized', (g.realized === null || g.realized === undefined) ? '—' : (g.realized >= 0 ? '+' : '') + fmt(g.realized, 2));

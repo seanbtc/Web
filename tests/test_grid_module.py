@@ -300,3 +300,5 @@ def test_index_shows_geometric_spacing(client, tmp_path, monkeypatch):
 
     assert '间距 0.5%' in html
     assert '74755.5' in html
+    # 轮询刷新也走几何口径（不能用旧的 g.distance）
+    assert 'g.distance_pct' in html
