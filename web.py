@@ -3574,27 +3574,48 @@ def _health_direction_display(name, branch):
 
 GRIDBOT_STATE_FILE = os.getenv('GRIDBOT_STATE_FILE') or os.path.join(
     os.path.dirname(os.path.abspath(__file__)), '..', 'GridBot', 'runtime', 'live_state.json')
+GRIDBOT_CONFIG_FILE = os.getenv('GRIDBOT_CONFIG_FILE') or os.path.join(
+    os.path.dirname(os.path.dirname(GRIDBOT_STATE_FILE)), 'config.live.json')
 GRIDBOT_SYMBOL = os.getenv('GRIDBOT_SYMBOL', 'BTCUSDC')
 _grid_price_cache = {'ts': 0.0, 'price': None}
 
 
+def _grid_config():
+    """只读 GridBot 运行配置（间距/止盈/价格精度/DataFeed）；缺失或损坏返回 {}。"""
+    try:
+        with open(GRIDBOT_CONFIG_FILE, 'r', encoding='utf-8') as handle:
+            config = json.load(handle)
+    except (OSError, ValueError):
+        return {}
+    return config if isinstance(config, dict) else {}
+
+
 def _grid_price(timeout=5.0):
-    """BTCUSDC 现价（30s 缓存；失败回退上次值/None，不阻塞页面）。"""
+    """BTCUSDC 现价（30s 缓存；Binance 直连失败 → DataFeed BTCUSDT 代理 → 上次值）。
+
+    服务器到 fapi.binance.com 偶发 DNS 失败；DataFeed 仅支持 BTCUSDT，
+    作为展示用代理价（与 BTCUSDC 价差通常 <10 USDC），不参与交易。
+    """
     now = time.time()
     cached = _grid_price_cache.get('price')
     if cached and now - float(_grid_price_cache.get('ts') or 0) < 30:
         return cached
-    try:
-        response = requests.get(
-            'https://fapi.binance.com/fapi/v1/ticker/price',
-            params={'symbol': GRIDBOT_SYMBOL}, timeout=timeout)
-        if response.status_code == 200:
-            price = float(response.json().get('price') or 0.0)
-            if price > 0:
-                _grid_price_cache.update(ts=now, price=price)
-                return price
-    except Exception:
-        pass
+    config = _grid_config()
+    datafeed = str(config.get('datafeed_url') or 'http://127.0.0.1:9550').rstrip('/')
+    candidates = (
+        ('https://fapi.binance.com/fapi/v1/ticker/price', {'symbol': GRIDBOT_SYMBOL}),
+        (f'{datafeed}/price', {'symbol': 'BTCUSDT'}),
+    )
+    for url, params in candidates:
+        try:
+            response = requests.get(url, params=params, timeout=timeout)
+            if response.status_code == 200:
+                price = float(response.json().get('price') or 0.0)
+                if price > 0:
+                    _grid_price_cache.update(ts=now, price=price)
+                    return price
+        except Exception:
+            continue
     return cached
 
 
@@ -3651,7 +3672,8 @@ def load_grid_state():
                 'realized': None, 'cycles': 0, 'realized_gross': None,
                 'realized_fees': None, 'last_realized': None, 'warning': '',
                 'last_fill': '', 'age_seconds': None, 'symbol': GRIDBOT_SYMBOL,
-                'baseline': 0.0, 'distance': 0.0, 'order_qty': 0.0, 'max_levels': 0,
+                'baseline': 0.0, 'distance': 0.0, 'distance_pct': None,
+                'order_qty': 0.0, 'max_levels': 0,
                 'paused': False, 'updated_at': ''}
 
     updated_raw = str(state.get('updated_at') or '')
@@ -3674,7 +3696,40 @@ def load_grid_state():
         status = '待触发'
 
     baseline = float(state.get('baseline') or 0.0)
-    distance = float(state.get('grid_distance') or 0.0)
+    config = _grid_config()
+    distance = float(state.get('grid_distance') or config.get('grid_distance') or 0.0)
+
+    def _optional_number(value):
+        try:
+            return float(value) if value is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    # 2026-11 起 GridBot 用 0.5% 几何间距（TP = entry×(1+pct)）；旧 state/配置回退线性
+    distance_pct = _optional_number(state.get('grid_distance_pct'))
+    if distance_pct is None:
+        distance_pct = _optional_number(config.get('grid_distance_pct'))
+    tp_distance = _optional_number(state.get('take_profit_distance'))
+    if tp_distance is None:
+        tp_distance = _optional_number(config.get('take_profit_distance'))
+    if tp_distance is None:
+        tp_distance = distance or _optional_number(config.get('grid_distance'))
+    price_tick = _optional_number(state.get('price_tick'))
+    if price_tick is None:
+        price_tick = _optional_number(config.get('price_tick'))
+
+    def _tp_from_entry(entry):
+        """与 GridBot.tp_price_from_entry 同口径：几何 entry×(1+pct)，线性 entry+tp_distance。"""
+        if distance_pct:
+            value = entry * (1 + distance_pct / 100.0)
+        elif tp_distance:
+            value = entry + tp_distance
+        else:
+            return None
+        if price_tick:
+            value = round(round(value / price_tick) * price_tick, 10)
+        return round(value, 2)
+
     lots = []
     for item in state.get('lots') or []:
         try:
@@ -3685,7 +3740,7 @@ def load_grid_state():
             continue
         if level < 1 or qty <= 0:
             continue
-        tp = round(baseline - (level - 1) * distance, 2) if baseline and distance else None
+        tp = _tp_from_entry(entry)
         sell_order_id = item.get('sell_order_id')
         lots.append({'level': level, 'entry': entry, 'qty': qty, 'tp': tp,
                      'sell_order_id': sell_order_id,
@@ -3750,7 +3805,7 @@ def load_grid_state():
 
     return {
         'available': True, 'status': status, 'symbol': str(state.get('symbol') or GRIDBOT_SYMBOL),
-        'baseline': baseline, 'distance': distance,
+        'baseline': baseline, 'distance': distance, 'distance_pct': distance_pct,
         'order_qty': float(state.get('order_qty') or 0.0),
         'max_levels': int(state.get('max_levels') or 0),
         'paused': bool(state.get('paused')), 'started': bool(state.get('started')),

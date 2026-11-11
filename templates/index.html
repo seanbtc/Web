@@ -1978,7 +1978,7 @@
                     <span class="text-xs text-gray-500 ml-auto" id="grid-age">{% if grid.age_seconds is not none %}{{ grid.age_seconds|round(0)|int }}s 前{% else %}—{% endif %}</span>
                 </div>
                 <div class="text-xs text-gray-500" id="grid-subtitle">
-                    {{ grid.symbol or 'BTCUSDC' }} · 只做多 · 间距 {{ '%.0f'|format(grid.distance or 0) }} · 基准 {{ '%.0f'|format(grid.baseline or 0) }}{% if grid.updated_at %} · 更新 {{ grid.updated_at }}{% endif %}
+                    {{ grid.symbol or 'BTCUSDC' }} · 只做多 · {% if grid.distance_pct %}间距 {{ '%g'|format(grid.distance_pct) }}%{% else %}间距 {{ '%.0f'|format(grid.distance or 0) }}{% endif %} · 基准 {{ '%.0f'|format(grid.baseline or 0) }}{% if grid.updated_at %} · 更新 {{ grid.updated_at }}{% endif %}
                 </div>
             </div>
 

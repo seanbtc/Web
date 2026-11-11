@@ -39,7 +39,7 @@ def _login(client):
     client.post('/login', data={'username': 'admin', 'password': 'test123'})
 
 
-def _write_state(tmp_path, monkeypatch, **overrides):
+def _write_state(tmp_path, monkeypatch, config=None, **overrides):
     state = {
         'symbol': 'BTCUSDC',
         'baseline': 81000.0,
@@ -57,6 +57,18 @@ def _write_state(tmp_path, monkeypatch, **overrides):
     path = tmp_path / 'live_state.json'
     path.write_text(json.dumps(state), encoding='utf-8')
     monkeypatch.setattr(web, 'GRIDBOT_STATE_FILE', str(path))
+    cfg = {
+        'symbol': 'BTCUSDC',
+        'grid_distance': 500.0,
+        'take_profit_distance': None,
+        'price_tick': 0.1,
+        'datafeed_url': 'http://127.0.0.1:9550',
+    }
+    cfg.update(config or {})
+    cfg_path = tmp_path / 'config.live.json'
+    cfg_path.write_text(json.dumps(cfg), encoding='utf-8')
+    monkeypatch.setattr(web, 'GRIDBOT_CONFIG_FILE', str(cfg_path))
+    web._grid_price_cache.update(ts=0.0, price=None)
     return path
 
 
@@ -97,12 +109,87 @@ def test_load_grid_state_running_with_lots(tmp_path, monkeypatch):
     assert view['status'] == '运行中'
     assert view['lot_count'] == 2
     assert view['inventory'] == pytest.approx(0.008)
-    # 默认止盈价 = 基准 - (层-1)*间距
+    # 线性模式（无 grid_distance_pct）：止盈价 = 买入价 + 间距
     assert view['lots'][0]['tp'] == pytest.approx(81000.0)
     assert view['lots'][1]['tp'] == pytest.approx(80500.0)
+    assert view['distance_pct'] is None
     # 浮盈 = (81000-80500)*0.004 + (81000-80000)*0.004
     assert view['unrealized'] == pytest.approx(6.0)
     assert view['next_buy']['level'] == 2
+
+
+def test_load_grid_state_geometric_tp(tmp_path, monkeypatch):
+    """0.5% 几何间距：TP = entry×1.005（与 GridBot.tp_price_from_entry 同口径）。"""
+    lots = [
+        {'level': 17, 'entry': 74383.6, 'qty': 0.006, 'sell_order_id': 83206091338},
+        {'level': 21, 'entry': 72907.1, 'qty': 0.006, 'sell_order_id': 90000000001},
+    ]
+    _write_state(tmp_path, monkeypatch, lots=lots,
+                 config={'grid_distance_pct': 0.5})
+    monkeypatch.setattr(web, '_grid_price', lambda timeout=5.0: 73575.0)
+
+    view = web.load_grid_state()
+
+    assert view['distance_pct'] == pytest.approx(0.5)
+    assert view['lots'][0]['tp'] == pytest.approx(74755.5)
+    assert view['lots'][1]['tp'] == pytest.approx(73271.6)
+    # 浮盈仍按买入价计算
+    assert view['unrealized'] == pytest.approx((73575.0 - 74383.6) * 0.006
+                                               + (73575.0 - 72907.1) * 0.006, abs=1e-4)
+
+
+def test_state_distance_pct_takes_precedence(tmp_path, monkeypatch):
+    """GridBot 后续若把 grid_distance_pct 写进 state，则优先于 config。"""
+    lots = [{'level': 17, 'entry': 74383.6, 'qty': 0.006, 'sell_order_id': 1}]
+    _write_state(tmp_path, monkeypatch, lots=lots, grid_distance_pct=0.5,
+                 config={'grid_distance_pct': None})
+    monkeypatch.setattr(web, '_grid_price', lambda timeout=5.0: 73575.0)
+
+    view = web.load_grid_state()
+
+    assert view['distance_pct'] == pytest.approx(0.5)
+    assert view['lots'][0]['tp'] == pytest.approx(74755.5)
+
+
+def test_grid_price_falls_back_to_datafeed(tmp_path, monkeypatch):
+    """Binance 直连失败（服务器 DNS 抖动）→ DataFeed BTCUSDT 代理价。"""
+    _write_state(tmp_path, monkeypatch)
+    calls = []
+
+    class _Resp:
+        status_code = 200
+
+        def __init__(self, price):
+            self._price = price
+
+        def json(self):
+            return {'price': str(self._price)}
+
+    def _fake_get(url, params=None, timeout=None):
+        calls.append(url)
+        if 'fapi.binance.com' in url:
+            raise RuntimeError('dns failure')
+        if '127.0.0.1:9550' in url:
+            return _Resp(73550.0)
+        raise AssertionError(url)
+
+    monkeypatch.setattr(web.requests, 'get', _fake_get)
+
+    assert web._grid_price() == pytest.approx(73550.0)
+    assert any('fapi.binance.com' in url for url in calls)
+    assert any('127.0.0.1:9550' in url for url in calls)
+
+
+def test_grid_price_returns_cached_when_all_sources_fail(tmp_path, monkeypatch):
+    _write_state(tmp_path, monkeypatch)
+    web._grid_price_cache.update(ts=0.0, price=70000.0)
+
+    def _fake_get(url, params=None, timeout=None):
+        raise RuntimeError('down')
+
+    monkeypatch.setattr(web.requests, 'get', _fake_get)
+
+    assert web._grid_price() == pytest.approx(70000.0)
 
 
 def test_load_grid_state_without_price_has_no_unrealized(tmp_path, monkeypatch):
@@ -200,3 +287,16 @@ def test_index_contains_grid_section(client, tmp_path, monkeypatch):
     assert 'id="grid-next-buy-id"' in html
     assert '已套利盈利' in html
     assert '/api/grid_status' in html
+
+
+def test_index_shows_geometric_spacing(client, tmp_path, monkeypatch):
+    _write_state(tmp_path, monkeypatch, lots=[
+        {'level': 17, 'entry': 74383.6, 'qty': 0.006, 'sell_order_id': 1}],
+        config={'grid_distance_pct': 0.5})
+    monkeypatch.setattr(web, '_grid_price', lambda timeout=5.0: 73575.0)
+    _login(client)
+
+    html = client.get('/').get_data(as_text=True)
+
+    assert '间距 0.5%' in html
+    assert '74755.5' in html
