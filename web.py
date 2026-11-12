@@ -3673,6 +3673,7 @@ def load_grid_state():
                 'realized_fees': None, 'last_realized': None, 'warning': '',
                 'last_fill': '', 'age_seconds': None, 'symbol': GRIDBOT_SYMBOL,
                 'baseline': 0.0, 'distance': 0.0, 'distance_pct': None,
+                'pause_below_price': None,
                 'order_qty': 0.0, 'max_levels': 0,
                 'paused': False, 'updated_at': ''}
 
@@ -3717,6 +3718,9 @@ def load_grid_state():
     price_tick = _optional_number(state.get('price_tick'))
     if price_tick is None:
         price_tick = _optional_number(config.get('price_tick'))
+    pause_below_price = _optional_number(state.get('pause_below_price'))
+    if pause_below_price is None:
+        pause_below_price = _optional_number(config.get('pause_below_price'))
 
     def _tp_from_entry(entry):
         """与 GridBot.tp_price_from_entry 同口径：几何 entry×(1+pct)，线性 entry+tp_distance。"""
@@ -3806,6 +3810,7 @@ def load_grid_state():
     return {
         'available': True, 'status': status, 'symbol': str(state.get('symbol') or GRIDBOT_SYMBOL),
         'baseline': baseline, 'distance': distance, 'distance_pct': distance_pct,
+        'pause_below_price': pause_below_price,
         'order_qty': float(state.get('order_qty') or 0.0),
         'max_levels': int(state.get('max_levels') or 0),
         'paused': bool(state.get('paused')), 'started': bool(state.get('started')),

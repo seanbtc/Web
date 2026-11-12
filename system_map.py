@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections import Counter
 
 SCHEMA_VERSION = 1
-UPDATED_AT = '2026-11-10'
+UPDATED_AT = '2026-11-13'
 
 STATUS_LABELS = {
     'live': '已上线',

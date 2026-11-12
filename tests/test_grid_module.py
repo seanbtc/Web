@@ -44,6 +44,7 @@ def _write_state(tmp_path, monkeypatch, config=None, **overrides):
         'symbol': 'BTCUSDC',
         'baseline': 81000.0,
         'grid_distance': 500.0,
+        'pause_below_price': 69000.0,
         'order_qty': 0.004,
         'max_levels': 5,
         'paused': False,
@@ -60,6 +61,7 @@ def _write_state(tmp_path, monkeypatch, config=None, **overrides):
     cfg = {
         'symbol': 'BTCUSDC',
         'grid_distance': 500.0,
+        'pause_below_price': 69000.0,
         'take_profit_distance': None,
         'price_tick': 0.1,
         'datafeed_url': 'http://127.0.0.1:9550',
@@ -131,6 +133,7 @@ def test_load_grid_state_geometric_tp(tmp_path, monkeypatch):
     view = web.load_grid_state()
 
     assert view['distance_pct'] == pytest.approx(0.5)
+    assert view['pause_below_price'] == pytest.approx(69000.0)
     assert view['lots'][0]['tp'] == pytest.approx(74755.5)
     assert view['lots'][1]['tp'] == pytest.approx(73271.6)
     # 浮盈仍按买入价计算
@@ -148,6 +151,7 @@ def test_state_distance_pct_takes_precedence(tmp_path, monkeypatch):
     view = web.load_grid_state()
 
     assert view['distance_pct'] == pytest.approx(0.5)
+    assert view['pause_below_price'] == pytest.approx(69000.0)
     assert view['lots'][0]['tp'] == pytest.approx(74755.5)
 
 
@@ -299,6 +303,7 @@ def test_index_shows_geometric_spacing(client, tmp_path, monkeypatch):
     html = client.get('/').get_data(as_text=True)
 
     assert '间距 0.5%' in html
+    assert '下限 69000' in html
     assert '74755.5' in html
     # 轮询刷新也走几何口径（不能用旧的 g.distance）
     assert 'g.distance_pct' in html
