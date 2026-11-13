@@ -303,7 +303,7 @@ def test_index_shows_geometric_spacing(client, tmp_path, monkeypatch):
     html = client.get('/').get_data(as_text=True)
 
     assert '间距 0.5%' in html
-    assert '下限 69000' in html
+    assert '日线下限 69000' in html
     assert '74755.5' in html
     # 轮询刷新也走几何口径（不能用旧的 g.distance）
     assert 'g.distance_pct' in html

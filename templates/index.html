@@ -1978,7 +1978,7 @@
                     <span class="text-xs text-gray-500 ml-auto" id="grid-age">{% if grid.age_seconds is not none %}{{ grid.age_seconds|round(0)|int }}s 前{% else %}—{% endif %}</span>
                 </div>
                 <div class="text-xs text-gray-500" id="grid-subtitle">
-                    {{ grid.symbol or 'BTCUSDC' }} · 只做多 · {% if grid.distance_pct %}间距 {{ '%g'|format(grid.distance_pct) }}%{% else %}间距 {{ '%.0f'|format(grid.distance or 0) }}{% endif %} · 基准 {{ '%.0f'|format(grid.baseline or 0) }}{% if grid.pause_below_price %} · 下限 {{ '%.0f'|format(grid.pause_below_price) }}{% endif %}{% if grid.updated_at %} · 更新 {{ grid.updated_at }}{% endif %}
+                    {{ grid.symbol or 'BTCUSDC' }} · 只做多 · {% if grid.distance_pct %}间距 {{ '%g'|format(grid.distance_pct) }}%{% else %}间距 {{ '%.0f'|format(grid.distance or 0) }}{% endif %} · 基准 {{ '%.0f'|format(grid.baseline or 0) }}{% if grid.pause_below_price %} · 日线下限 {{ '%.0f'|format(grid.pause_below_price) }}{% endif %}{% if grid.updated_at %} · 更新 {{ grid.updated_at }}{% endif %}
                 </div>
             </div>
 
@@ -2096,7 +2096,7 @@
                     const spacingText = (g.distance_pct !== null && g.distance_pct !== undefined)
                         ? '间距 ' + g.distance_pct + '%'
                         : '间距 ' + fmt(g.distance, 0);
-                    set('grid-subtitle', (g.symbol || 'BTCUSDC') + ' · 只做多 · ' + spacingText + ' · 基准 ' + fmt(g.baseline, 0) + (g.pause_below_price ? ' · 下限 ' + fmt(g.pause_below_price, 0) : '') + (g.updated_at ? ' · 更新 ' + g.updated_at : ''));
+                    set('grid-subtitle', (g.symbol || 'BTCUSDC') + ' · 只做多 · ' + spacingText + ' · 基准 ' + fmt(g.baseline, 0) + (g.pause_below_price ? ' · 日线下限 ' + fmt(g.pause_below_price, 0) : '') + (g.updated_at ? ' · 更新 ' + g.updated_at : ''));
                     set('grid-inventory', fmt(g.inventory, 4));
                     set('grid-unrealized', (g.unrealized === null || g.unrealized === undefined) ? '—' : (g.unrealized >= 0 ? '+' : '') + fmt(g.unrealized, 2));
                     set('grid-realized', (g.realized === null || g.realized === undefined) ? '—' : (g.realized >= 0 ? '+' : '') + fmt(g.realized, 2));
