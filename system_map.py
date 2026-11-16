@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections import Counter
 
 SCHEMA_VERSION = 1
-UPDATED_AT = '2026-11-15'
+UPDATED_AT = '2026-11-16'
 
 STATUS_LABELS = {
     'live': '已上线',
@@ -140,8 +140,8 @@ LAYERS = [
              'desc': 'AHR999 抄底定投实盘（AHR999<0.45 每日检查，按 UM 账户 BTC 余额的 2%/次加仓；目标每日动态读取）',
              'caps': ['AHR999 条件定投', '动态目标', '旧计划停用']},
             {'id': 'web', 'name': 'Web 面板', 'status': 'live', 'service': 'web',
-             'desc': '本页所在：交易/帖子/盈亏/系统骨架/博客；头部 AHR999 + 200MA 牛熊分界线；策略健康 long/short 合并对照；摸顶摸底模块展示 AHR999 定投仓位；现货/摸底数据分文件（spot_trades / bottom_top_trades）',
-             'caps': ['登录门禁', 'AHR999 估值', '200MA 牛熊线', '摸顶摸底盈亏', 'AHR999 定投仓位', '现货/摸底数据分文件']},
+             'desc': '本页所在：交易/帖子/盈亏/系统骨架/博客；头部 AHR999 + 200MA 牛熊分界线；策略健康 long/short 合并对照；摸顶摸底模块展示 AHR999 定投仓位；现货/摸底数据分文件（spot_trades / bottom_top_trades）；仓位健康卡片（保证金监控只读投影）',
+             'caps': ['登录门禁', 'AHR999 估值', '200MA 牛熊线', '摸顶摸底盈亏', 'AHR999 定投仓位', '现货/摸底数据分文件', '仓位健康卡片']},
             {'id': 'blog', 'name': '博客（公开页）', 'status': 'live',
              'desc': 'Hexo 全量迁移（2026-10-19）：公开 /blog + 看板入口；Python 渲染（Markdown/Pygments），独立于交易链路',
              'caps': ['公开访问', '91 篇文章']},
@@ -192,11 +192,12 @@ LAYERS = [
             {'id': 'sentinel_um_short', 'name': 'Sentinel · um short', 'status': 'live',
              'service': 'sentinel-um-short',
              'desc': 'um short 腿实例（独立 data_dir；watchdog 关闭防双份巡检推送）', 'caps': ['钉钉 fact-only', 'AI 告警复核（降噪）']},
-            {'id': 'margin_monitor', 'name': '保证金监控', 'status': 'live',
-             'service': 'marginmonitor',
-             'desc': 'UM 账户杠杆/保证金率/静态爆仓价监控（只读，钉钉分级告警；不对 AHR999/GridBot 做任何操作）',
-             'caps': ['合约杠杆', '权益 beta（含 BTC 抵押双杀）', '保证金率', '静态爆仓价',
-                      'AHR999 加仓提示']},
+            {'id': 'margin_monitor', 'name': '保证金监控 v2', 'status': 'live',
+             'systemd': 'margin-monitor',
+             'desc': 'UM 账户杠杆/保证金率/分层维持保证金/分层爆仓价/压力表/VaR/策略归因/F&G 节流建议监控（只读，systemd 守护，钉钉分级告警；不对 AHR999/GridBot 做任何操作）',
+             'caps': ['合约/总敞口杠杆', '权益 beta（含 BTC 抵押双杀）', '分层维持保证金', '二分爆仓价',
+                      '40k/35k/30k 压力表', 'AHR 加仓情景', '历史 VaR/CVaR', '策略归因/预算',
+                      'F&G 节流建议', '心跳/历史/日报']},
             {'id': 'strategy_health', 'name': '策略健康页', 'status': 'live',
              'desc': 'Sentinel M1–M5：参数一致性 / 开仓对齐 / 分布健康 / 维护建议（只读；long/short 合并为一张对照表；看板「策略模块」区块内切换，独立页保留）',
              'caps': ['登录门禁', '策略模块区切换', 'L/S 合并对照']},

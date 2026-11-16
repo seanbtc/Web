@@ -561,6 +561,7 @@
             #triangle-section { order: 4; display: none; }
             #lead-section { order: 5; }
             #grid-section { order: 6; }
+            #margin-section { order: 6; }
             #top-section { order: 7; }
             #bottom-section { order: 8; }
             #top-bottom-section { order: 6; display: none; }
@@ -852,6 +853,11 @@
                 display: flex;
                 flex-direction: column;
                 overflow-y: auto;
+            }
+
+            #margin-section {
+                grid-column: 1 / -1;
+                grid-row: 5;
             }
 
             #top-section {
@@ -2070,6 +2076,361 @@
             </div>
         </section>
 
+        <section id="margin-section" class="mb-12 bg-gray-100 rounded-xl p-6 panel-section">
+            <div class="flex items-start justify-between mb-3">
+                <div>
+                    <h3 class="text-lg font-semibold text-dark flex items-center">
+                        <i class="fa fa-heartbeat text-red-500 mr-2"></i>仓位健康 · 保证金风险
+                        <span id="margin-level" class="ml-3 px-3 py-1 rounded-full text-xs font-semibold
+                            {% if margin.stale %}bg-gray-200 text-gray-600
+                            {% elif margin.level == 'critical' %}bg-red-600 text-white
+                            {% elif margin.level == 'danger' %}bg-red-100 text-red-700
+                            {% elif margin.level == 'watch' %}bg-yellow-100 text-yellow-700
+                            {% else %}bg-green-100 text-green-700{% endif %}">{{ margin.status_label }}</span>
+                    </h3>
+                    <div class="text-xs text-gray-500 mt-1" id="margin-subtitle">
+                        数据源 logs/margin_monitor.json
+                        {% if margin.ts %} · 采集 {{ margin.ts }}{% endif %}
+                        {% if margin.age_seconds is not none %} · {{ '%.0f'|format(margin.age_seconds) }}s 前{% endif %}
+                        · 60s 刷新 · 只读（不自动调仓）
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-3">
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">账户权益</div>
+                    <div class="text-lg font-semibold text-dark" id="margin-equity">{{ '{:,.0f}'.format(margin.equity) if margin.equity is not none else '—' }}</div>
+                    <div class="text-xs text-gray-400" id="margin-equity-sub">可用 {{ '{:,.0f}'.format(margin.available_balance) if margin.available_balance is not none else '—' }}</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">BTC 价格</div>
+                    <div class="text-lg font-semibold text-dark" id="margin-btc">{{ '{:,.0f}'.format(margin.btc_price) if margin.btc_price is not none else '—' }}</div>
+                    <div class="text-xs text-gray-400" id="margin-btc-sub">抵押 {{ '%.4f'|format(margin.btc_collateral or 0) }} BTC</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">合约杠杆</div>
+                    <div class="text-lg font-semibold text-dark" id="margin-fut-lev">{{ '%.2f'|format(margin.futures_leverage) if margin.futures_leverage is not none else '—' }}x</div>
+                    <div class="text-xs text-gray-400" id="margin-fut-lev-sub">名义 {{ '{:,.0f}'.format(margin.futures_notional) if margin.futures_notional is not none else '—' }}</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">权益 beta</div>
+                    <div class="text-lg font-semibold {% if margin.equity_beta is not none and margin.equity_beta >= 2 %}text-red-600{% elif margin.equity_beta is not none and margin.equity_beta >= 1.5 %}text-yellow-600{% else %}text-dark{% endif %}" id="margin-beta">{{ '%.2f'|format(margin.equity_beta) if margin.equity_beta is not none else '—' }}</div>
+                    <div class="text-xs text-gray-400" id="margin-beta-sub">总敞口 {{ '%.2f'|format(margin.gross_leverage) if margin.gross_leverage is not none else '—' }}x</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">保证金率</div>
+                    <div class="text-lg font-semibold text-dark" id="margin-mm">{{ '%.2f'|format(margin.margin_ratio_pct) if margin.margin_ratio_pct is not none else '—' }}%</div>
+                    <div class="text-xs text-gray-400" id="margin-mm-sub">维持保证金 {{ '{:,.0f}'.format(margin.maintenance_margin) if margin.maintenance_margin is not none else '—' }} ({{ margin.mm_source or '—' }}{% if margin.maintenance_margin_account is not none %} / 账户 {{ '{:,.0f}'.format(margin.maintenance_margin_account) }}{% endif %})</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">静态爆仓价</div>
+                    <div class="text-lg font-semibold {% if margin.liquidation_distance_pct is not none and margin.liquidation_distance_pct <= 35 %}text-red-600{% else %}text-dark{% endif %}" id="margin-liq">{{ '{:,.0f}'.format(margin.liquidation_price) if margin.liquidation_price is not none else '—' }}</div>
+                    <div class="text-xs text-gray-400" id="margin-liq-sub">距爆仓 {{ '%.1f'|format(margin.liquidation_distance_pct) if margin.liquidation_distance_pct is not none else '—' }}%</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">恐惧贪婪指数</div>
+                    <div class="text-lg font-semibold" id="margin-fng">
+                        {% if margin.sentiment and margin.sentiment.value is not none %}{{ margin.sentiment.value }} · {{ margin.sentiment.classification or '—' }}{% else %}—{% endif %}
+                    </div>
+                    <div class="text-xs text-gray-400" id="margin-fng-sub">
+                        {% if margin.sentiment and margin.sentiment.throttle %}建议 AHR 节流 {{ '%.2f'|format(margin.sentiment.throttle.factor or 1) }}x（仅建议）{% if margin.sentiment.as_of %} · {{ margin.sentiment.as_of }}{% endif %}{% else %}—{% endif %}
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">40k 情景保证金率</div>
+                    <div class="text-lg font-semibold text-dark" id="margin-stress40">
+                        {% set row40 = (margin.stress or [])|selectattr('price', 'equalto', 40000)|first %}
+                        {% if row40 and row40.margin_ratio_pct is not none %}{{ '%.2f'|format(row40.margin_ratio_pct) }}%{% else %}—{% endif %}
+                    </div>
+                    <div class="text-xs text-gray-400" id="margin-stress40-sub">权益 {{ '{:,.0f}'.format(row40.equity) if row40 and row40.equity is not none else '—' }}</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">7 日趋势</div>
+                    <div class="text-lg font-semibold text-dark" id="margin-trend">
+                        {% if margin.trend and margin.trend.beta_change is not none %}β {{ '%+.2f'|format(margin.trend.beta_change) }}{% else %}—{% endif %}
+                    </div>
+                    <div class="text-xs text-gray-400" id="margin-trend-sub">
+                        {% if margin.trend and margin.trend.price_change_pct is not none %}BTC {{ '%+.1f'|format(margin.trend.price_change_pct) }}%{% else %}—{% endif %}
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <div class="text-xs text-gray-500 mb-1">7 日资金费 / 利息</div>
+                    <div class="text-lg font-semibold {% if margin.income and margin.income.funding_7d is not none and margin.income.funding_7d < 0 %}text-red-600{% else %}text-dark{% endif %}" id="margin-income">
+                        {% if margin.income and margin.income.funding_7d is not none %}{{ '%+.2f'|format(margin.income.funding_7d) }}{% else %}—{% endif %}
+                    </div>
+                    <div class="text-xs text-gray-400" id="margin-income-sub">
+                        {% if margin.income %}利息 {{ '%+.2f'|format(margin.income.interest_7d or 0) }} · 手续费 {{ '%+.2f'|format(margin.income.commission_7d or 0) }}{% else %}—{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-3">
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <h4 class="text-sm font-semibold text-dark mb-2">当前持仓</h4>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 text-xs">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-2 py-1.5 text-left font-semibold text-gray-600">策略/合约</th>
+                                    <th class="px-2 py-1.5 text-right font-semibold text-gray-600">数量</th>
+                                    <th class="px-2 py-1.5 text-right font-semibold text-gray-600">开仓价</th>
+                                    <th class="px-2 py-1.5 text-right font-semibold text-gray-600">名义</th>
+                                    <th class="px-2 py-1.5 text-right font-semibold text-gray-600">浮盈亏</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200" id="margin-positions-body">
+                                {% for row in margin.positions %}
+                                <tr>
+                                    <td class="px-2 py-1.5">{{ row.symbol }} <span class="text-gray-400">{{ row.side }}</span></td>
+                                    <td class="px-2 py-1.5 text-right">{{ '%.4f'|format(row.qty or 0) }}</td>
+                                    <td class="px-2 py-1.5 text-right">{{ '{:,.0f}'.format(row.entry) if row.entry is not none else '—' }}</td>
+                                    <td class="px-2 py-1.5 text-right">{{ '{:,.0f}'.format(row.notional) if row.notional is not none else '—' }}</td>
+                                    <td class="px-2 py-1.5 text-right {% if row.unrealized_pnl is not none and row.unrealized_pnl < 0 %}text-red-600{% elif row.unrealized_pnl is not none %}text-green-600{% endif %}">{{ '%+.0f'|format(row.unrealized_pnl) if row.unrealized_pnl is not none else '—' }}</td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="5" class="px-2 py-4 text-center text-gray-500">无持仓</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <h4 class="text-sm font-semibold text-dark mb-2">策略归因 / 预算</h4>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 text-xs">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-2 py-1.5 text-left font-semibold text-gray-600">策略</th>
+                                    <th class="px-2 py-1.5 text-right font-semibold text-gray-600">名义</th>
+                                    <th class="px-2 py-1.5 text-right font-semibold text-gray-600">浮盈亏</th>
+                                    <th class="px-2 py-1.5 text-right font-semibold text-gray-600">beta</th>
+                                    <th class="px-2 py-1.5 text-left font-semibold text-gray-600">预算</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200" id="margin-attribution-body">
+                                {% for row in margin.attribution %}
+                                <tr>
+                                    <td class="px-2 py-1.5">{{ row.name }}</td>
+                                    <td class="px-2 py-1.5 text-right">{{ '{:,.0f}'.format(row.notional or 0) }}</td>
+                                    <td class="px-2 py-1.5 text-right {% if row.unrealized_pnl is not none and row.unrealized_pnl < 0 %}text-red-600{% elif row.unrealized_pnl %}text-green-600{% endif %}">{{ '%+.0f'|format(row.unrealized_pnl or 0) }}</td>
+                                    <td class="px-2 py-1.5 text-right">{{ '%.2f'|format(row.beta_contribution or 0) }}</td>
+                                    <td class="px-2 py-1.5 {% if row.breaches %}text-red-600{% else %}text-green-600{% endif %}">{% if row.breaches %}{{ row.breaches|join('; ') }}{% else %}正常{% endif %}</td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="5" class="px-2 py-4 text-center text-gray-500">暂无归因数据</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-md p-3 mb-3">
+                <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-sm font-semibold text-dark">价格压力表 / 爆仓距离</h4>
+                    <span class="text-xs text-gray-400">含 BTC 抵押 haircut 与分层维持保证金；40k/35k/30k 为极端情景</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 text-xs">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-2 py-1.5 text-left font-semibold text-gray-600">BTC 价格</th>
+                                <th class="px-2 py-1.5 text-right font-semibold text-gray-600">权益</th>
+                                <th class="px-2 py-1.5 text-right font-semibold text-gray-600">保证金率</th>
+                                <th class="px-2 py-1.5 text-right font-semibold text-gray-600">距爆仓</th>
+                                <th class="px-2 py-1.5 text-right font-semibold text-gray-600">AHR PnL</th>
+                                <th class="px-2 py-1.5 text-right font-semibold text-gray-600">Grid PnL</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="margin-stress-body">
+                            {% for row in margin.stress %}
+                            <tr class="{% if row.is_current %}bg-blue-50 font-semibold{% endif %}">
+                                <td class="px-2 py-1.5">{{ '{:,.0f}'.format(row.price or 0) }}{% if row.is_current %} <span class="text-blue-600">现价</span>{% endif %}</td>
+                                <td class="px-2 py-1.5 text-right">{{ '{:,.0f}'.format(row.equity) if row.equity is not none else '—' }}</td>
+                                <td class="px-2 py-1.5 text-right">{{ '%.2f'|format(row.margin_ratio_pct) if row.margin_ratio_pct is not none else '—' }}%</td>
+                                <td class="px-2 py-1.5 text-right">{{ '%.1f'|format(row.liquidation_distance_pct) if row.liquidation_distance_pct is not none else '—' }}%</td>
+                                <td class="px-2 py-1.5 text-right {% if row.position_pnl.get('BTCUSD1') is not none and row.position_pnl.get('BTCUSD1') < 0 %}text-red-600{% endif %}">{{ '%+.0f'|format(row.position_pnl.get('BTCUSD1') or 0) }}</td>
+                                <td class="px-2 py-1.5 text-right {% if row.position_pnl.get('BTCUSDC') is not none and row.position_pnl.get('BTCUSDC') < 0 %}text-red-600{% endif %}">{{ '%+.0f'|format(row.position_pnl.get('BTCUSDC') or 0) }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="6" class="px-2 py-4 text-center text-gray-500">暂无压力表数据</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <details class="mt-2">
+                    <summary class="text-xs text-gray-500 cursor-pointer">AHR999 剩余全部加仓后的压力表（仅情景，不代表会成交）</summary>
+                    <div class="overflow-x-auto mt-2">
+                        <table class="min-w-full divide-y divide-gray-200 text-xs">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-2 py-1.5 text-left font-semibold text-gray-600">BTC 价格</th>
+                                    <th class="px-2 py-1.5 text-right font-semibold text-gray-600">权益</th>
+                                    <th class="px-2 py-1.5 text-right font-semibold text-gray-600">保证金率</th>
+                                    <th class="px-2 py-1.5 text-right font-semibold text-gray-600">距爆仓</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200" id="margin-stress-ahr-body">
+                                {% for row in margin.stress_ahr_filled %}
+                                <tr class="{% if row.is_current %}bg-blue-50 font-semibold{% endif %}">
+                                    <td class="px-2 py-1.5">{{ '{:,.0f}'.format(row.price or 0) }}{% if row.is_current %} <span class="text-blue-600">现价</span>{% endif %}</td>
+                                    <td class="px-2 py-1.5 text-right">{{ '{:,.0f}'.format(row.equity) if row.equity is not none else '—' }}</td>
+                                    <td class="px-2 py-1.5 text-right">{{ '%.2f'|format(row.margin_ratio_pct) if row.margin_ratio_pct is not none else '—' }}%</td>
+                                    <td class="px-2 py-1.5 text-right">{{ '%.1f'|format(row.liquidation_distance_pct) if row.liquidation_distance_pct is not none else '—' }}%</td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="4" class="px-2 py-4 text-center text-gray-500">暂无情景数据</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <h4 class="text-sm font-semibold text-dark mb-2">触发原因</h4>
+                    <ul class="text-xs text-gray-600 space-y-1" id="margin-reasons">
+                        {% for reason in margin.reasons %}<li>• {{ reason }}</li>{% else %}<li class="text-gray-400">无（全部指标在阈值内）</li>{% endfor %}
+                    </ul>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-3">
+                    <h4 class="text-sm font-semibold text-dark mb-2">建议（仅建议，不自动执行）</h4>
+                    <ul class="text-xs text-gray-600 space-y-1" id="margin-recommendations">
+                        {% for item in margin.recommendations %}<li>• {{ item }}</li>{% else %}<li class="text-gray-400">无</li>{% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <div class="text-xs text-gray-500 mt-2">
+                <i class="fa fa-eye mr-1"></i>只读展示（数据源 logs/margin_monitor.json + heartbeat，60s 刷新）；监控由 systemd `margin-monitor` 守护，不自动下单/减仓。
+                {% if margin.heartbeat_age_seconds is not none %}心跳 {{ '%.0f'|format(margin.heartbeat_age_seconds) }}s 前。{% endif %}
+            </div>
+        </section>
+
+        <script>
+        (function () {
+            const fmt = (v, d) => (v === null || v === undefined || Number.isNaN(Number(v))) ? '—' : Number(v).toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d});
+            const price = (v) => (v === null || v === undefined) ? '—' : Math.round(Number(v)).toLocaleString('en-US');
+            const pct = (v, d) => (v === null || v === undefined) ? '—' : fmt(v, d) + '%';
+            const signed = (v, d) => (v === null || v === undefined) ? '—' : (Number(v) >= 0 ? '+' : '') + fmt(v, d);
+            function esc(text) {
+                return String(text === null || text === undefined ? '' : text)
+                    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }
+            function setText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
+            let lastFingerprint = '';
+            async function refreshMargin() {
+                try {
+                    const res = await fetch('/api/margin_status', {headers: {'Accept': 'application/json'}});
+                    if (!res.ok) return;
+                    const m = await res.json();
+                    if (!m.available) {
+                        setText('margin-level', '无数据');
+                        setText('margin-subtitle', '监控状态文件缺失/损坏（查看 logs/margin_monitor.json 与 systemd margin-monitor）');
+                        return;
+                    }
+                    const fingerprint = JSON.stringify(m);
+                    setText('margin-subtitle', '数据源 logs/margin_monitor.json · 采集 ' + (m.ts || '—')
+                        + (m.age_seconds === null ? '' : ' · ' + Math.round(m.age_seconds) + 's 前')
+                        + ' · 60s 刷新 · 只读（不自动调仓）');
+                    if (fingerprint === lastFingerprint) return;
+                    lastFingerprint = fingerprint;
+                    const levelEl = document.getElementById('margin-level');
+                    if (levelEl) {
+                        levelEl.textContent = m.status_label || m.status;
+                        const cls = m.stale ? 'ml-3 px-3 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-600'
+                            : m.level === 'critical' ? 'ml-3 px-3 py-1 rounded-full text-xs font-semibold bg-red-600 text-white'
+                            : m.level === 'danger' ? 'ml-3 px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700'
+                            : m.level === 'watch' ? 'ml-3 px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700'
+                            : 'ml-3 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700';
+                        levelEl.className = cls;
+                    }
+                    setText('margin-equity', price(m.equity));
+                    setText('margin-equity-sub', '可用 ' + price(m.available_balance));
+                    setText('margin-btc', price(m.btc_price));
+                    setText('margin-btc-sub', '抵押 ' + fmt(m.btc_collateral || 0, 4) + ' BTC');
+                    setText('margin-fut-lev', fmt(m.futures_leverage, 2) + 'x');
+                    setText('margin-fut-lev-sub', '名义 ' + price(m.futures_notional));
+                    setText('margin-beta', fmt(m.equity_beta, 2));
+                    setText('margin-beta-sub', '总敞口 ' + fmt(m.gross_leverage, 2) + 'x');
+                    setText('margin-mm', fmt(m.margin_ratio_pct, 2) + '%');
+                    setText('margin-mm-sub', '维持保证金 ' + price(m.maintenance_margin) + ' (' + (m.mm_source || '—')
+                        + (m.maintenance_margin_account === null || m.maintenance_margin_account === undefined ? '' : ' / 账户 ' + price(m.maintenance_margin_account)) + ')');
+                    setText('margin-liq', price(m.liquidation_price));
+                    setText('margin-liq-sub', '距爆仓 ' + (m.liquidation_distance_pct === null ? '—' : fmt(m.liquidation_distance_pct, 1) + '%'));
+                    if (m.sentiment) {
+                        setText('margin-fng', (m.sentiment.value === null ? '—' : m.sentiment.value) + ' · ' + (m.sentiment.classification || '—'));
+                        setText('margin-fng-sub', '建议 AHR 节流 ' + fmt((m.sentiment.throttle || {}).factor, 2) + 'x（仅建议）');
+                    }
+                    const row40 = (m.stress || []).find(r => Math.abs((r.price || 0) - 40000) < 1);
+                    setText('margin-stress40', row40 ? pct(row40.margin_ratio_pct, 2) : '—');
+                    setText('margin-stress40-sub', row40 ? '权益 ' + price(row40.equity) : '—');
+                    const trend = m.trend || {};
+                    setText('margin-trend', trend.beta_change === undefined || trend.beta_change === null ? '—' : 'β ' + signed(trend.beta_change, 2));
+                    setText('margin-trend-sub', '保证金 ' + signed(trend.margin_ratio_change, 2) + 'pp · 爆仓 ' + signed(trend.liq_distance_change, 1) + 'pp');
+                    if (m.income) {
+                        setText('margin-income', signed(m.income.funding_7d, 2));
+                        setText('margin-income-sub', '利息 ' + signed(m.income.interest_7d, 2) + ' · 手续费 ' + signed(m.income.commission_7d, 2));
+                    }
+                    const posBody = document.getElementById('margin-positions-body');
+                    if (posBody) {
+                        posBody.innerHTML = (m.positions || []).length ? m.positions.map(p =>
+                            '<tr><td class="px-2 py-1.5">' + esc(p.symbol) + ' <span class="text-gray-400">' + esc(p.side) + '</span></td>'
+                            + '<td class="px-2 py-1.5 text-right">' + fmt(p.qty, 4) + '</td>'
+                            + '<td class="px-2 py-1.5 text-right">' + price(p.entry) + '</td>'
+                            + '<td class="px-2 py-1.5 text-right">' + price(p.notional) + '</td>'
+                            + '<td class="px-2 py-1.5 text-right ' + (p.unrealized_pnl < 0 ? 'text-red-600' : 'text-green-600') + '">' + signed(p.unrealized_pnl, 0) + '</td></tr>'
+                        ).join('') : '<tr><td colspan="5" class="px-2 py-4 text-center text-gray-500">无持仓</td></tr>';
+                    }
+                    const attrBody = document.getElementById('margin-attribution-body');
+                    if (attrBody) {
+                        attrBody.innerHTML = (m.attribution || []).length ? m.attribution.map(a =>
+                            '<tr><td class="px-2 py-1.5">' + esc(a.name) + '</td>'
+                            + '<td class="px-2 py-1.5 text-right">' + price(a.notional) + '</td>'
+                            + '<td class="px-2 py-1.5 text-right ' + ((a.unrealized_pnl || 0) < 0 ? 'text-red-600' : 'text-green-600') + '">' + signed(a.unrealized_pnl, 0) + '</td>'
+                            + '<td class="px-2 py-1.5 text-right">' + fmt(a.beta_contribution, 2) + '</td>'
+                            + '<td class="px-2 py-1.5 ' + ((a.breaches || []).length ? 'text-red-600' : 'text-green-600') + '">' + ((a.breaches || []).length ? esc(a.breaches.join('; ')) : '正常') + '</td></tr>'
+                        ).join('') : '<tr><td colspan="5" class="px-2 py-4 text-center text-gray-500">暂无归因数据</td></tr>';
+                    }
+                    const stressBody = document.getElementById('margin-stress-body');
+                    if (stressBody) {
+                        stressBody.innerHTML = (m.stress || []).length ? m.stress.map(r =>
+                            '<tr class="' + (r.is_current ? 'bg-blue-50 font-semibold' : '') + '"><td class="px-2 py-1.5">' + price(r.price) + (r.is_current ? ' <span class="text-blue-600">现价</span>' : '') + '</td>'
+                            + '<td class="px-2 py-1.5 text-right">' + price(r.equity) + '</td>'
+                            + '<td class="px-2 py-1.5 text-right">' + pct(r.margin_ratio_pct, 2) + '</td>'
+                            + '<td class="px-2 py-1.5 text-right">' + pct(r.liquidation_distance_pct, 1) + '</td>'
+                            + '<td class="px-2 py-1.5 text-right ' + (((r.position_pnl || {}).BTCUSD1 || 0) < 0 ? 'text-red-600' : '') + '">' + signed((r.position_pnl || {}).BTCUSD1, 0) + '</td>'
+                            + '<td class="px-2 py-1.5 text-right ' + (((r.position_pnl || {}).BTCUSDC || 0) < 0 ? 'text-red-600' : '') + '">' + signed((r.position_pnl || {}).BTCUSDC, 0) + '</td></tr>'
+                        ).join('') : '<tr><td colspan="6" class="px-2 py-4 text-center text-gray-500">暂无压力表数据</td></tr>';
+                    }
+                    const ahrBody = document.getElementById('margin-stress-ahr-body');
+                    if (ahrBody) {
+                        ahrBody.innerHTML = (m.stress_ahr_filled || []).length ? m.stress_ahr_filled.map(r =>
+                            '<tr class="' + (r.is_current ? 'bg-blue-50 font-semibold' : '') + '"><td class="px-2 py-1.5">' + price(r.price) + (r.is_current ? ' <span class="text-blue-600">现价</span>' : '') + '</td>'
+                            + '<td class="px-2 py-1.5 text-right">' + price(r.equity) + '</td>'
+                            + '<td class="px-2 py-1.5 text-right">' + pct(r.margin_ratio_pct, 2) + '</td>'
+                            + '<td class="px-2 py-1.5 text-right">' + pct(r.liquidation_distance_pct, 1) + '</td></tr>'
+                        ).join('') : '<tr><td colspan="4" class="px-2 py-4 text-center text-gray-500">暂无情景数据</td></tr>';
+                    }
+                    const reasonsEl = document.getElementById('margin-reasons');
+                    if (reasonsEl) reasonsEl.innerHTML = (m.reasons || []).length
+                        ? m.reasons.map(r => '<li>• ' + esc(r) + '</li>').join('')
+                        : '<li class="text-gray-400">无（全部指标在阈值内）</li>';
+                    const recEl = document.getElementById('margin-recommendations');
+                    if (recEl) recEl.innerHTML = (m.recommendations || []).length
+                        ? m.recommendations.map(r => '<li>• ' + esc(r) + '</li>').join('')
+                        : '<li class="text-gray-400">无</li>';
+                } catch (e) { /* 只读轮询失败静默，保留上次值 */ }
+            }
+            setInterval(refreshMargin, 60000);
+        })();
+        </script>
         <script>
         (function () {
             const fmt = (v, d) => (v === null || v === undefined || Number.isNaN(Number(v))) ? '—' : Number(v).toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d});

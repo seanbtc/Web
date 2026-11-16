@@ -3303,13 +3303,19 @@ def update_spot_data():
 @app.route('/')
 def index():
     return render_template('index.html', health=load_strategy_health(),
-                           grid=load_grid_state())
+                           grid=load_grid_state(), margin=load_margin_state())
 
 
 @app.route('/api/grid_status', methods=['GET'])
 def api_grid_status():
     """GridBot 只读状态（登录门禁由 before_request 统一保护）。"""
     return jsonify(load_grid_state())
+
+
+@app.route('/api/margin_status', methods=['GET'])
+def api_margin_status():
+    """保证金风险监控只读状态（登录门禁由 before_request 统一保护）。"""
+    return jsonify(load_margin_state())
 
 
 @app.route('/skeleton')
@@ -3578,6 +3584,204 @@ GRIDBOT_CONFIG_FILE = os.getenv('GRIDBOT_CONFIG_FILE') or os.path.join(
     os.path.dirname(os.path.dirname(GRIDBOT_STATE_FILE)), 'config.live.json')
 GRIDBOT_SYMBOL = os.getenv('GRIDBOT_SYMBOL', 'BTCUSDC')
 _grid_price_cache = {'ts': 0.0, 'price': None}
+
+MARGIN_STATE_FILE = os.getenv('MARGIN_STATE_FILE') or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), '..', 'logs', 'margin_monitor.json')
+MARGIN_HEARTBEAT_FILE = os.getenv('MARGIN_HEARTBEAT_FILE') or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), '..', 'logs', 'margin_monitor.heartbeat')
+MARGIN_STALE_SECONDS = 300.0
+try:
+    MARGIN_STALE_SECONDS = float(os.getenv('MARGIN_STALE_SECONDS') or MARGIN_STALE_SECONDS)
+except ValueError:
+    MARGIN_STALE_SECONDS = 300.0
+MARGIN_STATUS_LABELS = {'ok': '正常', 'watch': '关注', 'danger': '危险', 'critical': '危急'}
+
+
+def _margin_age_seconds(value):
+    """ISO 时间戳 / epoch 秒 → 距今秒数；无法解析返回 None。"""
+    if value is None:
+        return None
+    try:
+        if isinstance(value, (int, float)):
+            return max(0.0, time.time() - float(value))
+        stamp = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=timezone.utc)
+        return max(0.0, (datetime.now(timezone.utc) - stamp).total_seconds())
+    except (TypeError, ValueError):
+        return None
+
+
+def _margin_num(value):
+    try:
+        return round(float(value), 4) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def load_margin_state():
+    """保证金风险监控状态（只读）：读取 logs/margin_monitor.json 的 last_report。
+
+    监控进程独立于 Web（systemd margin-monitor）；本函数只做只读投影，
+    文件缺失/损坏/过期时返回 available=False，不影响页面其他模块。
+    """
+    empty = {
+        'available': False, 'stale': True, 'status': 'unknown', 'status_label': '无数据',
+        'level': 'unknown', 'age_seconds': None, 'heartbeat_age_seconds': None,
+        'ts': '', 'btc_price': None, 'equity': None, 'available_balance': None,
+        'futures_notional': None, 'futures_leverage': None, 'gross_leverage': None,
+        'equity_beta': None, 'margin_ratio_pct': None, 'initial_margin_usage_pct': None,
+        'liquidation_price': None, 'liquidation_distance_pct': None,
+        'maintenance_margin': None, 'mm_source': '', 'positions': [], 'stress': [],
+        'stress_ahr_filled': [], 'attribution': [], 'sentiment': None, 'income': None,
+        'trend': {}, 'var': None, 'episodes': [], 'recommendations': [], 'reasons': [],
+        'btc_collateral': None, 'net_btc_delta': None,
+        'maintenance_margin_account': None, 'maintenance_margin_tiered': None,
+    }
+    try:
+        with open(MARGIN_STATE_FILE, 'r', encoding='utf-8') as handle:
+            state = json.load(handle)
+    except (OSError, ValueError, TypeError):
+        return empty
+    report = state.get('last_report') if isinstance(state, dict) else None
+    if not isinstance(report, dict):
+        return empty
+
+    metrics = report.get('metrics') if isinstance(report.get('metrics'), dict) else {}
+    risk = report.get('risk') if isinstance(report.get('risk'), dict) else {}
+    level = str(risk.get('level') or state.get('last_level') or 'ok')
+    age = _margin_age_seconds(state.get('last_success_ts'))
+    if age is None:
+        age = _margin_age_seconds(report.get('ts'))
+    heartbeat_age = None
+    try:
+        with open(MARGIN_HEARTBEAT_FILE, 'r', encoding='utf-8') as handle:
+            heartbeat_age = _margin_age_seconds(json.load(handle).get('ts'))
+    except (OSError, ValueError, TypeError):
+        heartbeat_age = None
+    stale = age is None or age > MARGIN_STALE_SECONDS
+    if heartbeat_age is None or heartbeat_age > MARGIN_STALE_SECONDS:
+        stale = True
+    status_label = MARGIN_STATUS_LABELS.get(level, level)
+    if stale:
+        status_label = f'{status_label}（数据过期）'
+
+    positions = []
+    for row in metrics.get('positions') or []:
+        if not isinstance(row, dict):
+            continue
+        positions.append({
+            'symbol': row.get('symbol'), 'side': row.get('side'),
+            'qty': _margin_num(row.get('qty')), 'entry': _margin_num(row.get('entry')),
+            'mark': _margin_num(row.get('mark')), 'notional': _margin_num(row.get('notional')),
+            'unrealized_pnl': _margin_num(row.get('unrealized_pnl')),
+            'leverage': _margin_num(row.get('leverage')),
+        })
+
+    def _stress_rows(rows):
+        out = []
+        for row in rows or []:
+            if not isinstance(row, dict):
+                continue
+            out.append({
+                'price': _margin_num(row.get('price')),
+                'is_current': bool(row.get('is_current')),
+                'equity': _margin_num(row.get('equity')),
+                'margin_ratio_pct': _margin_num(row.get('margin_ratio_pct')),
+                'liquidation_distance_pct': _margin_num(row.get('liquidation_distance_pct')),
+                'position_pnl': {str(k): _margin_num(v)
+                                 for k, v in (row.get('position_pnl') or {}).items()},
+            })
+        return out
+
+    attribution = []
+    raw_attribution = report.get('attribution')
+    if isinstance(raw_attribution, dict):
+        items = raw_attribution.values()
+    elif isinstance(raw_attribution, list):
+        items = raw_attribution
+    else:
+        items = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        attribution.append({
+            'name': item.get('name') or '',
+            'symbols': item.get('symbols') or [],
+            'qty': _margin_num(item.get('qty')),
+            'notional': _margin_num(item.get('notional')),
+            'unrealized_pnl': _margin_num(item.get('unrealized_pnl')),
+            'margin_est': _margin_num(item.get('margin_est')),
+            'beta_contribution': _margin_num(item.get('beta_contribution')),
+            'breaches': item.get('breaches') or [],
+            'budget': item.get('budget') or {},
+        })
+    attribution.sort(key=lambda item: -(item.get('notional') or 0))
+
+    sentiment = report.get('sentiment') if isinstance(report.get('sentiment'), dict) else None
+    if sentiment:
+        sentiment = {
+            'value': _margin_num(sentiment.get('value')),
+            'classification': sentiment.get('classification') or '',
+            'as_of': sentiment.get('as_of') or '',
+            'source': sentiment.get('source') or '',
+            'throttle': {
+                'factor': _margin_num((sentiment.get('throttle') or {}).get('factor')),
+                'reason': (sentiment.get('throttle') or {}).get('reason') or '',
+            },
+        }
+    income = report.get('income') if isinstance(report.get('income'), dict) else None
+    if income:
+        income = {
+            'funding_7d': _margin_num(income.get('funding_7d')),
+            'interest_7d': _margin_num(income.get('interest_7d')),
+            'commission_7d': _margin_num(income.get('commission_7d')),
+            'total_7d': _margin_num(income.get('total_7d')),
+        }
+    trend = report.get('trend') if isinstance(report.get('trend'), dict) else {}
+
+    return {
+        'available': True,
+        'stale': stale,
+        'status': level,
+        'status_label': status_label,
+        'level': level,
+        'age_seconds': _margin_num(age),
+        'heartbeat_age_seconds': _margin_num(heartbeat_age),
+        'ts': report.get('ts') or '',
+        'btc_price': _margin_num(metrics.get('btc_price')),
+        'equity': _margin_num(metrics.get('equity')),
+        'available_balance': _margin_num(metrics.get('available')),
+        'futures_notional': _margin_num(metrics.get('futures_notional')),
+        'futures_leverage': _margin_num(metrics.get('futures_leverage')),
+        'gross_leverage': _margin_num(metrics.get('gross_leverage')),
+        'equity_beta': _margin_num(metrics.get('equity_beta')),
+        'margin_ratio_pct': _margin_num(metrics.get('margin_ratio_pct')),
+        'initial_margin_usage_pct': _margin_num(metrics.get('initial_margin_usage_pct')),
+        'liquidation_price': _margin_num(metrics.get('liquidation_price_estimate')),
+        'liquidation_distance_pct': _margin_num(metrics.get('liquidation_distance_pct')),
+        'maintenance_margin': _margin_num(
+            (metrics.get('maintenance_margin_tiered')
+             if metrics.get('mm_source') == 'tiered'
+             and metrics.get('maintenance_margin_tiered') is not None
+             else metrics.get('maintenance_margin'))),
+        'maintenance_margin_account': _margin_num(metrics.get('maintenance_margin')),
+        'maintenance_margin_tiered': _margin_num(metrics.get('maintenance_margin_tiered')),
+        'mm_source': metrics.get('mm_source') or '',
+        'positions': positions,
+        'stress': _stress_rows(report.get('stress')),
+        'stress_ahr_filled': _stress_rows(report.get('stress_ahr_filled')),
+        'attribution': attribution,
+        'sentiment': sentiment,
+        'income': income,
+        'trend': trend,
+        'var': report.get('var') if isinstance(report.get('var'), dict) else None,
+        'episodes': report.get('episodes') or [],
+        'recommendations': report.get('recommendations') or [],
+        'reasons': risk.get('reasons') or [],
+        'btc_collateral': _margin_num(metrics.get('btc_collateral')),
+        'net_btc_delta': _margin_num(metrics.get('net_btc_delta')),
+    }
 
 
 def _grid_config():
