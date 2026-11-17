@@ -273,6 +273,91 @@
             color: #334155 !important;
             border-color: rgba(71, 85, 105, 0.38) !important;
         }
+        /* ========== 仓位健康：头部入口 + 右侧抽屉（不占用主看板栅格） ========== */
+        #risk-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            flex: 0 0 auto;
+            white-space: nowrap;
+            cursor: pointer;
+            font-variant-numeric: tabular-nums;
+            transition: box-shadow 0.18s ease, transform 0.18s ease;
+        }
+        #risk-chip:hover {
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 6px 16px rgba(0, 0, 0, 0.08);
+        }
+        #risk-chip:focus-visible {
+            outline: 2px solid rgba(0, 113, 227, 0.55);
+            outline-offset: 2px;
+        }
+        #risk-chip.risk-ok {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(16, 185, 129, 0.26)) !important;
+            color: #166534 !important;
+            border: 1px solid rgba(34, 197, 94, 0.38) !important;
+        }
+        #risk-chip.risk-watch {
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.28)) !important;
+            color: #92400e !important;
+            border: 1px solid rgba(245, 158, 11, 0.42) !important;
+        }
+        #risk-chip.risk-danger {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(220, 38, 38, 0.23)) !important;
+            color: #991b1b !important;
+            border: 1px solid rgba(239, 68, 68, 0.38) !important;
+        }
+        #risk-chip.risk-critical {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.28), rgba(153, 27, 27, 0.34)) !important;
+            color: #7f1d1d !important;
+            border: 1px solid rgba(185, 28, 28, 0.5) !important;
+        }
+        #risk-chip.risk-na {
+            background: linear-gradient(135deg, rgba(100, 116, 139, 0.18), rgba(71, 85, 105, 0.24)) !important;
+            color: #334155 !important;
+            border: 1px solid rgba(71, 85, 105, 0.38) !important;
+        }
+        .risk-drawer {
+            position: fixed;
+            inset: 0;
+            z-index: 90;
+            display: none;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 1.1rem;
+        }
+        .risk-drawer.open {
+            display: flex;
+        }
+        .risk-drawer-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.42);
+            backdrop-filter: blur(3px);
+        }
+        .risk-drawer .risk-drawer-panel {
+            position: relative;
+            z-index: 1;
+            width: min(1400px, 100%);
+            max-height: calc(100vh - 2.2rem);
+            overflow-y: auto;
+            margin: 0 !important;
+            border: 1px solid rgba(255, 255, 255, 0.82);
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+        body.risk-drawer-open {
+            overflow: hidden;
+        }
+        @media (max-width: 767px) {
+            .risk-drawer {
+                padding: 0;
+                align-items: stretch;
+            }
+            .risk-drawer .risk-drawer-panel {
+                width: 100%;
+                max-height: 100vh;
+                border-radius: 0 !important;
+            }
+        }
         h1 {
             font-size: 1.48rem;
             font-weight: 600;
@@ -561,7 +646,6 @@
             #triangle-section { order: 4; display: none; }
             #lead-section { order: 5; }
             #grid-section { order: 6; }
-            #margin-section { order: 6; }
             #top-section { order: 7; }
             #bottom-section { order: 8; }
             #top-bottom-section { order: 6; display: none; }
@@ -697,7 +781,7 @@
                 line-height: 1.15rem;
             }
 
-            header .space-x-6 {
+            header .gap-x-4 {
                 column-gap: 0.9rem !important;
             }
 
@@ -853,11 +937,6 @@
                 display: flex;
                 flex-direction: column;
                 overflow-y: auto;
-            }
-
-            #margin-section {
-                grid-column: 1 / -1;
-                grid-row: 5;
             }
 
             #top-section {
@@ -1721,7 +1800,13 @@
                     <span class="px-3 py-1 rounded-full text-sm font-semibold flex items-center ma-flat" id="alpha-ma-zone" title="AlphaEngine K线趋势 · 数据不可用">—</span>
                 </div>
             </div>
-            <div class="flex items-center space-x-6">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <button type="button" id="risk-chip" class="px-3 py-1 rounded-full text-sm font-semibold
+                        {% if margin.stale %}risk-na{% elif margin.level == 'critical' %}risk-critical{% elif margin.level == 'danger' %}risk-danger{% elif margin.level == 'watch' %}risk-watch{% else %}risk-ok{% endif %}"
+                        aria-haspopup="dialog" aria-controls="risk-drawer" aria-expanded="false"
+                        title="仓位健康 · 保证金风险（只读，点击查看详情）">
+                    <i class="fa fa-heartbeat mr-1"></i>仓位健康 <span id="risk-chip-state">{{ margin.status_label }}</span>
+                </button>
                 <div class="text-sm font-semibold text-gray-700" id="current-time"></div>
                 <div class="text-sm font-semibold">
                     <span id="runtime" class="bg-green-100 text-green-800 px-3 py-1 rounded-full">策略已运行: 0天</span>
@@ -2076,10 +2161,13 @@
             </div>
         </section>
 
-        <section id="margin-section" class="mb-12 bg-gray-100 rounded-xl p-6 panel-section">
+        <div id="risk-drawer" class="risk-drawer" aria-hidden="true">
+            <div class="risk-drawer-backdrop" data-risk-close></div>
+            <section id="margin-section" class="mb-12 bg-gray-100 rounded-xl p-6 panel-section risk-drawer-panel"
+                     role="dialog" aria-modal="true" aria-labelledby="margin-title">
             <div class="flex items-start justify-between mb-3">
                 <div>
-                    <h3 class="text-lg font-semibold text-dark flex items-center">
+                    <h3 id="margin-title" class="text-lg font-semibold text-dark flex items-center">
                         <i class="fa fa-heartbeat text-red-500 mr-2"></i>仓位健康 · 保证金风险
                         <span id="margin-level" class="ml-3 px-3 py-1 rounded-full text-xs font-semibold
                             {% if margin.stale %}bg-gray-200 text-gray-600
@@ -2095,6 +2183,10 @@
                         · 60s 刷新 · 只读（不自动调仓）
                     </div>
                 </div>
+                <button type="button" class="ml-3 shrink-0 whitespace-nowrap px-3 py-1 rounded-full text-xs font-semibold bg-white text-gray-600 hover:text-red-500 shadow-sm"
+                        data-risk-close aria-label="关闭仓位健康面板">
+                    <i class="fa fa-times mr-1"></i>关闭
+                </button>
             </div>
 
             <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-3">
@@ -2311,7 +2403,8 @@
                 <i class="fa fa-eye mr-1"></i>只读展示（数据源 logs/margin_monitor.json + heartbeat，60s 刷新）；监控由 systemd `margin-monitor` 守护，不自动下单/减仓。
                 {% if margin.heartbeat_age_seconds is not none %}心跳 {{ '%.0f'|format(margin.heartbeat_age_seconds) }}s 前。{% endif %}
             </div>
-        </section>
+            </section>
+        </div>
 
         <script>
         (function () {
@@ -2324,6 +2417,46 @@
                     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             }
             function setText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
+            const riskDrawer = document.getElementById('risk-drawer');
+            const riskChip = document.getElementById('risk-chip');
+            const riskChipState = document.getElementById('risk-chip-state');
+            // 抽屉移出 #dashboard-main（其 position/z-index 形成层叠上下文，会把遮罩压在 header 之下）
+            if (riskDrawer && riskDrawer.parentElement !== document.body) {
+                document.body.appendChild(riskDrawer);
+            }
+            function setRiskChip(level, label, title) {
+                if (!riskChip) return;
+                riskChip.classList.remove('risk-ok', 'risk-watch', 'risk-danger', 'risk-critical', 'risk-na');
+                riskChip.classList.add('risk-' + (level || 'na'));
+                if (riskChipState) riskChipState.textContent = label || '—';
+                if (title) riskChip.title = title;
+            }
+            function openRiskDrawer() {
+                if (!riskDrawer) return;
+                riskDrawer.classList.add('open');
+                riskDrawer.setAttribute('aria-hidden', 'false');
+                if (riskChip) riskChip.setAttribute('aria-expanded', 'true');
+                document.body.classList.add('risk-drawer-open');
+                refreshMargin();
+            }
+            function closeRiskDrawer() {
+                if (!riskDrawer) return;
+                riskDrawer.classList.remove('open');
+                riskDrawer.setAttribute('aria-hidden', 'true');
+                if (riskChip) riskChip.setAttribute('aria-expanded', 'false');
+                document.body.classList.remove('risk-drawer-open');
+            }
+            if (riskChip) riskChip.addEventListener('click', openRiskDrawer);
+            if (riskDrawer) {
+                riskDrawer.querySelectorAll('[data-risk-close]').forEach(function (el) {
+                    el.addEventListener('click', closeRiskDrawer);
+                });
+            }
+            document.addEventListener('keydown', function (e) {
+                if ((e.key === 'Escape' || e.key === 'Esc') && riskDrawer && riskDrawer.classList.contains('open')) {
+                    closeRiskDrawer();
+                }
+            });
             let lastFingerprint = '';
             async function refreshMargin() {
                 try {
@@ -2333,12 +2466,18 @@
                     if (!m.available) {
                         setText('margin-level', '无数据');
                         setText('margin-subtitle', '监控状态文件缺失/损坏（查看 logs/margin_monitor.json 与 systemd margin-monitor）');
+                        setRiskChip('na', '无数据', '仓位健康 · 监控数据缺失');
                         return;
                     }
                     const fingerprint = JSON.stringify(m);
                     setText('margin-subtitle', '数据源 logs/margin_monitor.json · 采集 ' + (m.ts || '—')
                         + (m.age_seconds === null ? '' : ' · ' + Math.round(m.age_seconds) + 's 前')
                         + ' · 60s 刷新 · 只读（不自动调仓）');
+                    setRiskChip(m.stale ? 'na' : (m.level || 'unknown'), m.status_label || m.status || '—',
+                        '仓位健康 · ' + (m.status_label || m.status || '—')
+                        + (m.margin_ratio_pct === null || m.margin_ratio_pct === undefined ? '' : ' · 保证金率 ' + fmt(m.margin_ratio_pct, 1) + '%')
+                        + (m.liquidation_distance_pct === null || m.liquidation_distance_pct === undefined ? '' : ' · 距爆仓 ' + fmt(m.liquidation_distance_pct, 1) + '%')
+                        + ' · 点击查看详情（只读）');
                     if (fingerprint === lastFingerprint) return;
                     lastFingerprint = fingerprint;
                     const levelEl = document.getElementById('margin-level');
@@ -2429,6 +2568,7 @@
                 } catch (e) { /* 只读轮询失败静默，保留上次值 */ }
             }
             setInterval(refreshMargin, 60000);
+            refreshMargin();
         })();
         </script>
         <script>

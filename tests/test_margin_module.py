@@ -179,6 +179,13 @@ def test_index_contains_margin_section(client, tmp_path, monkeypatch):
     assert '仓位健康' in html
     assert '/api/margin_status' in html
     assert 'AHR999 剩余全部加仓后的压力表' in html
+    # 2026-11-17：仓位健康改为“头部入口 + 抽屉”，不得再作为主看板栅格项；
+    # 旧实现 grid-row: 5 会挤压策略面板（1280 宽时 lead 仅 31px）。
+    assert 'id="risk-drawer"' in html
+    assert 'id="risk-chip"' in html
+    assert 'risk-drawer-panel' in html
+    assert '#margin-section { order: 6; }' not in html
+    assert 'grid-row: 5' not in html
 
 
 def test_load_margin_state_uses_tiered_mm_when_available(tmp_path, monkeypatch):
