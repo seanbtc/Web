@@ -213,6 +213,43 @@
             color: #334155 !important;
             border-color: rgba(71, 85, 105, 0.38) !important;
         }
+        #fear-greed-value {
+            background: rgba(255, 255, 255, 0.82);
+            color: var(--text-primary) !important;
+            border: 1px solid rgba(17, 17, 17, 0.08);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+            white-space: nowrap;
+        }
+        #fear-greed-value.fng-extreme-fear {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(185, 28, 28, 0.3)) !important;
+            color: #991b1b !important;
+            border-color: rgba(185, 28, 28, 0.45) !important;
+        }
+        #fear-greed-value.fng-fear {
+            background: linear-gradient(135deg, rgba(251, 146, 60, 0.22), rgba(234, 88, 12, 0.28)) !important;
+            color: #9a3412 !important;
+            border-color: rgba(234, 88, 12, 0.42) !important;
+        }
+        #fear-greed-value.fng-neutral {
+            background: linear-gradient(135deg, rgba(100, 116, 139, 0.18), rgba(71, 85, 105, 0.24)) !important;
+            color: #334155 !important;
+            border-color: rgba(71, 85, 105, 0.38) !important;
+        }
+        #fear-greed-value.fng-greed {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(16, 185, 129, 0.26)) !important;
+            color: #166534 !important;
+            border-color: rgba(34, 197, 94, 0.38) !important;
+        }
+        #fear-greed-value.fng-extreme-greed {
+            background: linear-gradient(135deg, rgba(22, 163, 74, 0.24), rgba(6, 95, 70, 0.3)) !important;
+            color: #065f46 !important;
+            border-color: rgba(6, 95, 70, 0.45) !important;
+        }
+        #fear-greed-value.fng-flat {
+            background: linear-gradient(135deg, rgba(100, 116, 139, 0.18), rgba(71, 85, 105, 0.24)) !important;
+            color: #334155 !important;
+            border-color: rgba(71, 85, 105, 0.38) !important;
+        }
         #ma200-value {
             background: rgba(255, 255, 255, 0.82);
             color: var(--text-primary) !important;
@@ -796,6 +833,7 @@
             #alpha-valuation,
             #alpha-ma-zone,
             #ahr999-value,
+            #fear-greed-value,
             #runtime {
                 padding: 0.16rem 0.55rem !important;
                 font-size: 0.73rem !important;
@@ -1790,6 +1828,12 @@
                 <div class="flex items-center ml-4">
                     <span class="text-sm font-semibold text-gray-700 mr-2">AHR999:</span>
                     <span class="px-3 py-1 rounded-full text-sm font-semibold ahr-flat" id="ahr999-value" title="AHR999 独立估值指数 · 数据不可用">—</span>
+                </div>
+                <div class="flex items-center ml-4">
+                    <span class="text-sm font-semibold text-gray-700 mr-2">F&G:</span>
+                    <span class="px-3 py-1 rounded-full text-sm font-semibold {% if fear_greed %}{{ fear_greed.css_class }}{% else %}fng-flat{% endif %}"
+                          id="fear-greed-value"
+                          title="加密恐惧与贪婪指数 0–100 · Alternative.me 综合指数（波动率25% / 动量与成交量25% / 社媒15% / 调查15% / BTC占比10% / Google Trends10%）{% if fear_greed %} · {{ fear_greed.label }}{% if fear_greed.as_of %} · {{ fear_greed.as_of }}{% endif %}{% if fear_greed.source %} · {{ fear_greed.source }}{% endif %}{% else %} · 数据不可用{% endif %}">{% if fear_greed %}{{ fear_greed.value }} · {{ fear_greed.label }}{% else %}—{% endif %}</span>
                 </div>
                 <div class="flex items-center ml-4">
                     <span class="text-sm font-semibold text-gray-700 mr-2">200MA:</span>
@@ -3133,7 +3177,7 @@
         let _lastYearlyFingerprint = '';
         let currentBtcPrice = null;
         // 渲染去重：避免每秒的行情推送把 header/图表整块重写（移动端会一直闪+掉帧）
-        const _marketRenderMemo = { valuation: '', price: '', ahr: '', ma: '', ma200: '' };
+        const _marketRenderMemo = { valuation: '', price: '', ahr: '', ma: '', ma200: '', fng: '' };
         let _lastRuntimeText = '';
         let _lastAssetCompositionFingerprint = '';
         let _lastAssetCompositionAt = 0;
@@ -4196,6 +4240,41 @@
                         parts.push('尚无可用的 AI 估值');
                     }
                     valuationEl.title = parts.join(' · ');
+                }
+            }
+
+            // 更新恐惧与贪婪指数（只展示，不参与交易决策）
+            const fngEl = document.getElementById('fear-greed-value');
+            if (fngEl) {
+                const fng = marketData.fear_greed;
+                const fngValue = fng ? Number(fng.value) : NaN;
+                const fngValid = !!(fng && Number.isFinite(fngValue) && fngValue >= 0 && fngValue <= 100);
+                const fngKey = fngValid
+                    ? `f|${fngValue}|${fng.label || ''}|${fng.as_of || ''}|${fng.source || ''}`
+                    : 'unavailable';
+                if (fngKey !== _marketRenderMemo.fng) {
+                    _marketRenderMemo.fng = fngKey;
+                    let fngClass = 'fng-flat';
+                    if (fngValid) {
+                        fngClass = fng.css_class || (
+                            fngValue <= 24 ? 'fng-extreme-fear'
+                                : fngValue <= 44 ? 'fng-fear'
+                                    : fngValue <= 55 ? 'fng-neutral'
+                                        : fngValue <= 75 ? 'fng-greed' : 'fng-extreme-greed'
+                        );
+                    }
+                    fngEl.className = `px-3 py-1 rounded-full text-sm font-semibold ${fngClass}`;
+                    fngEl.textContent = fngValid ? `${fngValue} · ${fng.label || ''}` : '—';
+                    const fngTitle = ['加密恐惧与贪婪指数 0–100', 'Alternative.me 综合指数（波动率25% / 动量与成交量25% / 社媒15% / 调查15% / BTC占比10% / Google Trends10%）'];
+                    if (fngValid) {
+                        if (fng.label) fngTitle.push(fng.label);
+                        if (fng.as_of) fngTitle.push(fng.as_of);
+                        if (fng.source) fngTitle.push(fng.source);
+                        if (fng.stale) fngTitle.push('回退缓存');
+                    } else {
+                        fngTitle.push('数据不可用');
+                    }
+                    fngEl.title = fngTitle.join(' · ');
                 }
             }
 

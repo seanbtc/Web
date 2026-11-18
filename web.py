@@ -21,6 +21,8 @@ import hashlib
 import secrets
 import re
 import mimetypes
+import gzip
+import csv
 import subprocess
 import requests
 import logging
@@ -78,6 +80,176 @@ _ahr999_last_good = None
 
 ALPHA_ENGINE_VALUATION_LABELS = ('极度低估', '轻度低估', '轻度高估', '极度高估')
 ALPHA_ENGINE_VALUATION_UNAVAILABLE = '未评估'
+
+# 加密恐惧与贪婪指数：Alternative.me 综合指数（0=极度恐惧，100=极度贪婪）。
+# 成分与权重：波动率 25%、市场动量/成交量 25%、社媒 15%、调查 15%、
+# BTC  dominance 10%、Google Trends 10%。官方按日发布，无法仅用 OHLCV 精确复算。
+FEAR_GREED_API_URL = os.getenv(
+    'FEAR_GREED_API_URL', 'https://api.alternative.me/fng/?limit=1&format=json')
+FEAR_GREED_REFRESH_SECONDS = int(os.getenv('FEAR_GREED_REFRESH_SECONDS') or 3600)
+FEAR_GREED_RETRY_SECONDS = 300
+FEAR_GREED_CACHE_FILE = os.getenv('FEAR_GREED_CACHE_FILE') or os.path.abspath(os.path.join(
+    os.path.dirname(__file__), '..', 'KlinesData', 'FACTORS', 'raw', 'fear_greed.csv.gz'))
+FEAR_GREED_MARGIN_STATE_FILE = os.getenv('MARGIN_STATE_FILE') or os.path.abspath(os.path.join(
+    os.path.dirname(__file__), '..', 'logs', 'margin_monitor.json'))
+_FEAR_GREED_CACHE = {'ts': 0.0, 'data': None}
+_FEAR_GREED_LOCK = threading.Lock()
+FEAR_GREED_LABELS = {
+    'extreme fear': '极度恐惧',
+    'fear': '恐惧',
+    'neutral': '中性',
+    'greed': '贪婪',
+    'extreme greed': '极度贪婪',
+}
+
+
+def fear_greed_label(value, classification=None):
+    """中文标签；优先官方 classification，缺失时按 0–100 分段回退。"""
+    raw = str(classification or '').strip().lower()
+    if raw in FEAR_GREED_LABELS:
+        return FEAR_GREED_LABELS[raw]
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return '—'
+    if value <= 24:
+        return '极度恐惧'
+    if value <= 44:
+        return '恐惧'
+    if value <= 55:
+        return '中性'
+    if value <= 75:
+        return '贪婪'
+    return '极度贪婪'
+
+
+def fear_greed_css_class(value):
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return 'fng-flat'
+    if value <= 24:
+        return 'fng-extreme-fear'
+    if value <= 44:
+        return 'fng-fear'
+    if value <= 55:
+        return 'fng-neutral'
+    if value <= 75:
+        return 'fng-greed'
+    return 'fng-extreme-greed'
+
+
+def _fear_greed_from_margin_state():
+    try:
+        with open(FEAR_GREED_MARGIN_STATE_FILE, 'r', encoding='utf-8') as handle:
+            state = json.load(handle)
+    except (OSError, ValueError, TypeError):
+        return None
+    report = state.get('last_report') if isinstance(state, dict) else None
+    sentiment = (report or {}).get('sentiment') if isinstance(report, dict) else None
+    if not isinstance(sentiment, dict):
+        return None
+    value = sentiment.get('value')
+    try:
+        value = int(float(value))
+    except (TypeError, ValueError):
+        return None
+    if not (0 <= value <= 100):
+        return None
+    return {
+        'value': value,
+        'label': fear_greed_label(value, sentiment.get('classification')),
+        'classification': sentiment.get('classification') or '',
+        'as_of': sentiment.get('as_of') or '',
+        'source': sentiment.get('source') or 'margin_monitor',
+        'stale': True,
+    }
+
+
+def _fear_greed_from_cache_file():
+    try:
+        with gzip.open(FEAR_GREED_CACHE_FILE, 'rt', encoding='utf-8') as handle:
+            rows = list(csv.DictReader(handle))
+    except (OSError, ValueError, TypeError):
+        return None
+    if not rows:
+        return None
+    last = rows[-1]
+    raw_value = (last.get('fng') or last.get('value') or last.get('fear_greed')
+                 or last.get('index'))
+    try:
+        value = int(float(raw_value))
+    except (TypeError, ValueError):
+        return None
+    if not (0 <= value <= 100):
+        return None
+    as_of = str(last.get('timestamp') or last.get('date') or '')
+    return {
+        'value': value,
+        'label': fear_greed_label(value),
+        'classification': '',
+        'as_of': as_of[:10],
+        'source': 'local_cache',
+        'stale': True,
+    }
+
+
+def load_fear_greed(force=False, fetcher=None):
+    """读取加密恐惧与贪婪指数（只读）。
+
+    - 优先 Alternative.me 官方日更 API；
+    - 失败时回退到 margin_monitor 状态或本地 fear_greed.csv.gz；
+    - 1 小时缓存，回退值 5 分钟后重试；
+    - 不在页面请求路径上抛异常。
+    """
+    now = time.time()
+    cached = _FEAR_GREED_CACHE.get('data')
+    cache_age = now - _FEAR_GREED_CACHE.get('ts', 0)
+    cache_ttl = (FEAR_GREED_REFRESH_SECONDS if cached
+                 else FEAR_GREED_RETRY_SECONDS)
+    if not force and cache_age < cache_ttl:
+        return cached
+    with _FEAR_GREED_LOCK:
+        now = time.time()
+        cached = _FEAR_GREED_CACHE.get('data')
+        age = now - _FEAR_GREED_CACHE.get('ts', 0)
+        ttl = FEAR_GREED_RETRY_SECONDS if not cached else (
+            FEAR_GREED_RETRY_SECONDS if cached.get('stale') else FEAR_GREED_REFRESH_SECONDS)
+        if not force and age < ttl:
+            return cached
+
+        data = None
+        try:
+            response = (fetcher or requests.get)(FEAR_GREED_API_URL, timeout=4)
+            response.raise_for_status()
+            payload = response.json()
+            item = (payload.get('data') or [{}])[0] if isinstance(payload, dict) else {}
+            value = int(float(item.get('value')))
+            if not (0 <= value <= 100):
+                raise ValueError('F&G 数值越界')
+            timestamp = item.get('timestamp')
+            as_of = ''
+            try:
+                as_of = datetime.fromtimestamp(int(float(timestamp)), timezone.utc).strftime('%Y-%m-%d')
+            except (TypeError, ValueError, OSError):
+                as_of = ''
+            data = {
+                'value': value,
+                'label': fear_greed_label(value, item.get('value_classification')),
+                'classification': str(item.get('value_classification') or ''),
+                'as_of': as_of,
+                'source': 'alternative.me',
+                'stale': False,
+            }
+        except Exception as exc:  # noqa: BLE001 - 展示数据失败不得影响看板
+            print(f"[Web] F&G 获取失败: {type(exc).__name__}: {exc}")
+            data = _fear_greed_from_margin_state() or _fear_greed_from_cache_file()
+
+        if data is not None:
+            data['css_class'] = fear_greed_css_class(data.get('value'))
+        _FEAR_GREED_CACHE['data'] = data
+        _FEAR_GREED_CACHE['ts'] = time.time()
+        return data
 
 
 def load_alpha_engine_valuation():
@@ -2302,8 +2474,27 @@ def fetch_btc_price():
     datafeed_reported = False
     last_ahr_fetch = 0.0
     ahr_interval = AHR999_REFRESH_SECONDS
+    last_fng_fetch = 0.0
 
     while True:
+        now_fng = time.time()
+        if now_fng - last_fng_fetch >= 60:
+            last_fng_fetch = now_fng
+            try:
+                fng_data = load_fear_greed()
+                if fng_data != data_storage.market_data.get('fear_greed'):
+                    data_storage.update_market_data({'fear_greed': fng_data})
+                    socketio.emit('market_update', {
+                        'market_data': data_storage.market_data,
+                        'strategy_status': data_storage.strategy_status,
+                    })
+                    if fng_data:
+                        print(f"[Web] F&G={fng_data.get('value')} "
+                              f"({fng_data.get('label')}) as_of={fng_data.get('as_of')} "
+                              f"source={fng_data.get('source')}")
+            except Exception as exc:  # noqa: BLE001
+                print(f"[Web] F&G 更新异常: {type(exc).__name__}: {exc}")
+
         now_ahr = time.time()
         if now_ahr - last_ahr_fetch >= ahr_interval:
             last_ahr_fetch = now_ahr
@@ -2444,6 +2635,7 @@ global_data = {
         'alpha_engine_valuation': alpha_engine_valuation,
         'alpha_engine_ma': alpha_engine_ma,
         'ahr999': None,
+        'fear_greed': None,
         'btc_price': 58000.0
     },
     'post_feed': load_promo_posts()
@@ -2950,6 +3142,8 @@ class DataStorage:
             self.market_data['alpha_engine_ma'] = data['alpha_engine_ma']
         if 'ahr999' in data:
             self.market_data['ahr999'] = data['ahr999']
+        if 'fear_greed' in data:
+            self.market_data['fear_greed'] = data['fear_greed']
         if 'btc_price' in data:
             self.market_data['btc_price'] = data['btc_price']
         self.update_global_data()
@@ -3303,7 +3497,8 @@ def update_spot_data():
 @app.route('/')
 def index():
     return render_template('index.html', health=load_strategy_health(),
-                           grid=load_grid_state(), margin=load_margin_state())
+                           grid=load_grid_state(), margin=load_margin_state(),
+                           fear_greed=load_fear_greed())
 
 
 @app.route('/api/grid_status', methods=['GET'])
@@ -3316,6 +3511,12 @@ def api_grid_status():
 def api_margin_status():
     """保证金风险监控只读状态（登录门禁由 before_request 统一保护）。"""
     return jsonify(load_margin_state())
+
+
+@app.route('/api/fear_greed', methods=['GET'])
+def api_fear_greed():
+    """加密恐惧与贪婪指数（Alternative.me，只读；登录门禁统一保护）。"""
+    return jsonify(load_fear_greed() or {})
 
 
 @app.route('/skeleton')
