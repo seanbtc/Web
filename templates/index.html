@@ -284,7 +284,7 @@
         #btc-price.price-pill {
             background: rgba(255, 255, 255, 0.82);
         }
-        /* 估值档位: 0–0.2 极度低估 / 0.2–0.5 轻度低估 / 0.5–0.8 轻度高估 / 0.8–1 极度高估 */
+        /* 估值档位: 10 档 (极端投降 / 深度低估 / ... / 泡沫狂热) */
         #alpha-valuation.val-deep-low {
             background: linear-gradient(135deg, rgba(22, 163, 74, 0.22), rgba(16, 185, 129, 0.30)) !important;
             color: #14532d !important;
@@ -1819,7 +1819,7 @@
                 <div class="flex items-center mr-6">
                     <span class="text-sm font-semibold text-gray-700 mr-2">市场估值:</span>
                     <span class="px-3 py-1 rounded-full text-sm font-semibold flex items-center val-na" id="alpha-valuation"
-                          title="AlphaEngine 0–1 市场估值 (0=极度低估, 1=极度高估) · 数据不可用">— 未评估</span>
+                          title="AlphaEngine 0–1 市场估值 (10 档) · 数据不可用">— 未评估</span>
                 </div>
                 <div class="flex items-center">
                     <span class="text-sm font-semibold text-gray-700 mr-2">价格:</span>
@@ -4218,10 +4218,16 @@
                 if (valuationKey !== _marketRenderMemo.valuation) {
                     _marketRenderMemo.valuation = valuationKey;
                     const bandClassMap = {
-                        '极度低估': 'val-deep-low',
-                        '轻度低估': 'val-low',
-                        '轻度高估': 'val-high',
-                        '极度高估': 'val-deep-high'
+                        '极端投降': 'val-deep-low',
+                        '深度低估': 'val-deep-low',
+                        '低估': 'val-low',
+                        '偏低估': 'val-low',
+                        '中性偏下': 'val-low',
+                        '中性偏上': 'val-high',
+                        '偏贵': 'val-high',
+                        '高估': 'val-high',
+                        '极度高估': 'val-deep-high',
+                        '泡沫/狂热': 'val-deep-high'
                     };
                     const bandClass = valuationValid
                         ? (bandClassMap[valuationLabel] || 'val-na')
@@ -4230,7 +4236,7 @@
                     valuationEl.textContent = valuationValid
                         ? `${valuationValue.toFixed(2)} ${valuationLabel}`
                         : '— 未评估';
-                    const parts = ['AlphaEngine 市场估值 (0=极度低估, 1=极度高估)'];
+                    const parts = ['AlphaEngine 市场估值 (10 档, 0=极端投降, 1=泡沫/狂热)'];
                     if (valuationValid) {
                         parts.push(`估值 ${valuationValue.toFixed(2)}`);
                         if (valuationLabel) parts.push(valuationLabel);

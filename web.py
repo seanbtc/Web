@@ -78,7 +78,10 @@ AHR999_DAILY_REFRESH_UTC_MINUTE = 5
 _ahr999_last_good = None
 
 
-ALPHA_ENGINE_VALUATION_LABELS = ('极度低估', '轻度低估', '轻度高估', '极度高估')
+ALPHA_ENGINE_VALUATION_LABELS = (
+    '极端投降', '深度低估', '低估', '偏低估', '中性偏下',
+    '中性偏上', '偏贵', '高估', '极度高估', '泡沫/狂热')
+
 ALPHA_ENGINE_VALUATION_UNAVAILABLE = '未评估'
 
 # 加密恐惧与贪婪指数：Alternative.me 综合指数（0=极度恐惧，100=极度贪婪）。
@@ -286,18 +289,16 @@ def load_alpha_engine_valuation():
 
 
 def valuation_band_label(value):
-    """0–1 估值 → 中文档位 (与 AlphaEngine/Web 口径一致, 左闭右开)。"""
+    """0–1 估值 → 10 档状态 (与 AlphaEngine 口径一致, 左闭右开)。"""
     try:
         number = float(value)
     except (TypeError, ValueError):
         return ALPHA_ENGINE_VALUATION_UNAVAILABLE
-    if number < 0.2:
-        return '极度低估'
-    if number < 0.5:
-        return '轻度低估'
-    if number < 0.8:
-        return '轻度高估'
-    return '极度高估'
+    for index, label in enumerate(ALPHA_ENGINE_VALUATION_LABELS):
+        upper = (index + 1) / 10
+        if number < upper or index == len(ALPHA_ENGINE_VALUATION_LABELS) - 1:
+            return label
+    return ALPHA_ENGINE_VALUATION_LABELS[-1]
 
 
 def load_alpha_engine_ma():

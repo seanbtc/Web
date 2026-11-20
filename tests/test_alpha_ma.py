@@ -41,23 +41,30 @@ def test_load_valuation_missing_file_returns_none(state_file):
 
 
 def test_load_valuation_valid(state_file):
-    _write_state(state_file, _valuation_state(0.62, '轻度高估'))
+    _write_state(state_file, _valuation_state(0.62, '偏贵'))
 
     assert web.load_alpha_engine_valuation() == {
-        'value': 0.62, 'label': '轻度高估', 'confidence': 'high',
+        'value': 0.62, 'label': '偏贵', 'confidence': 'high',
         'updated_at': '2026-11-10T04:25:00Z'}
 
 
 def test_load_valuation_missing_label_derived_from_value(state_file):
     _write_state(state_file, _valuation_state(0.18, confidence=''))
 
-    assert web.load_alpha_engine_valuation()['label'] == '极度低估'
+    assert web.load_alpha_engine_valuation()['label'] == '深度低估'
 
 
 @pytest.mark.parametrize('value,label', [
-    (0.0, '极度低估'), (0.19, '极度低估'), (0.2, '轻度低估'),
-    (0.49, '轻度低估'), (0.5, '轻度高估'), (0.79, '轻度高估'),
-    (0.8, '极度高估'), (1.0, '极度高估'),
+    (0.0, '极端投降'), (0.09, '极端投降'),
+    (0.1, '深度低估'), (0.19, '深度低估'),
+    (0.2, '低估'), (0.29, '低估'),
+    (0.3, '偏低估'), (0.39, '偏低估'),
+    (0.4, '中性偏下'), (0.49, '中性偏下'),
+    (0.5, '中性偏上'), (0.59, '中性偏上'),
+    (0.6, '偏贵'), (0.69, '偏贵'),
+    (0.7, '高估'), (0.79, '高估'),
+    (0.8, '极度高估'), (0.89, '极度高估'),
+    (0.9, '泡沫/狂热'), (1.0, '泡沫/狂热'),
 ])
 def test_valuation_band_label_boundaries(value, label):
     assert web.valuation_band_label(value) == label
@@ -109,7 +116,7 @@ def test_load_ma_valid_summary(state_file):
 
 
 def test_load_ma_without_key_returns_none(state_file):
-    _write_state(state_file, _valuation_state(0.62, '轻度高估'))
+    _write_state(state_file, _valuation_state(0.62, '偏贵'))
     assert web.load_alpha_engine_ma() is None
 
 
@@ -152,7 +159,7 @@ def test_load_ma_tolerates_corrupt_json_and_non_dict_state(state_file):
 # --- alpha_engine_update_changed: 变化检测 --------------------------------------
 
 _BASE_MA = {'available': True, 'zone': '强势多头区', 'as_of': '2026-09-21'}
-_BASE_VALUATION = {'value': 0.62, 'label': '轻度高估', 'confidence': 'high',
+_BASE_VALUATION = {'value': 0.62, 'label': '偏贵', 'confidence': 'high',
                    'updated_at': '2026-11-10T04:25:00Z'}
 
 
@@ -170,7 +177,7 @@ def test_update_changed_false_when_nothing_changes():
 
 def test_update_changed_on_valuation():
     assert web.alpha_engine_update_changed(
-        _market_data(), dict(_BASE_VALUATION, value=0.18, label='极度低估'),
+        _market_data(), dict(_BASE_VALUATION, value=0.18, label='深度低估'),
         _BASE_MA) is True
     # 值相同但置信/更新时间变化也算变化
     assert web.alpha_engine_update_changed(
